@@ -152,24 +152,33 @@ export async function refreshAccessToken(
 export async function fetchChannelInfo(
   accessToken: string
 ): Promise<YouTubeChannel> {
-  const response = await axios.get<{ items: YouTubeChannel[] }>(
-    `${YOUTUBE_API_BASE}/channels`,
-    {
-      params: {
-        part: 'snippet,statistics',
-        mine: true,
-      },
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+  try {
+    const response = await axios.get<{ items: YouTubeChannel[] }>(
+      `${YOUTUBE_API_BASE}/channels`,
+      {
+        params: {
+          part: 'snippet,statistics',
+          mine: true,
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.data || !response.data.items || response.data.items.length === 0) {
+      console.error('Unexpected API response:', response.data);
+      throw new Error('No channel found for this account');
     }
-  );
 
-  if (!response.data.items || response.data.items.length === 0) {
-    throw new Error('No channel found for this account');
+    return response.data.items[0];
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('YouTube API error fetching channel info:', error.response.data);
+      throw new Error(`YouTube API error: ${JSON.stringify(error.response.data)}`);
+    }
+    throw error;
   }
-
-  return response.data.items[0];
 }
 
 /**
