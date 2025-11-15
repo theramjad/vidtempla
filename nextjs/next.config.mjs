@@ -11,6 +11,13 @@ const config = {
   reactStrictMode: true,
   images: {
     remotePatterns: [
+      /* YouTube thumbnails */
+      {
+        hostname: "yt3.ggpht.com",
+      },
+      {
+        hostname: "i.ytimg.com",
+      },
       /* Prod */
       {
         hostname: "placehold.jp",

@@ -92,17 +92,25 @@ export async function exchangeCodeForTokens(
     grant_type: 'authorization_code',
   });
 
-  const response = await axios.post<OAuthTokenResponse>(
-    YOUTUBE_TOKEN_URL,
-    params.toString(),
-    {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    }
-  );
+  try {
+    const response = await axios.post<OAuthTokenResponse>(
+      YOUTUBE_TOKEN_URL,
+      params.toString(),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
+    );
 
-  return response.data;
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('OAuth token exchange error:', error.response.data);
+      throw new Error(`OAuth failed: ${JSON.stringify(error.response.data)}`);
+    }
+    throw error;
+  }
 }
 
 /**
