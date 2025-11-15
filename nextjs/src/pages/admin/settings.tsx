@@ -8,7 +8,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { createClient } from '@/utils/supabase/client';
+import { createClient } from '@/utils/supabase/component';
 import { Loader2 } from 'lucide-react';
 
 export default function SettingsPage() {
