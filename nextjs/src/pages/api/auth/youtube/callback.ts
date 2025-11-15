@@ -26,13 +26,13 @@ export default async function handler(
     if (error) {
       console.error('OAuth error:', error);
       return res.redirect(
-        '/admin/youtube/channels?error=' + encodeURIComponent(error as string)
+        '/admin/youtube?error=' + encodeURIComponent(error as string)
       );
     }
 
     if (!code || typeof code !== 'string') {
       return res.redirect(
-        '/admin/youtube/channels?error=no_code'
+        '/admin/youtube?error=no_code'
       );
     }
 
@@ -45,7 +45,7 @@ export default async function handler(
     } = await supabase.auth.getSession();
 
     if (!session) {
-      return res.redirect('/sign-in?redirect=/admin/youtube/channels');
+      return res.redirect('/sign-in?redirect=/admin/youtube');
     }
 
     // Exchange code for tokens
@@ -98,12 +98,12 @@ export default async function handler(
       });
     }
 
-    // Redirect to channels page with success message
-    return res.redirect('/admin/youtube/channels?success=true');
+    // Redirect to YouTube admin page with success message
+    return res.redirect('/admin/youtube?success=true');
   } catch (error) {
     console.error('Error in YouTube OAuth callback:', error);
     return res.redirect(
-      '/admin/youtube/channels?error=' +
+      '/admin/youtube?error=' +
         encodeURIComponent(
           error instanceof Error ? error.message : 'Unknown error'
         )
