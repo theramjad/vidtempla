@@ -84,15 +84,17 @@ export async function exchangeCodeForTokens(
     throw new Error('YouTube OAuth credentials not configured');
   }
 
+  const params = new URLSearchParams({
+    code,
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uri: redirectUri,
+    grant_type: 'authorization_code',
+  });
+
   const response = await axios.post<OAuthTokenResponse>(
     YOUTUBE_TOKEN_URL,
-    {
-      code,
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri,
-      grant_type: 'authorization_code',
-    },
+    params.toString(),
     {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -116,14 +118,16 @@ export async function refreshAccessToken(
     throw new Error('YouTube OAuth credentials not configured');
   }
 
+  const params = new URLSearchParams({
+    refresh_token: refreshToken,
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: 'refresh_token',
+  });
+
   const response = await axios.post<OAuthTokenResponse>(
     YOUTUBE_TOKEN_URL,
-    {
-      refresh_token: refreshToken,
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: 'refresh_token',
-    },
+    params.toString(),
     {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
