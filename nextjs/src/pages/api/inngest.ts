@@ -1,4 +1,3 @@
-import { aggregatorRun } from "@/inngest/aggregator";
 import { syncChannelVideos } from "@/inngest/youtube/syncChannelVideos";
 import { updateVideoDescriptions } from "@/inngest/youtube/updateVideoDescriptions";
 import { scheduledSync } from "@/inngest/youtube/scheduledSync";
@@ -12,9 +11,6 @@ export const config = {
 export default serve({
   client: inngestClient,
   functions: [
-    // Aggregator (legacy)
-    aggregatorRun,
-
     // YouTube background jobs
     syncChannelVideos,
     updateVideoDescriptions,
