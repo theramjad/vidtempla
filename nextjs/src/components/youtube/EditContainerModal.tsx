@@ -34,6 +34,7 @@ export default function EditContainerModal({
   const { toast } = useToast();
   const [name, setName] = useState('');
   const [templateIds, setTemplateIds] = useState<string[]>([]);
+  const [separator, setSeparator] = useState('\n\n');
 
   const { data: container } = api.admin.youtube.containers.list.useQuery(undefined, {
     enabled: open,
@@ -51,6 +52,7 @@ export default function EditContainerModal({
     if (container) {
       setName(container.name);
       setTemplateIds(container.template_order || []);
+      setSeparator(container.separator || '\n\n');
     }
   }, [container]);
 
@@ -89,6 +91,7 @@ export default function EditContainerModal({
         id: containerId,
         name,
         templateIds,
+        separator,
       });
 
       toast({
@@ -125,6 +128,49 @@ export default function EditContainerModal({
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Product Videos"
             />
+          </div>
+
+          {/* Template Separator */}
+          <div>
+            <Label htmlFor="separator">Template Separator</Label>
+            <div className="space-y-2">
+              <Input
+                id="separator"
+                value={separator}
+                onChange={(e) => setSeparator(e.target.value)}
+                placeholder="Enter separator (use \n for newline)"
+                className="font-mono text-sm"
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSeparator('\n\n')}
+                >
+                  Double Newline
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSeparator('\n\n\n')}
+                >
+                  Triple Newline
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSeparator('\n\n—————\n\n')}
+                >
+                  Line Separator
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This text will appear between templates. Use \n for line breaks.
+              </p>
+            </div>
           </div>
 
           {/* Template Order */}

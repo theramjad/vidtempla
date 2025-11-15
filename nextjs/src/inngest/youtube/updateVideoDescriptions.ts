@@ -77,7 +77,8 @@ export const updateVideoDescriptions = inngestClient.createFunction(
           container:containers(
             id,
             name,
-            template_order
+            template_order,
+            separator
           ),
           variables:video_variables(*)
         `
@@ -128,8 +129,12 @@ export const updateVideoDescriptions = inngestClient.createFunction(
             });
           }
 
-          // Build description
-          const newDescription = buildDescription(orderedTemplates, variablesMap);
+          // Build description with container's separator
+          const newDescription = buildDescription(
+            orderedTemplates,
+            variablesMap,
+            video.container.separator
+          );
 
           // Only update if description changed
           if (newDescription !== video.current_description) {

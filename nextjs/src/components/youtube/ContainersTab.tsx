@@ -44,7 +44,11 @@ export default function ContainersTab() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: '', templateIds: [] as string[] });
+  const [formData, setFormData] = useState({
+    name: '',
+    templateIds: [] as string[],
+    separator: '\n\n'
+  });
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { data: containers, isLoading, refetch } = api.admin.youtube.containers.list.useQuery();
@@ -68,7 +72,7 @@ export default function ContainersTab() {
         title: 'Container created',
         description: 'Your container has been created successfully.',
       });
-      setFormData({ name: '', templateIds: [] });
+      setFormData({ name: '', templateIds: [], separator: '\n\n' });
       setCreateDialogOpen(false);
       refetch();
     } catch (error) {
@@ -144,6 +148,47 @@ export default function ContainersTab() {
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="e.g., Product Videos"
                   />
+                </div>
+                <div>
+                  <Label htmlFor="separator">Template Separator</Label>
+                  <div className="space-y-2">
+                    <Input
+                      id="separator"
+                      value={formData.separator}
+                      onChange={(e) => setFormData({ ...formData, separator: e.target.value })}
+                      placeholder="Enter separator (use \n for newline)"
+                      className="font-mono text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFormData({ ...formData, separator: '\n\n' })}
+                      >
+                        Double Newline
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFormData({ ...formData, separator: '\n\n\n' })}
+                      >
+                        Triple Newline
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFormData({ ...formData, separator: '\n\n—————\n\n' })}
+                      >
+                        Line Separator
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      This text will appear between templates. Use \n for line breaks.
+                    </p>
+                  </div>
                 </div>
                 <div>
                   <Label>Select Templates</Label>

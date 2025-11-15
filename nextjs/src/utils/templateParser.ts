@@ -45,14 +45,16 @@ export function replaceVariables(
  * Builds final description by concatenating templates and replacing variables
  * @param templates - Array of template objects with content, in order
  * @param variables - Object mapping variable names to their values
+ * @param separator - Text to use between templates (default: '\n\n')
  * @returns Final description with all variables replaced
  */
 export function buildDescription(
   templates: Array<{ content: string }>,
-  variables: Record<string, string>
+  variables: Record<string, string>,
+  separator: string = '\n\n'
 ): string {
-  // Concatenate all template content
-  const combined = templates.map((t) => t.content).join('\n\n');
+  // Concatenate all template content with the specified separator
+  const combined = templates.map((t) => t.content).join(separator);
 
   // Replace all variables
   return replaceVariables(combined, variables);

@@ -138,6 +138,7 @@ export const youtubeRouter = createTRPCRouter({
         z.object({
           name: z.string().min(1),
           templateIds: z.array(z.string().uuid()),
+          separator: z.string().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -147,6 +148,7 @@ export const youtubeRouter = createTRPCRouter({
             user_id: ctx.user.id,
             name: input.name,
             template_order: input.templateIds,
+            separator: input.separator ?? '\n\n',
           })
           .select()
           .single();
@@ -162,12 +164,14 @@ export const youtubeRouter = createTRPCRouter({
           id: z.string().uuid(),
           name: z.string().min(1).optional(),
           templateIds: z.array(z.string().uuid()).optional(),
+          separator: z.string().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
         const updateData: any = {};
         if (input.name) updateData.name = input.name;
         if (input.templateIds) updateData.template_order = input.templateIds;
+        if (input.separator !== undefined) updateData.separator = input.separator;
 
         const { data, error } = await ctx.supabase
           .from('containers')
@@ -489,7 +493,7 @@ export const youtubeRouter = createTRPCRouter({
           .from('youtube_videos')
           .select(`
             *,
-            container:containers(id, template_order)
+            container:containers(id, template_order, separator)
           `)
           .eq('id', input.videoId)
           .single();
@@ -528,8 +532,12 @@ export const youtubeRouter = createTRPCRouter({
           variablesMap[v.variable_name] = v.variable_value || '';
         });
 
-        // Build description
-        const description = buildDescription(sortedTemplates, variablesMap);
+        // Build description with container's separator
+        const description = buildDescription(
+          sortedTemplates,
+          variablesMap,
+          video.container.separator
+        );
 
         return { description };
       }),
@@ -539,10 +547,7 @@ export const youtubeRouter = createTRPCRouter({
       .query(async ({ ctx, input }) => {
         const { data, error } = await ctx.supabase
           .from('description_history')
-          .select(`
-            *,
-            user:created_by(email)
-          `)
+          .select('*')
           .eq('video_id', input.videoId)
           .order('version_number', { ascending: false });
 
