@@ -1,283 +1,322 @@
-# Admin Dashboard Template
+# YouTube Description Manager
 
-A production-ready Next.js admin dashboard template for monitoring social media accounts and posts. Built with TypeScript, tRPC, Supabase, and Tailwind CSS with complete authentication and role-based access control.
+A powerful admin dashboard for managing YouTube video descriptions at scale using dynamic templates and variables.
 
-## 🚀 Features
+## Features
 
-- **Admin Dashboard**: Complete admin interface with role-based access control
-- **Twitter Monitoring**: Track multiple Twitter accounts and their posts
-- **Real-time Dashboard**: View accounts and posts in a clean, responsive interface
-- **Database Integration**: Powered by Supabase for reliable data storage
-- **Background Jobs**: Uses Inngest for scheduled tasks and data processing
-- **Authentication**: Built-in user authentication with Supabase Auth
-- **Admin Controls**: Secure admin-only sections with email-based authorization
-- **Type Safety**: Full TypeScript support with tRPC for end-to-end type safety
-- **Modern UI**: Beautiful, responsive interface built with Tailwind CSS and Radix UI
+### Core Functionality
+- **Multi-Channel Support**: Connect and manage multiple YouTube channels via OAuth
+- **Template System**: Create reusable description templates with `{{variable}}` placeholders
+- **Container Management**: Group templates together to create description structures
+- **Dynamic Variables**: Set unique variable values per video for personalized descriptions
+- **Version History**: Track all description changes with rollback capability
+- **Batch Updates**: Update multiple video descriptions simultaneously
 
-## 📋 Prerequisites
+### Key Features
+- 🔐 Secure OAuth authentication with YouTube
+- 📝 Powerful template editor with variable auto-detection
+- 🎯 Immutable video-to-container assignment for data integrity
+- 📊 Clean, intuitive admin dashboard
+- 🔄 Background job processing with Inngest
+- 🛡️ Row-level security with Supabase
+- 📱 Fully responsive UI
 
-Before setting up the project, ensure you have:
+## Tech Stack
 
-- Node.js 18+ installed
-- A Supabase account and project
-- RapidAPI account with access to Twitter API
-- (Optional) Inngest account for background jobs
+- **Frontend**: Next.js 15, React 18, TypeScript, Tailwind CSS
+- **UI Components**: Radix UI
+- **Backend**: tRPC for type-safe APIs
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth + YouTube OAuth
+- **Background Jobs**: Inngest
+- **API Integration**: YouTube Data API v3
 
-## 🛠️ Quick Setup
+## Getting Started
 
-### 1. Clone and Install
+### Prerequisites
+
+- Node.js 18+ and npm
+- Supabase account
+- Google Cloud account (for YouTube API)
+
+### 1. Clone the Repository
 
 ```bash
-git clone <your-repo-url>
-cd admin-dashboard-template
-cd nextjs
-npm install
+git clone https://github.com/yourusername/youtube-description-updater.git
+cd youtube-description-updater
 ```
 
-### 2. Environment Variables
-
-⚠️ **Important**: Copy the `.env.example` file to `.env.local` and update the values:
+### 2. Set Up Supabase
 
 ```bash
+# Install Supabase CLI if you haven't
+npm install -g supabase
+
+# Start local Supabase instance
+cd supabase
+supabase start
+```
+
+The migration files have already been created and will be applied automatically when you run `supabase start`.
+
+### 3. Set Up Google Cloud & YouTube API
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing one
+3. Enable the **YouTube Data API v3**
+4. Create OAuth 2.0 credentials:
+   - Application type: Web application
+   - Authorized redirect URIs: `http://localhost:3000/api/auth/youtube/callback`
+   - Note your Client ID and Client Secret
+
+### 4. Configure Environment Variables
+
+```bash
+cd nextjs
 cp .env.example .env.local
 ```
 
-Then edit `.env.local` with your actual values:
+Edit `.env.local` with your credentials:
 
 ```env
-# RapidAPI (Twitter monitoring)
-RAPID_API_KEY=your_rapidapi_key_here
+# YouTube OAuth (from Google Cloud Console)
+YOUTUBE_CLIENT_ID=your_google_oauth_client_id
+YOUTUBE_CLIENT_SECRET=your_google_oauth_client_secret
+YOUTUBE_REDIRECT_URI=http://localhost:3000/api/auth/youtube/callback
 
-# Supabase
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+# Encryption key (generate a random 32+ character string)
+ENCRYPTION_KEY=your_random_32_character_encryption_key_here
 
-# Inngest (Background jobs - required in production)
-INNGEST_EVENT_KEY=your_inngest_event_key
-INNGEST_SIGNING_KEY=your_inngest_signing_key
+# Supabase (from `supabase status` command)
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Inngest (for local development, use these defaults)
+INNGEST_EVENT_KEY=local
+INNGEST_SIGNING_KEY=local
 ```
 
-**Never commit your `.env.local` file to version control!** Use the provided `.env.example` as a template.
+### 5. Update Admin Email
 
-### 3. Admin Configuration
-
-🔐 **Critical**: Update the admin email addresses in the configuration file:
-
-1. Open `nextjs/src/config/app.ts`
-2. Update the `adminEmails` array with your email addresses:
+Edit `nextjs/src/config/app.ts` and add your email to the `adminEmails` array:
 
 ```typescript
-// Authentication settings
 auth: {
-  enableSignUp: true,
-  enablePasswordReset: true,
   adminEmails: [
-    "your-email@yourdomain.com", // Replace with your actual email
-    "admin@yourdomain.com",      // Add additional admin emails as needed
-  ] as readonly string[],
-},
+    "your-email@example.com", // Replace with your email
+  ],
+}
 ```
 
-⚠️ **Important**: Only users with emails in this array can access admin features. Make sure to add your email before deploying!
-
-### 4. Database Setup
-
-#### Create Supabase Tables
-
-Run these SQL commands in your Supabase SQL editor:
-
-```sql
--- Twitter accounts table
-CREATE TABLE twitter_accounts (
-  id BIGINT PRIMARY KEY,
-  username TEXT NOT NULL,
-  display_name TEXT,
-  followers_count INTEGER,
-  profile_image_url TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Tweets table
-CREATE TABLE tweets (
-  id TEXT PRIMARY KEY,
-  text TEXT NOT NULL,
-  account_id BIGINT REFERENCES twitter_accounts(id) ON DELETE CASCADE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  retweet_count INTEGER DEFAULT 0,
-  like_count INTEGER DEFAULT 0,
-  reply_count INTEGER DEFAULT 0,
-  quote_count INTEGER DEFAULT 0
-);
-
--- Indexes for better performance
-CREATE INDEX idx_tweets_account_id ON tweets(account_id);
-CREATE INDEX idx_tweets_created_at ON tweets(created_at DESC);
-CREATE INDEX idx_twitter_accounts_username ON twitter_accounts(username);
-```
-
-#### Enable Row Level Security (RLS)
-
-```sql
--- Enable RLS
-ALTER TABLE twitter_accounts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tweets ENABLE ROW LEVEL SECURITY;
-
--- Create policies (adjust based on your auth requirements)
-CREATE POLICY "Allow authenticated users to read twitter_accounts" 
-  ON twitter_accounts FOR SELECT 
-  TO authenticated 
-  USING (true);
-
-CREATE POLICY "Allow authenticated users to manage twitter_accounts" 
-  ON twitter_accounts FOR ALL 
-  TO authenticated 
-  USING (true);
-
-CREATE POLICY "Allow authenticated users to read tweets" 
-  ON tweets FOR SELECT 
-  TO authenticated 
-  USING (true);
-
-CREATE POLICY "Allow authenticated users to manage tweets" 
-  ON tweets FOR ALL 
-  TO authenticated 
-  USING (true);
-```
-
-### 4. API Keys Setup
-
-#### RapidAPI (Twitter)
-
-1. Sign up at [RapidAPI](https://rapidapi.com/)
-2. Subscribe to the [Twitter API v1.1](https://rapidapi.com/Glavier/api/twitter-api45)
-3. Copy your API key to the `RAPID_API_KEY` environment variable
-
-#### Supabase
-
-1. Create a project at [Supabase](https://supabase.com/)
-2. Go to Settings > API
-3. Copy the URL and anon key to your environment variables
-4. Copy the service role key (keep this secret!)
-
-### 5. Development Setup
-
-#### Generate Database Types
-
-To keep your TypeScript types in sync with your Supabase database:
+### 6. Install Dependencies and Run
 
 ```bash
-# Generate types for your database
+# Install dependencies
+cd nextjs
+npm install
+
+# Generate database types
+npx supabase gen types typescript --local > ../shared-types/database.types.ts
+
+# Start development server
+npm run dev
+```
+
+The app will be available at [http://localhost:3000](http://localhost:3000)
+
+## Usage Guide
+
+### 1. Sign Up / Sign In
+
+- Navigate to the app and sign up with the email you added to `adminEmails`
+- Verify your email via the Supabase inbucket at http://localhost:54324
+
+### 2. Connect YouTube Channel
+
+- Go to **Channels** tab
+- Click "Connect Channel"
+- Authorize with your YouTube account
+- Your channel will appear in the list
+
+### 3. Create Templates
+
+- Go to **Templates** tab
+- Click "Create Template"
+- Write your template using `{{variable_name}}` syntax:
+
+```
+Check out this amazing product!
+
+Price: {{price}}
+Discount Code: {{coupon_code}}
+Product Link: {{product_link}}
+
+Don't miss out!
+```
+
+- Variables are auto-detected and displayed
+
+### 4. Create Containers
+
+- Go to **Containers** tab
+- Click "Create Container"
+- Select templates to include (they'll be concatenated in order)
+- A container might include templates like: "Intro" + "Product Details" + "Call to Action"
+
+### 5. Assign Videos to Containers
+
+- Go to **Videos** tab
+- Find unassigned videos
+- Click "Assign" and select a container
+- **Important**: Container assignment is permanent and cannot be changed
+
+### 6. Edit Variables (Coming Soon)
+
+In a future update, you'll be able to:
+- Edit variable values for each video
+- Preview the final description
+- Update YouTube descriptions in bulk
+- View version history
+- Rollback to previous versions
+
+## Project Structure
+
+```
+youtube-description-updater/
+├── nextjs/                    # Main Next.js application
+│   ├── src/
+│   │   ├── components/        # React components
+│   │   │   ├── ui/           # Radix UI components
+│   │   │   ├── layout/       # Layout components
+│   │   │   └── youtube/      # YouTube feature components
+│   │   ├── config/           # App configuration
+│   │   ├── pages/            # Next.js pages
+│   │   │   ├── admin/        # Admin pages
+│   │   │   └── api/          # API routes
+│   │   ├── server/           # tRPC server and routers
+│   │   ├── utils/            # Utility functions
+│   │   └── lib/              # Library clients (YouTube API)
+│   └── package.json
+├── shared-types/             # Shared TypeScript types
+│   └── database.types.ts     # Generated Supabase types
+├── supabase/                # Supabase configuration
+│   ├── migrations/          # Database migrations
+│   └── schemas/             # Schema definition files
+└── PLAN.md                  # Detailed implementation plan
+```
+
+## Database Schema
+
+### Core Tables
+
+- **youtube_channels**: Connected YouTube channels with OAuth tokens
+- **templates**: Description templates with variables
+- **containers**: Collections of templates in specific order
+- **youtube_videos**: Video metadata and container assignments
+- **video_variables**: Variable values per video-template combination
+- **description_history**: Version history for all description changes
+
+### Key Relationships
+
+- Videos belong to ONE container (immutable)
+- Containers can have MULTIPLE templates
+- Templates can be used in MULTIPLE containers
+- Variables are unique per video + template combination
+
+## API Routes
+
+### tRPC Procedures
+
+All API routes are type-safe via tRPC:
+
+- **Channels**: list, initiateOAuth, disconnect, syncVideos
+- **Templates**: list, create, update, delete, parseVariables
+- **Containers**: list, create, update, delete
+- **Videos**: list, unassigned, assignToContainer, getVariables, updateVariables, preview, getHistory, rollback
+
+## Security
+
+- **Admin-Only Access**: All routes protected by email-based admin check
+- **Row-Level Security**: Supabase RLS ensures users only see their data
+- **Token Encryption**: OAuth tokens encrypted using AES-256-GCM
+- **Immutable Assignments**: Container assignments cannot be changed once set
+
+## Development
+
+### Running Migrations
+
+```bash
+cd supabase
+supabase migration up
+```
+
+### Generating Types
+
+```bash
 npx supabase gen types typescript --local > ../shared-types/database.types.ts
 ```
 
-#### Run the Application
+### Adding New Features
 
-```bash
-# Development
-npm run dev
+1. Update schema files in `supabase/schemas/`
+2. Generate migration: `supabase db diff -f migration_name`
+3. Apply migration: `supabase migration up`
+4. Regenerate types
+5. Update tRPC procedures in `nextjs/src/server/api/routers/admin/youtube.ts`
+6. Create/update UI components
 
-# Production build
-npm run build
-npm run start
-```
+## Next Steps
 
-Visit [http://localhost:3000](http://localhost:3000) and you'll be redirected to the admin dashboard.
+The following features are planned for future updates:
 
-## 🎯 Usage
+- [ ] Variable editing UI with bulk update capability
+- [ ] Preview modal showing final description
+- [ ] Version history viewer with diff comparison
+- [ ] Rollback functionality
+- [ ] Inngest background jobs for:
+  - Syncing channel videos
+  - Updating YouTube descriptions
+  - Scheduled periodic syncs
+- [ ] Advanced variable types (rich text, dropdowns, etc.)
+- [ ] Template inheritance and nesting
+- [ ] Conditional logic in templates
+- [ ] A/B testing for descriptions
+- [ ] Analytics and success tracking
 
-### Adding Twitter Accounts
+## Troubleshooting
 
-1. Navigate to the Twitter Monitoring dashboard
-2. Click "Add Account" 
-3. Enter a Twitter username (with or without @)
-4. The system will fetch account information and add it to monitoring
+### "Channel tokens not found" error
+- Reconnect your YouTube channel
+- Check that OAuth tokens are properly encrypted
 
-### Viewing Posts
+### Videos not showing up
+- Click "Sync Now" on your channel
+- Check Supabase logs for errors
+- Ensure YouTube API quota is not exceeded
 
-1. Go to the "Posts" tab in the Twitter dashboard
-2. View all posts from monitored accounts
-3. Filter by specific accounts if needed
+### Type errors after schema changes
+- Regenerate TypeScript types: `npx supabase gen types typescript --local > ../shared-types/database.types.ts`
+- Restart Next.js dev server
 
-### Configuration
-
-The app includes a configuration file at `src/config/app.ts` where you can:
-
-- Update branding and app name
-- Configure enabled features
-- Adjust API endpoints
-
-## 🔧 Customization
-
-### Adding New Social Platforms
-
-1. Add platform configuration to `src/config/app.ts`
-2. Create new database tables for the platform
-3. Add API routes in `src/server/api/routers/admin/`
-4. Create UI components in `src/components/[platform]/`
-5. Update the dashboard sidebar navigation
-
-### Styling
-
-The app uses Tailwind CSS. Customize the theme by editing:
-- `tailwind.config.ts` - Global theme configuration
-- `src/styles/globals.css` - Base styles
-- Component-level styling throughout the app
-
-### Database Schema
-
-Modify the database schema by:
-1. Adding new tables in Supabase
-2. Updating types if using TypeScript
-3. Adding new tRPC procedures for data access
-
-## 📚 Tech Stack
-
-- **Frontend**: Next.js 15, React 18, TypeScript
-- **Styling**: Tailwind CSS, Radix UI
-- **Backend**: tRPC, Next.js API Routes
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth
-- **Background Jobs**: Inngest
-- **Deployment**: Vercel-ready
-
-## 🚀 Deployment
-
-### Vercel (Recommended)
-
-1. Push your code to GitHub
-2. Connect your repository to Vercel
-3. Add environment variables in Vercel dashboard
-4. Deploy!
-
-### Other Platforms
-
-The app can be deployed to any platform that supports Next.js:
-- Netlify
-- Railway
-- DigitalOcean App Platform
-- Self-hosted with Docker
-
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+4. Submit a pull request
 
-## 📄 License
+## License
 
-This project is open source and available under the MIT License.
+MIT License - feel free to use this project for your own purposes!
 
-## 🆘 Support
+## Support
 
-If you encounter any issues:
+For issues and questions:
+- Check the [PLAN.md](./PLAN.md) file for implementation details
+- Review the [CLAUDE.md](./CLAUDE.md) file for development guidelines
+- Open an issue on GitHub
 
-1. Check the environment variables are correctly set
-2. Verify database tables are created
-3. Ensure API keys have proper permissions
-4. Check the console for error messages
+---
 
-For additional help, please open an issue in the repository.
+**Built with [Claude Code](https://claude.com/claude-code)**
