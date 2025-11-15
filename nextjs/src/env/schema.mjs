@@ -9,9 +9,6 @@ export const serverSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]),
   CLOUDFLARE_TUNNEL_URL: z.string().optional().default("http://localhost:3000"),
 
-  // RapidAPI (for Twitter monitoring - optional, not needed for YouTube features)
-  RAPID_API_KEY: z.string().optional(),
-
   // Supabase
   SUPABASE_SERVICE_ROLE_KEY: z.string(),
 
@@ -28,9 +25,6 @@ export const serverSchema = z.object({
 export const serverEnv = {
   NODE_ENV: process.env.NODE_ENV,
   CLOUDFLARE_TUNNEL_URL: process.env.CLOUDFLARE_TUNNEL_URL,
-
-  // RapidAPI (for Twitter monitoring)
-  RAPID_API_KEY: process.env.RAPID_API_KEY,
 
   // Supabase
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
