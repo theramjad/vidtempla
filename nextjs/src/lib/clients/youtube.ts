@@ -190,7 +190,7 @@ export async function fetchChannelVideos(
   pageToken?: string
 ): Promise<{ videos: YouTubeVideo[]; nextPageToken?: string }> {
   const response = await axios.get<{
-    items: YouTubeVideo[];
+    items: Array<{ id: { videoId: string }; snippet: any }>;
     nextPageToken?: string;
   }>(`${YOUTUBE_API_BASE}/search`, {
     params: {
@@ -207,7 +207,7 @@ export async function fetchChannelVideos(
   });
 
   // Fetch full video details including description
-  const videoIds = response.data.items.map((item) => item.id).join(',');
+  const videoIds = response.data.items.map((item) => item.id.videoId).join(',');
 
   const detailsResponse = await axios.get<{ items: YouTubeVideo[] }>(
     `${YOUTUBE_API_BASE}/videos`,

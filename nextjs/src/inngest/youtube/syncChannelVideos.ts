@@ -109,7 +109,7 @@ export const syncChannelVideos = inngestClient.createFunction(
           pageToken
         );
 
-        videos.push(...response.items);
+        videos.push(...response.videos);
         pageToken = response.nextPageToken;
       } while (pageToken);
 
@@ -118,7 +118,7 @@ export const syncChannelVideos = inngestClient.createFunction(
 
     // Step 5: Sync videos to database
     await step.run('sync-videos-to-db', async () => {
-      const videoIds = allVideos.map((v) => v.id.videoId);
+      const videoIds = allVideos.map((v) => v.id);
 
       // Get existing videos in database
       const { data: existingVideos } = await supabase
@@ -132,7 +132,7 @@ export const syncChannelVideos = inngestClient.createFunction(
 
       // Process each video
       for (const ytVideo of allVideos) {
-        const videoId = ytVideo.id.videoId;
+        const videoId = ytVideo.id;
         const isNewVideo = !existingVideoIds.has(videoId);
 
         if (isNewVideo) {
@@ -186,7 +186,7 @@ export const syncChannelVideos = inngestClient.createFunction(
 
       return {
         total: allVideos.length,
-        new: allVideos.filter((v) => !existingVideoIds.has(v.id.videoId)).length,
+        new: allVideos.filter((v) => !existingVideoIds.has(v.id)).length,
         deleted: videosToDelete.length,
       };
     });
