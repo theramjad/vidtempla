@@ -296,8 +296,8 @@ export const youtubeRouter = createTRPCRouter({
     list: adminProcedure
       .input(
         z.object({
-          channelId: z.string().uuid().optional(),
-          containerId: z.string().uuid().optional(),
+          channelId: z.union([z.string().uuid(), z.literal('')]).optional(),
+          containerId: z.union([z.string().uuid(), z.literal('')]).optional(),
           search: z.string().optional(),
         })
       )
@@ -311,11 +311,11 @@ export const youtubeRouter = createTRPCRouter({
           `)
           .eq('channel.user_id', ctx.user.id);
 
-        if (input.channelId) {
+        if (input.channelId && input.channelId !== '') {
           query = query.eq('channel_id', input.channelId);
         }
 
-        if (input.containerId) {
+        if (input.containerId && input.containerId !== '') {
           query = query.eq('container_id', input.containerId);
         }
 
@@ -588,7 +588,33 @@ export const youtubeRouter = createTRPCRouter({
           .eq('id', input.videoId);
 
         // Trigger Inngest event to update on YouTube
-        // Placeholder for now
+        await inngestClient.send({
+          name: 'youtube/videos.update',
+          data: {
+            videoIds: [input.videoId],
+            userId: ctx.user.id,
+          },
+        });
+
+        return { success: true };
+      }),
+
+    updateToYouTube: adminProcedure
+      .input(
+        z.object({
+          videoIds: z.array(z.string().uuid()),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        // Trigger Inngest event to update these videos
+        await inngestClient.send({
+          name: 'youtube/videos.update',
+          data: {
+            videoIds: input.videoIds,
+            userId: ctx.user.id,
+          },
+        });
+
         return { success: true };
       }),
   }),

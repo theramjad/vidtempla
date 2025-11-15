@@ -33,7 +33,6 @@ export default function PreviewModal({
   onSuccess,
 }: PreviewModalProps) {
   const { toast } = useToast();
-  const [isUpdating, setIsUpdating] = useState(false);
 
   const {
     data: preview,
@@ -41,23 +40,13 @@ export default function PreviewModal({
     refetch,
   } = api.admin.youtube.videos.preview.useQuery({ videoId }, { enabled: open });
 
+  const updateMutation = api.admin.youtube.videos.updateToYouTube.useMutation();
+
   const handleUpdateToYouTube = async () => {
     if (!preview?.description) return;
 
-    setIsUpdating(true);
     try {
-      // Trigger Inngest event to update this video
-      await fetch('/api/inngest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'youtube/videos.update',
-          data: {
-            videoIds: [videoId],
-            userId: 'current-user-id', // This will be handled properly in the backend
-          },
-        }),
-      });
+      await updateMutation.mutateAsync({ videoIds: [videoId] });
 
       toast({
         title: 'Update queued',
@@ -75,8 +64,6 @@ export default function PreviewModal({
             : 'Failed to queue description update',
         variant: 'destructive',
       });
-    } finally {
-      setIsUpdating(false);
     }
   };
 
@@ -141,10 +128,10 @@ export default function PreviewModal({
           <Button
             onClick={handleUpdateToYouTube}
             disabled={
-              isLoading || !preview?.description || isUpdating
+              isLoading || !preview?.description || updateMutation.isPending
             }
           >
-            {isUpdating ? (
+            {updateMutation.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Updating...
