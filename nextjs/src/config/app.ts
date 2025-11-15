@@ -7,15 +7,15 @@
 
 export const appConfig = {
   // Basic app information
-  name: "Social Monitor",
-  description: "Monitor and track social media accounts and posts",
+  name: "YouTube Description Manager",
+  description: "Manage YouTube video descriptions with dynamic templates",
   supportEmail: "support@yourdomain.com",
 
   // Branding
   brand: {
-    name: "Social Monitor",
-    shortName: "SM",
-    tagline: "Monitor social media with ease",
+    name: "YouTube Description Manager",
+    shortName: "YT",
+    tagline: "Manage YouTube descriptions with ease",
   },
 
   // Authentication settings
@@ -29,13 +29,13 @@ export const appConfig = {
 
   // Dashboard configuration
   dashboard: {
-    defaultRoute: "/admin/twitter",
+    defaultRoute: "/admin/youtube",
     showSettings: true,
     navigation: [
       {
-        title: "Twitter Monitoring",
+        title: "YouTube Manager",
         subItems: [
-          { title: "Dashboard", url: "/admin/twitter" },
+          { title: "Dashboard", url: "/admin/youtube" },
         ],
       },
       {
