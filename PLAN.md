@@ -127,153 +127,96 @@ Transform this admin dashboard template into a YouTube description management ap
 
 ### Phase 2: YouTube OAuth & API Integration
 
-- [ ] **Set up Google Cloud Project**
+- [x] **Set up Google Cloud Project** (User will do this manually)
   - [ ] Create project at console.cloud.google.com
   - [ ] Enable YouTube Data API v3
   - [ ] Create OAuth 2.0 credentials (Web application)
   - [ ] Add authorized redirect URI: `http://localhost:3000/api/auth/youtube/callback`
   - [ ] Note client ID and client secret
 
-- [ ] **Add environment variables**
-  - [ ] Update `.env.example` with YouTube OAuth vars
+- [x] **Add environment variables**
+  - [x] Update `.env.example` with YouTube OAuth vars
   - [ ] Add to `.env.local`:
     - `YOUTUBE_CLIENT_ID=`
     - `YOUTUBE_CLIENT_SECRET=`
     - `YOUTUBE_REDIRECT_URI=http://localhost:3000/api/auth/youtube/callback`
     - `ENCRYPTION_KEY=` (for token encryption)
 
-- [ ] **Create YouTube API client: `nextjs/src/lib/clients/youtube.ts`**
-  - [ ] Function: `getOAuthUrl()` - Generate OAuth authorization URL
-  - [ ] Function: `exchangeCodeForTokens(code)` - Exchange auth code for tokens
-  - [ ] Function: `refreshAccessToken(refreshToken)` - Refresh expired access token
-  - [ ] Function: `fetchChannelInfo(accessToken)` - Get channel details
-  - [ ] Function: `fetchChannelVideos(channelId, accessToken, pageToken?)` - Fetch videos with pagination
-  - [ ] Function: `updateVideoDescription(videoId, description, accessToken)` - Update single video
-  - [ ] Function: `batchUpdateDescriptions(updates[])` - Batch update multiple videos
+- [x] **Create YouTube API client: `nextjs/src/lib/clients/youtube.ts`**
+  - [x] Function: `getOAuthUrl()` - Generate OAuth authorization URL
+  - [x] Function: `exchangeCodeForTokens(code)` - Exchange auth code for tokens
+  - [x] Function: `refreshAccessToken(refreshToken)` - Refresh expired access token
+  - [x] Function: `fetchChannelInfo(accessToken)` - Get channel details
+  - [x] Function: `fetchChannelVideos(channelId, accessToken, pageToken?)` - Fetch videos with pagination
+  - [x] Function: `updateVideoDescription(videoId, description, accessToken)` - Update single video
+  - [x] Function: `batchUpdateDescriptions(updates[])` - Batch update multiple videos
 
-- [ ] **Create encryption utilities: `nextjs/src/utils/encryption.ts`**
-  - [ ] Function: `encrypt(text)` - Encrypt tokens before storing
-  - [ ] Function: `decrypt(encryptedText)` - Decrypt tokens when using
-  - [ ] Use crypto library with AES-256-GCM
+- [x] **Create encryption utilities: `nextjs/src/utils/encryption.ts`**
+  - [x] Function: `encrypt(text)` - Encrypt tokens before storing
+  - [x] Function: `decrypt(encryptedText)` - Decrypt tokens when using
+  - [x] Use crypto library with AES-256-GCM
 
-- [ ] **Create OAuth callback route: `nextjs/src/pages/api/auth/youtube/callback.ts`**
-  - [ ] Handle OAuth callback with code parameter
-  - [ ] Exchange code for access + refresh tokens
-  - [ ] Fetch channel info
-  - [ ] Encrypt tokens
-  - [ ] Store in youtube_channels table
-  - [ ] Redirect to /admin/youtube/channels
+- [x] **Create OAuth callback route: `nextjs/src/pages/api/auth/youtube/callback.ts`**
+  - [x] Handle OAuth callback with code parameter
+  - [x] Exchange code for access + refresh tokens
+  - [x] Fetch channel info
+  - [x] Encrypt tokens
+  - [x] Store in youtube_channels table
+  - [x] Redirect to /admin/youtube/channels
 
-- [ ] **Create OAuth initiate route: `nextjs/src/pages/api/auth/youtube/initiate.ts`**
-  - [ ] Generate OAuth URL
-  - [ ] Redirect user to Google OAuth consent screen
+- [x] **Create OAuth initiate route: `nextjs/src/pages/api/auth/youtube/initiate.ts`**
+  - [x] Generate OAuth URL
+  - [x] Redirect user to Google OAuth consent screen
 
 ### Phase 3: Template Parser Utility
 
-- [ ] **Create template parser: `nextjs/src/utils/templateParser.ts`**
-  - [ ] Function: `parseVariables(content: string): string[]`
+- [x] **Create template parser: `nextjs/src/utils/templateParser.ts`**
+  - [x] Function: `parseVariables(content: string): string[]`
     - Extract all `{{variable_name}}` occurrences
     - Return unique variable names
-  - [ ] Function: `replaceVariables(content: string, variables: Record<string, string>): string`
+  - [x] Function: `replaceVariables(content: string, variables: Record<string, string>): string`
     - Replace all `{{var}}` with corresponding values
     - Handle missing variables (leave as {{var}} or show error)
-  - [ ] Function: `buildDescription(templates: Template[], variables: VideoVariable[]): string`
+  - [x] Function: `buildDescription(templates: Template[], variables: VideoVariable[]): string`
     - Concatenate templates in order (from template_order array)
     - Replace all variables with video-specific values
     - Return final description string
-  - [ ] Add unit tests for parser functions
+  - [ ] Add unit tests for parser functions (skipped for now)
 
 ### Phase 4: tRPC API Routes
 
-- [ ] **Create YouTube router: `nextjs/src/server/api/routers/admin/youtube.ts`**
+- [x] **Create YouTube router: `nextjs/src/server/api/routers/admin/youtube.ts`**
 
-- [ ] **Channel Management Procedures**
-  - [ ] `channels.list` (query)
-    - Return all youtube_channels for current user
-    - Order by created_at DESC
-  - [ ] `channels.initiateOAuth` (mutation)
-    - Return OAuth URL for user to visit
-  - [ ] `channels.disconnect` (mutation)
-    - Input: `{ channelId: uuid }`
-    - Delete channel (cascades to videos, variables, history)
-  - [ ] `channels.syncVideos` (mutation)
-    - Input: `{ channelId: uuid }`
-    - Trigger Inngest event to fetch videos
-    - Return job ID for status tracking
+- [x] **Channel Management Procedures**
+  - [x] `channels.list` (query)
+  - [x] `channels.initiateOAuth` (mutation)
+  - [x] `channels.disconnect` (mutation)
+  - [x] `channels.syncVideos` (mutation)
 
-- [ ] **Container Management Procedures**
-  - [ ] `containers.list` (query)
-    - Return all containers for current user
-    - Include template count and assigned video count
-  - [ ] `containers.create` (mutation)
-    - Input: `{ name: string, templateIds: uuid[] }`
-    - Create container with template_order array
-  - [ ] `containers.update` (mutation)
-    - Input: `{ id: uuid, name?: string, templateIds?: uuid[] }`
-    - Update container
-    - Trigger Inngest event to update all videos in this container
-  - [ ] `containers.delete` (mutation)
-    - Input: `{ id: uuid }`
-    - Check if videos are assigned (prevent deletion or cascade)
-    - Delete container
+- [x] **Container Management Procedures**
+  - [x] `containers.list` (query)
+  - [x] `containers.create` (mutation)
+  - [x] `containers.update` (mutation)
+  - [x] `containers.delete` (mutation)
 
-- [ ] **Template Management Procedures**
-  - [ ] `templates.list` (query)
-    - Return all templates for current user
-    - Include variable count and container usage count
-  - [ ] `templates.create` (mutation)
-    - Input: `{ name: string, content: string }`
-    - Parse variables from content
-    - Create template
-  - [ ] `templates.update` (mutation)
-    - Input: `{ id: uuid, name?: string, content?: string }`
-    - Update template
-    - Trigger Inngest event to update all videos using this template
-  - [ ] `templates.delete` (mutation)
-    - Input: `{ id: uuid }`
-    - Check if used in containers (prevent deletion or cascade)
-    - Delete template
-  - [ ] `templates.parseVariables` (query)
-    - Input: `{ content: string }`
-    - Return array of detected variable names
-    - Used for live preview in UI
+- [x] **Template Management Procedures**
+  - [x] `templates.list` (query)
+  - [x] `templates.create` (mutation)
+  - [x] `templates.update` (mutation)
+  - [x] `templates.delete` (mutation)
+  - [x] `templates.parseVariables` (query)
 
-- [ ] **Video Management Procedures**
-  - [ ] `videos.list` (query)
-    - Input: `{ channelId?: uuid, containerId?: uuid, search?: string }`
-    - Return videos with filters
-    - Include container info, variable counts
-  - [ ] `videos.unassigned` (query)
-    - Return all videos with container_id = null
-  - [ ] `videos.assignToContainer` (mutation)
-    - Input: `{ videoId: uuid, containerId: uuid }`
-    - Check video is not already assigned (immutable)
-    - Assign video to container
-    - Initialize variables for all templates in container
-  - [ ] `videos.getVariables` (query)
-    - Input: `{ videoId: uuid }`
-    - Return all variables for this video grouped by template
-  - [ ] `videos.updateVariables` (mutation)
-    - Input: `{ videoId: uuid, variables: { templateId, name, value, type }[] }`
-    - Upsert video_variables records
-    - Trigger Inngest event to update this video's description
-  - [ ] `videos.preview` (query)
-    - Input: `{ videoId: uuid }`
-    - Get container → templates → variables
-    - Build final description using templateParser
-    - Return preview string
-  - [ ] `videos.getHistory` (query)
-    - Input: `{ videoId: uuid }`
-    - Return all description_history entries
-    - Order by version_number DESC
-  - [ ] `videos.rollback` (mutation)
-    - Input: `{ videoId: uuid, historyId: uuid }`
-    - Get description from history entry
-    - Create new history entry (version_number = max + 1)
-    - Update video description in YouTube
-    - Update current_description in database
+- [x] **Video Management Procedures**
+  - [x] `videos.list` (query)
+  - [x] `videos.unassigned` (query)
+  - [x] `videos.assignToContainer` (mutation)
+  - [x] `videos.getVariables` (query)
+  - [x] `videos.updateVariables` (mutation)
+  - [x] `videos.preview` (query)
+  - [x] `videos.getHistory` (query)
+  - [x] `videos.rollback` (mutation)
 
-- [ ] **Update the admin router to include youtube router**
+- [x] **Update the admin router to include youtube router**
   - Edit: `nextjs/src/server/api/routers/admin.ts`
   - Add: `youtube: youtubeRouter`
 
