@@ -149,20 +149,29 @@ export default function ContainersTab() {
                   <Label>Select Templates</Label>
                   <div className="border rounded-md p-3 space-y-2 max-h-60 overflow-y-auto">
                     {templates && templates.length > 0 ? (
-                      templates.map((template) => (
-                        <label
-                          key={template.id}
-                          className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.templateIds.includes(template.id)}
-                            onChange={() => toggleTemplate(template.id)}
-                            className="rounded"
-                          />
-                          <span>{template.name}</span>
-                        </label>
-                      ))
+                      templates.map((template) => {
+                        const orderIndex = formData.templateIds.indexOf(template.id);
+                        const isSelected = orderIndex !== -1;
+                        return (
+                          <label
+                            key={template.id}
+                            className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleTemplate(template.id)}
+                              className="rounded"
+                            />
+                            {isSelected && (
+                              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-medium">
+                                {orderIndex + 1}
+                              </span>
+                            )}
+                            <span>{template.name}</span>
+                          </label>
+                        );
+                      })
                     ) : (
                       <p className="text-sm text-muted-foreground">No templates available. Create templates first.</p>
                     )}
@@ -170,6 +179,23 @@ export default function ContainersTab() {
                   <p className="text-sm text-muted-foreground mt-2">
                     Templates will be applied in the order selected
                   </p>
+
+                  {formData.templateIds.length > 0 && (
+                    <div className="mt-4 p-3 bg-muted rounded-md">
+                      <p className="text-sm font-medium mb-2">Template Order Preview:</p>
+                      <ol className="text-sm space-y-1">
+                        {formData.templateIds.map((templateId, index) => {
+                          const template = templates?.find((t) => t.id === templateId);
+                          return (
+                            <li key={templateId} className="flex items-center gap-2">
+                              <span className="font-medium text-primary">{index + 1}.</span>
+                              <span>{template?.name || 'Unknown Template'}</span>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </div>
+                  )}
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
@@ -185,7 +211,7 @@ export default function ContainersTab() {
           </Dialog>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

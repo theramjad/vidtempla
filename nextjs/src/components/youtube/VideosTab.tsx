@@ -111,10 +111,10 @@ export default function VideosTab() {
           Manage your YouTube videos and assign them to containers
         </p>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         <div className="space-y-4">
           {/* Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 pb-0">
             <div>
               <Label htmlFor="channel-filter">Channel</Label>
               <Select
