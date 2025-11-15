@@ -14,7 +14,7 @@ This is an admin dashboard template built with Next.js 15, TypeScript, Supabase,
 
 ## Project Structure
 ```
-admin-dashboard-template/
+youtube-description-updater/
 ├── nextjs/                    # Main Next.js application
 │   ├── src/
 │   │   ├── components/        # React components
@@ -37,6 +37,8 @@ admin-dashboard-template/
     ├── migrations/          # Database migration files
     └── config.toml         # Supabase configuration
 ```
+
+Always run npm run dev within the Next.js project.
 
 ## Core Development Principles
 
