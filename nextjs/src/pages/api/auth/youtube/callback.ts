@@ -4,7 +4,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createServerSupabaseClient } from '@/utils/supabase/server-props';
+import createClient from '@/utils/supabase/api';
 import {
   exchangeCodeForTokens,
   fetchChannelInfo,
@@ -37,7 +37,7 @@ export default async function handler(
     }
 
     // Create Supabase client
-    const supabase = createServerSupabaseClient({ req, res });
+    const supabase = createClient(req, res);
 
     // Get current user
     const {
