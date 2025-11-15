@@ -7,14 +7,14 @@
 
 export const appConfig = {
   // Basic app information
-  name: "YouTube Description Manager",
+  name: "YTDM",
   description: "Manage YouTube video descriptions with dynamic templates",
   supportEmail: "support@yourdomain.com",
 
   // Branding
   brand: {
-    name: "YouTube Description Manager",
-    shortName: "YT",
+    name: "YTDM",
+    shortName: "YTDM",
     tagline: "Manage YouTube descriptions with ease",
   },
 
@@ -41,6 +41,10 @@ export const appConfig = {
       {
         title: "Settings",
         url: "/admin/settings",
+      },
+      {
+        title: "Pricing",
+        url: "/admin/pricing",
       },
     ],
   },
