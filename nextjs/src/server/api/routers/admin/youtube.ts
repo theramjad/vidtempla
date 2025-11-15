@@ -14,6 +14,7 @@ import {
   buildDescription,
   findMissingVariables,
 } from '@/utils/templateParser';
+import { inngestClient } from '@/lib/clients/inngest';
 
 // Helper function to get valid access token (refresh if needed)
 async function getValidAccessToken(
@@ -102,8 +103,15 @@ export const youtubeRouter = createTRPCRouter({
       .input(z.object({ channelId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         // Trigger Inngest event to sync videos in background
-        // For now, return a placeholder - we'll implement Inngest later
-        return { jobId: `sync-${input.channelId}-${Date.now()}` };
+        await inngestClient.send({
+          name: 'youtube/channel.sync',
+          data: {
+            channelId: input.channelId,
+            userId: ctx.user.id,
+          },
+        });
+
+        return { success: true, jobId: `sync-${input.channelId}-${Date.now()}` };
       }),
   }),
 
