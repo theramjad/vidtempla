@@ -31,12 +31,18 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Play } from 'lucide-react';
+import { Loader2, Play, Edit, Eye, History } from 'lucide-react';
+import EditVariablesModal from './EditVariablesModal';
+import PreviewModal from './PreviewModal';
+import HistoryDrawer from './HistoryDrawer';
 
 export default function VideosTab() {
   const { toast } = useToast();
   const [filters, setFilters] = useState({ channelId: '', containerId: '', search: '' });
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [editVariablesOpen, setEditVariablesOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
   const [selectedContainerId, setSelectedContainerId] = useState('');
 
@@ -73,6 +79,21 @@ export default function VideosTab() {
   const openAssignDialog = (video: any) => {
     setSelectedVideo(video);
     setAssignDialogOpen(true);
+  };
+
+  const openEditVariables = (video: any) => {
+    setSelectedVideo(video);
+    setEditVariablesOpen(true);
+  };
+
+  const openPreview = (video: any) => {
+    setSelectedVideo(video);
+    setPreviewOpen(true);
+  };
+
+  const openHistory = (video: any) => {
+    setSelectedVideo(video);
+    setHistoryOpen(true);
   };
 
   return (
@@ -185,15 +206,44 @@ export default function VideosTab() {
                         : '—'}
                     </TableCell>
                     <TableCell className="text-right">
-                      {!video.container_id && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openAssignDialog(video)}
-                        >
-                          Assign
-                        </Button>
-                      )}
+                      <div className="flex justify-end gap-2">
+                        {!video.container_id ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openAssignDialog(video)}
+                          >
+                            Assign
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openEditVariables(video)}
+                              title="Edit Variables"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openPreview(video)}
+                              title="Preview Description"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openHistory(video)}
+                              title="Version History"
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -246,6 +296,39 @@ export default function VideosTab() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Edit Variables Modal */}
+        {selectedVideo && (
+          <EditVariablesModal
+            videoId={selectedVideo.id}
+            videoTitle={selectedVideo.title}
+            open={editVariablesOpen}
+            onOpenChange={setEditVariablesOpen}
+            onSuccess={refetch}
+          />
+        )}
+
+        {/* Preview Modal */}
+        {selectedVideo && (
+          <PreviewModal
+            videoId={selectedVideo.id}
+            videoTitle={selectedVideo.title}
+            open={previewOpen}
+            onOpenChange={setPreviewOpen}
+            onSuccess={refetch}
+          />
+        )}
+
+        {/* History Drawer */}
+        {selectedVideo && (
+          <HistoryDrawer
+            videoId={selectedVideo.id}
+            videoTitle={selectedVideo.title}
+            open={historyOpen}
+            onOpenChange={setHistoryOpen}
+            onSuccess={refetch}
+          />
+        )}
       </CardContent>
     </Card>
   );

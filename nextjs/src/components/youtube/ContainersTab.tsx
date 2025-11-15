@@ -37,10 +37,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, Edit2, Trash2 } from 'lucide-react';
+import EditContainerModal from './EditContainerModal';
 
 export default function ContainersTab() {
   const { toast } = useToast();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: '', templateIds: [] as string[] });
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -104,6 +107,11 @@ export default function ContainersTab() {
         ? prev.templateIds.filter((id) => id !== templateId)
         : [...prev.templateIds, templateId],
     }));
+  };
+
+  const openEditDialog = (containerId: string) => {
+    setSelectedContainerId(containerId);
+    setEditDialogOpen(true);
   };
 
   return (
@@ -209,40 +217,59 @@ export default function ContainersTab() {
                     {container.template_order?.length || 0} template(s)
                   </TableCell>
                   <TableCell className="text-right">
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={deletingId === container.id}
-                        >
-                          {deletingId === container.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Container?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will remove the container. Videos assigned to this container will become unassigned.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(container.id)}>
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openEditDialog(container.id)}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={deletingId === container.id}
+                          >
+                            {deletingId === container.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Container?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will remove the container. Videos assigned to this container will become unassigned.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(container.id)}>
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+        )}
+
+        {/* Edit Container Modal */}
+        {selectedContainerId && (
+          <EditContainerModal
+            containerId={selectedContainerId}
+            open={editDialogOpen}
+            onOpenChange={setEditDialogOpen}
+            onSuccess={refetch}
+          />
         )}
       </CardContent>
     </Card>
