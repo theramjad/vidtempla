@@ -579,13 +579,6 @@ export const youtubeRouter = createTRPCRouter({
           });
         }
 
-        // Create new history entry with the rolled back description
-        await ctx.supabase.from('description_history').insert({
-          video_id: input.videoId,
-          description: history.description,
-          created_by: ctx.user.id,
-        });
-
         // Update video's current description
         await ctx.supabase
           .from('youtube_videos')
@@ -593,6 +586,7 @@ export const youtubeRouter = createTRPCRouter({
           .eq('id', input.videoId);
 
         // Trigger Inngest event to update on YouTube
+        // The Inngest job will create the history entry after successful update
         await inngestClient.send({
           name: 'youtube/videos.update',
           data: {
