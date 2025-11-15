@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '@/utils/api';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
   Dialog,
@@ -175,11 +175,13 @@ export default function EditVariablesModal({
                         <Label htmlFor={`var-${key}`}>
                           {'{{'} {variable.name} {'}}'}
                         </Label>
-                        <Input
+                        <Textarea
                           id={`var-${key}`}
                           value={variable.value}
                           onChange={(e) => handleValueChange(key, e.target.value)}
                           placeholder={`Enter ${variable.name}`}
+                          className="resize-y min-h-[50px]"
+                          rows={1}
                         />
                       </div>
                       <div>

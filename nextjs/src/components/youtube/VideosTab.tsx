@@ -38,7 +38,7 @@ import HistoryDrawer from './HistoryDrawer';
 
 export default function VideosTab() {
   const { toast } = useToast();
-  const [filters, setFilters] = useState({ channelId: '', containerId: '', search: '' });
+  const [filters, setFilters] = useState({ channelId: 'all', containerId: 'all', search: '' });
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [editVariablesOpen, setEditVariablesOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -48,7 +48,14 @@ export default function VideosTab() {
 
   const { data: channels } = api.admin.youtube.channels.list.useQuery();
   const { data: containers } = api.admin.youtube.containers.list.useQuery();
-  const { data: videos, isLoading, refetch } = api.admin.youtube.videos.list.useQuery(filters);
+
+  // Convert "all" to empty string for the API query
+  const apiFilters = {
+    channelId: filters.channelId === 'all' ? '' : filters.channelId,
+    containerId: filters.containerId === 'all' ? '' : filters.containerId,
+    search: filters.search,
+  };
+  const { data: videos, isLoading, refetch } = api.admin.youtube.videos.list.useQuery(apiFilters);
   const assignMutation = api.admin.youtube.videos.assignToContainer.useMutation();
 
   const handleAssign = async () => {
@@ -118,7 +125,7 @@ export default function VideosTab() {
                   <SelectValue placeholder="All channels" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All channels</SelectItem>
+                  <SelectItem value="all">All channels</SelectItem>
                   {channels?.map((channel) => (
                     <SelectItem key={channel.id} value={channel.id}>
                       {channel.title}
@@ -138,7 +145,7 @@ export default function VideosTab() {
                   <SelectValue placeholder="All containers" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All containers</SelectItem>
+                  <SelectItem value="all">All containers</SelectItem>
                   {containers?.map((container) => (
                     <SelectItem key={container.id} value={container.id}>
                       {container.name}
@@ -174,6 +181,7 @@ export default function VideosTab() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-32">Thumbnail</TableHead>
                   <TableHead>Video</TableHead>
                   <TableHead>Channel</TableHead>
                   <TableHead>Container</TableHead>
@@ -184,6 +192,13 @@ export default function VideosTab() {
               <TableBody>
                 {videos.map((video) => (
                   <TableRow key={video.id}>
+                    <TableCell>
+                      <img
+                        src={`https://img.youtube.com/vi/${video.video_id}/default.jpg`}
+                        alt={video.title}
+                        className="w-24 h-auto rounded"
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Play className="h-4 w-4 text-muted-foreground" />
