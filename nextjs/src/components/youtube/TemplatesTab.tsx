@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, Edit2, Trash2 } from 'lucide-react';
+import UpdateImpactDialog from './UpdateImpactDialog';
 
 export default function TemplatesTab() {
   const { toast } = useToast();
@@ -47,10 +48,21 @@ export default function TemplatesTab() {
   const [formData, setFormData] = useState({ name: '', content: '' });
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Track original content for change detection
+  const [originalContent, setOriginalContent] = useState('');
+
+  // Impact dialog state
+  const [showImpactDialog, setShowImpactDialog] = useState(false);
+  const [impactData, setImpactData] = useState<{
+    videoCount: number;
+    containers: Array<{ id: string; name: string; videoCount: number }>;
+  }>({ videoCount: 0, containers: [] });
+
   const { data: templates, isLoading, refetch } = api.admin.youtube.templates.list.useQuery();
   const createMutation = api.admin.youtube.templates.create.useMutation();
   const updateMutation = api.admin.youtube.templates.update.useMutation();
   const deleteMutation = api.admin.youtube.templates.delete.useMutation();
+  const getAffectedVideosMutation = api.admin.youtube.templates.getAffectedVideos.useMutation();
 
   const handleCreate = async () => {
     if (!formData.name.trim()) {
@@ -83,16 +95,49 @@ export default function TemplatesTab() {
   const handleEdit = async () => {
     if (!selectedTemplate) return;
 
+    // If content didn't change, save directly without confirmation
+    if (formData.content === originalContent) {
+      await performUpdate();
+      return;
+    }
+
+    // Get affected videos and containers
+    try {
+      const result = await getAffectedVideosMutation.mutateAsync({
+        templateId: selectedTemplate.id,
+      });
+      setImpactData({
+        videoCount: result.count,
+        containers: result.containers,
+      });
+      setShowImpactDialog(true);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to check affected videos',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const performUpdate = async () => {
+    if (!selectedTemplate) return;
+
     try {
       await updateMutation.mutateAsync({
         id: selectedTemplate.id,
         name: formData.name,
         content: formData.content,
       });
+
+      const contentChanged = formData.content !== originalContent;
       toast({
         title: 'Template updated',
-        description: 'Your template has been updated successfully.',
+        description: contentChanged
+          ? `Template updated. ${impactData.videoCount} video${impactData.videoCount !== 1 ? 's' : ''} will be updated in the background.`
+          : 'Template has been updated successfully.',
       });
+
       setEditDialogOpen(false);
       setSelectedTemplate(null);
       setFormData({ name: '', content: '' });
@@ -129,6 +174,7 @@ export default function TemplatesTab() {
   const openEditDialog = (template: any) => {
     setSelectedTemplate(template);
     setFormData({ name: template.name, content: template.content });
+    setOriginalContent(template.content);
     setEditDialogOpen(true);
   };
 
@@ -316,6 +362,16 @@ export default function TemplatesTab() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Impact Dialog */}
+        <UpdateImpactDialog
+          open={showImpactDialog}
+          onOpenChange={setShowImpactDialog}
+          onConfirm={performUpdate}
+          updateType="template"
+          videoCount={impactData.videoCount}
+          containers={impactData.containers}
+        />
       </CardContent>
     </Card>
   );

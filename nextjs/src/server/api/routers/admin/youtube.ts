@@ -184,7 +184,24 @@ export const youtubeRouter = createTRPCRouter({
         if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
 
         // Trigger Inngest event to update all videos in this container
-        // Placeholder for now
+        // Only trigger if template_order or separator changed (affects description)
+        if (input.templateIds !== undefined || input.separator !== undefined) {
+          const { data: videos } = await ctx.supabase
+            .from('youtube_videos')
+            .select('id')
+            .eq('container_id', input.id);
+
+          if (videos && videos.length > 0) {
+            await inngestClient.send({
+              name: 'youtube/videos.update',
+              data: {
+                videoIds: videos.map((v) => v.id),
+                userId: ctx.user.id,
+              },
+            });
+          }
+        }
+
         return data;
       }),
 
@@ -200,6 +217,23 @@ export const youtubeRouter = createTRPCRouter({
         if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
 
         return { success: true };
+      }),
+
+    getAffectedVideos: adminProcedure
+      .input(z.object({ containerId: z.string().uuid() }))
+      .query(async ({ ctx, input }) => {
+        const { data: videos, error } = await ctx.supabase
+          .from('youtube_videos')
+          .select('id, title, video_id')
+          .eq('container_id', input.containerId)
+          .order('title', { ascending: true });
+
+        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+
+        return {
+          videos: videos || [],
+          count: videos?.length || 0,
+        };
       }),
   }),
 
@@ -269,7 +303,36 @@ export const youtubeRouter = createTRPCRouter({
         if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
 
         // Trigger Inngest event to update all videos using this template
-        // Placeholder for now
+        // Only trigger if content changed (affects description)
+        if (input.content !== undefined) {
+          // Find all containers that use this template
+          const { data: containers } = await ctx.supabase
+            .from('containers')
+            .select('id')
+            .eq('user_id', ctx.user.id)
+            .contains('template_order', [input.id]);
+
+          if (containers && containers.length > 0) {
+            const containerIds = containers.map((c) => c.id);
+
+            // Get all videos from these containers
+            const { data: videos } = await ctx.supabase
+              .from('youtube_videos')
+              .select('id')
+              .in('container_id', containerIds);
+
+            if (videos && videos.length > 0) {
+              await inngestClient.send({
+                name: 'youtube/videos.update',
+                data: {
+                  videoIds: videos.map((v) => v.id),
+                  userId: ctx.user.id,
+                },
+              });
+            }
+          }
+        }
+
         return data;
       }),
 
@@ -291,6 +354,50 @@ export const youtubeRouter = createTRPCRouter({
       .input(z.object({ content: z.string() }))
       .query(({ input }) => {
         return { variables: parseVariables(input.content) };
+      }),
+
+    getAffectedVideos: adminProcedure
+      .input(z.object({ templateId: z.string().uuid() }))
+      .query(async ({ ctx, input }) => {
+        // First, find all containers that use this template
+        const { data: containers, error: containerError } = await ctx.supabase
+          .from('containers')
+          .select('id, name, template_order')
+          .eq('user_id', ctx.user.id)
+          .contains('template_order', [input.templateId]);
+
+        if (containerError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: containerError.message });
+
+        if (!containers || containers.length === 0) {
+          return {
+            videos: [],
+            count: 0,
+            containers: [],
+          };
+        }
+
+        // Get all videos from these containers
+        const containerIds = containers.map((c) => c.id);
+        const { data: videos, error: videoError } = await ctx.supabase
+          .from('youtube_videos')
+          .select('id, title, video_id, container_id')
+          .in('container_id', containerIds)
+          .order('title', { ascending: true });
+
+        if (videoError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: videoError.message });
+
+        // Build container info with video counts
+        const containerInfo = containers.map((container) => ({
+          id: container.id,
+          name: container.name,
+          videoCount: videos?.filter((v) => v.container_id === container.id).length || 0,
+        }));
+
+        return {
+          videos: videos || [],
+          count: videos?.length || 0,
+          containers: containerInfo,
+        };
       }),
   }),
 

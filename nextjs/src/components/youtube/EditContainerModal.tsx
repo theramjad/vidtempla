@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, GripVertical, ArrowUp, ArrowDown, X } from 'lucide-react';
+import UpdateImpactDialog from './UpdateImpactDialog';
 
 interface EditContainerModalProps {
   containerId: string;
@@ -36,6 +37,14 @@ export default function EditContainerModal({
   const [templateIds, setTemplateIds] = useState<string[]>([]);
   const [separator, setSeparator] = useState('\n\n');
 
+  // Track original values for change detection
+  const [originalTemplateIds, setOriginalTemplateIds] = useState<string[]>([]);
+  const [originalSeparator, setOriginalSeparator] = useState('\n\n');
+
+  // Impact dialog state
+  const [showImpactDialog, setShowImpactDialog] = useState(false);
+  const [affectedVideoCount, setAffectedVideoCount] = useState(0);
+
   const { data: container } = api.admin.youtube.containers.list.useQuery(undefined, {
     enabled: open,
     select: (containers) => containers.find((c) => c.id === containerId),
@@ -46,6 +55,7 @@ export default function EditContainerModal({
   });
 
   const updateMutation = api.admin.youtube.containers.update.useMutation();
+  const getAffectedVideosMutation = api.admin.youtube.containers.getAffectedVideos.useMutation();
 
   // Initialize form data
   useEffect(() => {
@@ -53,6 +63,8 @@ export default function EditContainerModal({
       setName(container.name);
       setTemplateIds(container.template_order || []);
       setSeparator(container.separator || '\n\n');
+      setOriginalTemplateIds(container.template_order || []);
+      setOriginalSeparator(container.separator || '\n\n');
     }
   }, [container]);
 
@@ -85,7 +97,38 @@ export default function EditContainerModal({
     return allTemplates?.find((t) => t.id === templateId)?.name || 'Unknown Template';
   };
 
+  // Check if changes affect video descriptions
+  const hasDescriptionChanges = () => {
+    const templateOrderChanged =
+      JSON.stringify(templateIds) !== JSON.stringify(originalTemplateIds);
+    const separatorChanged = separator !== originalSeparator;
+    return templateOrderChanged || separatorChanged;
+  };
+
   const handleSave = async () => {
+    // If no description-affecting changes, save directly
+    if (!hasDescriptionChanges()) {
+      await performUpdate();
+      return;
+    }
+
+    // Get affected videos count
+    try {
+      const result = await getAffectedVideosMutation.mutateAsync({
+        containerId,
+      });
+      setAffectedVideoCount(result.count);
+      setShowImpactDialog(true);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to check affected videos',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const performUpdate = async () => {
     try {
       await updateMutation.mutateAsync({
         id: containerId,
@@ -94,9 +137,12 @@ export default function EditContainerModal({
         separator,
       });
 
+      const hasChanges = hasDescriptionChanges();
       toast({
         title: 'Container updated',
-        description: 'Container has been updated successfully.',
+        description: hasChanges
+          ? `Container updated. ${affectedVideoCount} video${affectedVideoCount !== 1 ? 's' : ''} will be updated in the background.`
+          : 'Container has been updated successfully.',
       });
 
       onSuccess?.();
@@ -276,6 +322,14 @@ export default function EditContainerModal({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <UpdateImpactDialog
+        open={showImpactDialog}
+        onOpenChange={setShowImpactDialog}
+        onConfirm={performUpdate}
+        updateType="container"
+        videoCount={affectedVideoCount}
+      />
     </Dialog>
   );
 }
