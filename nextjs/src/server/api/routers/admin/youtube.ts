@@ -221,7 +221,7 @@ export const youtubeRouter = createTRPCRouter({
 
     getAffectedVideos: adminProcedure
       .input(z.object({ containerId: z.string().uuid() }))
-      .query(async ({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { data: videos, error } = await ctx.supabase
           .from('youtube_videos')
           .select('id, title, video_id')
@@ -358,7 +358,7 @@ export const youtubeRouter = createTRPCRouter({
 
     getAffectedVideos: adminProcedure
       .input(z.object({ templateId: z.string().uuid() }))
-      .query(async ({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         // First, find all containers that use this template
         const { data: containers, error: containerError } = await ctx.supabase
           .from('containers')
