@@ -3,7 +3,8 @@
  * Main page with tabs for channels, templates, containers, and videos
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
@@ -11,9 +12,35 @@ import ChannelsTab from '@/components/youtube/ChannelsTab';
 import TemplatesTab from '@/components/youtube/TemplatesTab';
 import ContainersTab from '@/components/youtube/ContainersTab';
 import VideosTab from '@/components/youtube/VideosTab';
+import { useToast } from '@/hooks/use-toast';
 
 export default function YouTubePage() {
   const [activeTab, setActiveTab] = useState('channels');
+  const router = useRouter();
+  const { toast } = useToast();
+
+  // Handle error messages from URL query parameters
+  useEffect(() => {
+    const { error } = router.query;
+    if (error && typeof error === 'string') {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error,
+      });
+
+      // Clean up the URL by removing the error query parameter
+      const { error: _, ...queryWithoutError } = router.query;
+      router.replace(
+        {
+          pathname: router.pathname,
+          query: queryWithoutError,
+        },
+        undefined,
+        { shallow: true }
+      );
+    }
+  }, [router.query, toast]);
 
   return (
     <DashboardLayout>
