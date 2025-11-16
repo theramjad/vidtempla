@@ -10,7 +10,8 @@
       "Bash(npx supabase:*)",
       "Bash(shared-types/database.types.ts)",
       "Bash(npm install:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

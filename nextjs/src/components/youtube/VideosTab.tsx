@@ -195,7 +195,7 @@ export default function VideosTab() {
                     <TableCell>
                       <img
                         src={`https://img.youtube.com/vi/${video.video_id}/default.jpg`}
-                        alt={video.title}
+                        alt={video.title || 'Video thumbnail'}
                         className="w-24 h-auto rounded"
                       />
                     </TableCell>

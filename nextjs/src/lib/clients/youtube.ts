@@ -171,7 +171,12 @@ export async function fetchChannelInfo(
       throw new Error('No channel found for this account');
     }
 
-    return response.data.items[0];
+    const channel = response.data.items[0];
+    if (!channel) {
+      throw new Error('No channel found for this account');
+    }
+
+    return channel;
   } catch (error) {
     if (axios.isAxiosError(error) && error.response) {
       console.error('YouTube API error fetching channel info:', error.response.data);
@@ -255,6 +260,9 @@ export async function updateVideoDescription(
   }
 
   const video = videoResponse.data.items[0];
+  if (!video) {
+    throw new Error(`Video ${videoId} not found`);
+  }
 
   // Update the description
   await axios.put(

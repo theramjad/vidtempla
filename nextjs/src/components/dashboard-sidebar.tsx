@@ -21,7 +21,6 @@ import { appConfig } from "@/config/app";
 import { useUser } from "@/hooks/useUser";
 import { ChevronUp } from "lucide-react";
 import { useRouter } from "next/router";
-import type { SimpleIcon } from "simple-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,7 +28,9 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-const items = appConfig.dashboard.navigation;
+type NavItem = { readonly title: string; readonly url: string } | { readonly title: string; readonly subItems: readonly { readonly title: string; readonly url: string }[] };
+
+const items = appConfig.dashboard.navigation as readonly NavItem[];
 
 export default function DashboardSidebar() {
   const { user, signOut } = useUser();
@@ -74,7 +75,7 @@ export default function DashboardSidebar() {
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <SidebarMenuSub>
-                          {item.subItems.map((subItem) => (
+                          {'subItems' in item && item.subItems.map((subItem) => (
                             <SidebarMenuSubItem key={subItem.title}>
                               <SidebarMenuSubButton asChild>
                                 <a href={subItem.url} className="px-6 py-3">

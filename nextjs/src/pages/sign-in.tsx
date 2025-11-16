@@ -7,6 +7,7 @@ import { appConfig } from "@/config/app";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle } from "lucide-react";
+import Link from "next/link";
 
 /* 
 Function to parse URL params. This is required because the auth flow from
@@ -250,22 +251,22 @@ export default function Page() {
                 </div>
                 {appConfig.auth.enablePasswordReset && (
                   <div className="text-center">
-                    <a
+                    <Link
                       href="/forgot-password"
                       className="text-sm text-emerald-600 hover:text-emerald-500"
                     >
                       Forgot your password?
-                    </a>
+                    </Link>
                   </div>
                 )}
                 {appConfig.auth.enableSignUp && (
                   <div className="text-center">
-                    <a
+                    <Link
                       href="/sign-up"
                       className="text-sm text-emerald-600 hover:text-emerald-500"
                     >
                       Don't have an account? Sign up
-                    </a>
+                    </Link>
                   </div>
                 )}
               </form>

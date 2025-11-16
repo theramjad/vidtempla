@@ -15,7 +15,7 @@ export const billingRouter = createTRPCRouter({
    * Get the current user's subscription plan
    */
   getCurrentPlan: protectedProcedure.query(async ({ ctx }) => {
-    const { data: subscription, error } = await ctx.supabase
+    const { data: subscription, error } = await supabaseServer
       .from("subscriptions")
       .select("*")
       .eq("user_id", ctx.user.id)
@@ -77,7 +77,7 @@ export const billingRouter = createTRPCRouter({
         }
 
         // Get or create subscription record to store polar_customer_id
-        const { data: subscription } = await ctx.supabase
+        const { data: subscription } = await supabaseServer
           .from("subscriptions")
           .select("*")
           .eq("user_id", ctx.user.id)
@@ -96,7 +96,7 @@ export const billingRouter = createTRPCRouter({
 
         // If we have a customer ID from the checkout, update our subscription record
         if (checkoutSession.customerId && subscription) {
-          await ctx.supabase
+          await supabaseServer
             .from("subscriptions")
             .update({
               polar_customer_id: checkoutSession.customerId,
@@ -125,7 +125,7 @@ export const billingRouter = createTRPCRouter({
    */
   getCustomerPortalUrl: protectedProcedure.query(async ({ ctx }) => {
     try {
-      const { data: subscription } = await ctx.supabase
+      const { data: subscription } = await supabaseServer
         .from("subscriptions")
         .select("polar_customer_id")
         .eq("user_id", ctx.user.id)
@@ -163,7 +163,7 @@ export const billingRouter = createTRPCRouter({
    */
   getUsageStats: protectedProcedure.query(async ({ ctx }) => {
     // Get channel count
-    const { data: channels, error: channelsError } = await ctx.supabase
+    const { data: channels, error: channelsError } = await supabaseServer
       .from("youtube_channels")
       .select("id")
       .eq("user_id", ctx.user.id);
@@ -176,7 +176,7 @@ export const billingRouter = createTRPCRouter({
     }
 
     // Get video count across all user's channels
-    const { data: videos, error: videosError } = await ctx.supabase
+    const { data: videos, error: videosError } = await supabaseServer
       .from("youtube_videos")
       .select("id")
       .in(
@@ -192,7 +192,7 @@ export const billingRouter = createTRPCRouter({
     }
 
     // Get current plan
-    const { data: subscription } = await ctx.supabase
+    const { data: subscription } = await supabaseServer
       .from("subscriptions")
       .select("plan_tier")
       .eq("user_id", ctx.user.id)
@@ -218,7 +218,7 @@ export const billingRouter = createTRPCRouter({
    * Get payment history (orders)
    */
   getOrders: protectedProcedure.query(async ({ ctx }) => {
-    const { data: orders, error } = await ctx.supabase
+    const { data: orders, error } = await supabaseServer
       .from("orders")
       .select("*")
       .eq("user_id", ctx.user.id)

@@ -74,10 +74,9 @@ export default function EditContainerModal({
 
     if (targetIndex < 0 || targetIndex >= newTemplateIds.length) return;
 
-    [newTemplateIds[index], newTemplateIds[targetIndex]] = [
-      newTemplateIds[targetIndex],
-      newTemplateIds[index],
-    ];
+    const temp = newTemplateIds[index];
+    newTemplateIds[index] = newTemplateIds[targetIndex]!;
+    newTemplateIds[targetIndex] = temp!;
 
     setTemplateIds(newTemplateIds);
   };

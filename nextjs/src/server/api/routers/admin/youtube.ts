@@ -15,6 +15,8 @@ import {
   findMissingVariables,
 } from '@/utils/templateParser';
 import { inngestClient } from '@/lib/clients/inngest';
+import { supabaseServer } from '@/lib/clients/supabase';
+import type { Database } from '@shared-types/database.types';
 
 // Helper function to get valid access token (refresh if needed)
 async function getValidAccessToken(
@@ -24,7 +26,7 @@ async function getValidAccessToken(
     token_expires_at: string | null;
     id: string;
   },
-  supabase: any
+  supabaseServer: any
 ): Promise<string> {
   if (!channel.access_token_encrypted || !channel.refresh_token_encrypted) {
     throw new TRPCError({
@@ -51,7 +53,7 @@ async function getValidAccessToken(
     const newExpiresAt = new Date();
     newExpiresAt.setSeconds(newExpiresAt.getSeconds() + newTokens.expires_in);
 
-    await supabase
+    await supabaseServer
       .from('youtube_channels')
       .update({
         access_token_encrypted: encrypt(newTokens.access_token),
@@ -69,8 +71,8 @@ export const youtubeRouter = createTRPCRouter({
   // ==================== Channel Management ====================
 
   channels: createTRPCRouter({
-    list: adminProcedure.query(async ({ ctx }) => {
-      const { data, error } = await ctx.supabase
+    list: adminProcedure.query(async ({ ctx }): Promise<Database['public']['Tables']['youtube_channels']['Row'][]> => {
+      const { data, error } = await supabaseServer
         .from('youtube_channels')
         .select('*')
         .eq('user_id', ctx.user.id)
@@ -78,7 +80,7 @@ export const youtubeRouter = createTRPCRouter({
 
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
 
-      return data;
+      return data || [];
     }),
 
     initiateOAuth: adminProcedure.mutation(async () => {
@@ -88,7 +90,7 @@ export const youtubeRouter = createTRPCRouter({
     disconnect: adminProcedure
       .input(z.object({ channelId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
-        const { error } = await ctx.supabase
+        const { error } = await supabaseServer
           .from('youtube_channels')
           .delete()
           .eq('id', input.channelId)
@@ -118,8 +120,8 @@ export const youtubeRouter = createTRPCRouter({
   // ==================== Container Management ====================
 
   containers: createTRPCRouter({
-    list: adminProcedure.query(async ({ ctx }) => {
-      const { data, error } = await ctx.supabase
+    list: adminProcedure.query(async ({ ctx }): Promise<Database['public']['Tables']['containers']['Row'][]> => {
+      const { data, error } = await supabaseServer
         .from('containers')
         .select(`
           *,
@@ -142,7 +144,7 @@ export const youtubeRouter = createTRPCRouter({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const { data, error } = await ctx.supabase
+        const { data, error } = await supabaseServer
           .from('containers')
           .insert({
             user_id: ctx.user.id,
@@ -173,7 +175,7 @@ export const youtubeRouter = createTRPCRouter({
         if (input.templateIds) updateData.template_order = input.templateIds;
         if (input.separator !== undefined) updateData.separator = input.separator;
 
-        const { data, error } = await ctx.supabase
+        const { data, error } = await supabaseServer
           .from('containers')
           .update(updateData)
           .eq('id', input.id)
@@ -186,7 +188,7 @@ export const youtubeRouter = createTRPCRouter({
         // Trigger Inngest event to update all videos in this container
         // Only trigger if template_order or separator changed (affects description)
         if (input.templateIds !== undefined || input.separator !== undefined) {
-          const { data: videos } = await ctx.supabase
+          const { data: videos } = await supabaseServer
             .from('youtube_videos')
             .select('id')
             .eq('container_id', input.id);
@@ -208,7 +210,7 @@ export const youtubeRouter = createTRPCRouter({
     delete: adminProcedure
       .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
-        const { error } = await ctx.supabase
+        const { error } = await supabaseServer
           .from('containers')
           .delete()
           .eq('id', input.id)
@@ -222,7 +224,7 @@ export const youtubeRouter = createTRPCRouter({
     getAffectedVideos: adminProcedure
       .input(z.object({ containerId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
-        const { data: videos, error } = await ctx.supabase
+        const { data: videos, error } = await supabaseServer
           .from('youtube_videos')
           .select('id, title, video_id')
           .eq('container_id', input.containerId)
@@ -240,8 +242,8 @@ export const youtubeRouter = createTRPCRouter({
   // ==================== Template Management ====================
 
   templates: createTRPCRouter({
-    list: adminProcedure.query(async ({ ctx }) => {
-      const { data, error } = await ctx.supabase
+    list: adminProcedure.query(async ({ ctx }): Promise<(Database['public']['Tables']['templates']['Row'] & { variables: string[] })[]> => {
+      const { data, error } = await supabaseServer
         .from('templates')
         .select('*')
         .eq('user_id', ctx.user.id)
@@ -250,7 +252,7 @@ export const youtubeRouter = createTRPCRouter({
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
 
       // Add variable count to each template
-      return data.map((template) => ({
+      return (data || []).map((template) => ({
         ...template,
         variables: parseVariables(template.content),
       }));
@@ -264,7 +266,7 @@ export const youtubeRouter = createTRPCRouter({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const { data, error } = await ctx.supabase
+        const { data, error } = await supabaseServer
           .from('templates')
           .insert({
             user_id: ctx.user.id,
@@ -292,7 +294,7 @@ export const youtubeRouter = createTRPCRouter({
         if (input.name) updateData.name = input.name;
         if (input.content !== undefined) updateData.content = input.content;
 
-        const { data, error } = await ctx.supabase
+        const { data, error } = await supabaseServer
           .from('templates')
           .update(updateData)
           .eq('id', input.id)
@@ -306,7 +308,7 @@ export const youtubeRouter = createTRPCRouter({
         // Only trigger if content changed (affects description)
         if (input.content !== undefined) {
           // Find all containers that use this template
-          const { data: containers } = await ctx.supabase
+          const { data: containers } = await supabaseServer
             .from('containers')
             .select('id')
             .eq('user_id', ctx.user.id)
@@ -316,7 +318,7 @@ export const youtubeRouter = createTRPCRouter({
             const containerIds = containers.map((c) => c.id);
 
             // Get all videos from these containers
-            const { data: videos } = await ctx.supabase
+            const { data: videos } = await supabaseServer
               .from('youtube_videos')
               .select('id')
               .in('container_id', containerIds);
@@ -339,7 +341,7 @@ export const youtubeRouter = createTRPCRouter({
     delete: adminProcedure
       .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
-        const { error } = await ctx.supabase
+        const { error } = await supabaseServer
           .from('templates')
           .delete()
           .eq('id', input.id)
@@ -360,7 +362,7 @@ export const youtubeRouter = createTRPCRouter({
       .input(z.object({ templateId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         // First, find all containers that use this template
-        const { data: containers, error: containerError } = await ctx.supabase
+        const { data: containers, error: containerError } = await supabaseServer
           .from('containers')
           .select('id, name, template_order')
           .eq('user_id', ctx.user.id)
@@ -378,7 +380,7 @@ export const youtubeRouter = createTRPCRouter({
 
         // Get all videos from these containers
         const containerIds = containers.map((c) => c.id);
-        const { data: videos, error: videoError } = await ctx.supabase
+        const { data: videos, error: videoError } = await supabaseServer
           .from('youtube_videos')
           .select('id, title, video_id, container_id')
           .in('container_id', containerIds)
@@ -413,7 +415,7 @@ export const youtubeRouter = createTRPCRouter({
         })
       )
       .query(async ({ ctx, input }) => {
-        let query = ctx.supabase
+        let query = supabaseServer
           .from('youtube_videos')
           .select(`
             *,
@@ -440,11 +442,11 @@ export const youtubeRouter = createTRPCRouter({
 
         if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
 
-        return data;
+        return data || [];
       }),
 
     unassigned: adminProcedure.query(async ({ ctx }) => {
-      const { data, error } = await ctx.supabase
+      const { data, error } = await supabaseServer
         .from('youtube_videos')
         .select(`
           *,
@@ -468,7 +470,7 @@ export const youtubeRouter = createTRPCRouter({
       )
       .mutation(async ({ ctx, input }) => {
         // First verify the video isn't already assigned
-        const { data: video } = await ctx.supabase
+        const { data: video } = await supabaseServer
           .from('youtube_videos')
           .select('container_id')
           .eq('id', input.videoId)
@@ -482,7 +484,7 @@ export const youtubeRouter = createTRPCRouter({
         }
 
         // Get the container's templates
-        const { data: container } = await ctx.supabase
+        const { data: container } = await supabaseServer
           .from('containers')
           .select('template_order')
           .eq('id', input.containerId)
@@ -497,7 +499,7 @@ export const youtubeRouter = createTRPCRouter({
         }
 
         // Assign video to container
-        const { error: updateError } = await ctx.supabase
+        const { error: updateError } = await supabaseServer
           .from('youtube_videos')
           .update({ container_id: input.containerId })
           .eq('id', input.videoId);
@@ -506,7 +508,7 @@ export const youtubeRouter = createTRPCRouter({
 
         // Initialize variables for all templates in the container
         if (container.template_order && container.template_order.length > 0) {
-          const { data: templates } = await ctx.supabase
+          const { data: templates } = await supabaseServer
             .from('templates')
             .select('id, content')
             .in('id', container.template_order);
@@ -528,7 +530,7 @@ export const youtubeRouter = createTRPCRouter({
             });
 
             if (variablesToCreate.length > 0) {
-              await ctx.supabase
+              await supabaseServer
                 .from('video_variables')
                 .insert(variablesToCreate);
             }
@@ -541,7 +543,7 @@ export const youtubeRouter = createTRPCRouter({
     getVariables: adminProcedure
       .input(z.object({ videoId: z.string().uuid() }))
       .query(async ({ ctx, input }) => {
-        const { data, error } = await ctx.supabase
+        const { data, error } = await supabaseServer
           .from('video_variables')
           .select(`
             *,
@@ -571,7 +573,7 @@ export const youtubeRouter = createTRPCRouter({
       .mutation(async ({ ctx, input }) => {
         // Upsert all variables
         for (const variable of input.variables) {
-          await ctx.supabase
+          await supabaseServer
             .from('video_variables')
             .upsert(
               {
@@ -596,7 +598,7 @@ export const youtubeRouter = createTRPCRouter({
       .input(z.object({ videoId: z.string().uuid() }))
       .query(async ({ ctx, input }) => {
         // Get video with container
-        const { data: video } = await ctx.supabase
+        const { data: video } = await supabaseServer
           .from('youtube_videos')
           .select(`
             *,
@@ -613,7 +615,7 @@ export const youtubeRouter = createTRPCRouter({
         }
 
         // Get templates in order
-        const { data: templates } = await ctx.supabase
+        const { data: templates } = await supabaseServer
           .from('templates')
           .select('id, content')
           .in('id', video.container.template_order);
@@ -628,7 +630,7 @@ export const youtubeRouter = createTRPCRouter({
           .filter(Boolean);
 
         // Get all variables for this video
-        const { data: variables } = await ctx.supabase
+        const { data: variables } = await supabaseServer
           .from('video_variables')
           .select('variable_name, variable_value')
           .eq('video_id', input.videoId);
@@ -652,7 +654,7 @@ export const youtubeRouter = createTRPCRouter({
     getHistory: adminProcedure
       .input(z.object({ videoId: z.string().uuid() }))
       .query(async ({ ctx, input }) => {
-        const { data, error } = await ctx.supabase
+        const { data, error } = await supabaseServer
           .from('description_history')
           .select('*')
           .eq('video_id', input.videoId)
@@ -672,7 +674,7 @@ export const youtubeRouter = createTRPCRouter({
       )
       .mutation(async ({ ctx, input }) => {
         // Get the historical description
-        const { data: history } = await ctx.supabase
+        const { data: history } = await supabaseServer
           .from('description_history')
           .select('description')
           .eq('id', input.historyId)
@@ -687,7 +689,7 @@ export const youtubeRouter = createTRPCRouter({
         }
 
         // Update video's current description
-        await ctx.supabase
+        await supabaseServer
           .from('youtube_videos')
           .update({ current_description: history.description })
           .eq('id', input.videoId);

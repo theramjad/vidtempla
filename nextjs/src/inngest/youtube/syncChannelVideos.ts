@@ -11,7 +11,7 @@ import {
   fetchChannelVideos,
   fetchChannelInfo,
 } from '@/lib/clients/youtube';
-import type { Database } from 'shared-types/database.types';
+import type { Database } from '@shared-types/database.types';
 import { checkVideoLimit } from '@/lib/plan-limits';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;

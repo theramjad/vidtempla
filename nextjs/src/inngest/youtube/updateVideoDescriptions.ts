@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { decrypt, encrypt } from '@/utils/encryption';
 import { refreshAccessToken, updateVideoDescription } from '@/lib/clients/youtube';
 import { buildDescription } from '@/utils/templateParser';
-import type { Database } from 'shared-types/database.types';
+import type { Database } from '@shared-types/database.types';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -154,7 +154,12 @@ export const updateVideoDescriptions = inngestClient.createFunction(
 
     // Step 3: Update YouTube in batches (respect API rate limits)
     const BATCH_SIZE = 10;
-    const updateResults = [];
+    const updateResults: Array<{
+      videoId: string;
+      success: boolean;
+      description?: string;
+      error?: string;
+    }> = [];
 
     for (let i = 0; i < descriptionsToUpdate.length; i += BATCH_SIZE) {
       const batch = descriptionsToUpdate.slice(i, i + BATCH_SIZE);
@@ -206,9 +211,12 @@ export const updateVideoDescriptions = inngestClient.createFunction(
 
     // Step 4: Update database for successful updates
     await step.run('update-database', async () => {
-      const successfulUpdates = updateResults.filter((r) => r.success);
+      const successfulUpdates = updateResults.filter((r) => r.success && r.description);
 
       for (const update of successfulUpdates) {
+        // TypeScript now knows description exists due to filter
+        const description = update.description!;
+
         // Get current version number
         const { data: historyData } = await supabase
           .from('description_history')
@@ -223,13 +231,13 @@ export const updateVideoDescriptions = inngestClient.createFunction(
         // Update current_description
         await supabase
           .from('youtube_videos')
-          .update({ current_description: update.description })
+          .update({ current_description: description })
           .eq('id', update.videoId);
 
         // Create history entry
         await supabase.from('description_history').insert({
           video_id: update.videoId,
-          description: update.description,
+          description: description,
           version_number: nextVersion,
           created_by: userId,
         });

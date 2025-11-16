@@ -18,6 +18,52 @@ export default function Page() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResetForm, setShowResetForm] = useState(false);
 
+  // Listen for PASSWORD_RECOVERY event
+  useEffect(() => {
+    if (!appConfig.auth.enablePasswordReset) return;
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        // Show the password reset form when PASSWORD_RECOVERY event is detected
+        setShowResetForm(true);
+        toast({
+          title: "Ready to reset",
+          description: "You can now set your new password.",
+        });
+      }
+    });
+
+    // Cleanup subscription on unmount
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase, toast]);
+
+  // Check if user is authenticated via the reset password flow
+  useEffect(() => {
+    if (!appConfig.auth.enablePasswordReset) return;
+
+    const checkResetPasswordFlow = async () => {
+      // If we have a hash in the URL, it means the user clicked on a reset password link
+      const hash = window.location.hash;
+      if (hash && hash.includes("type=recovery")) {
+        setShowResetForm(true);
+      } else if (!user && !hash) {
+        // If no hash and no user, redirect to forgot-password
+        toast({
+          variant: "destructive",
+          title: "Access denied",
+          description: "You need a valid reset link to access this page.",
+        });
+        router.push("/forgot-password");
+      }
+    };
+
+    checkResetPasswordFlow();
+  }, [router, user, toast]);
+
   // Check if password reset is enabled
   if (!appConfig.auth.enablePasswordReset) {
     return (
@@ -41,48 +87,6 @@ export default function Page() {
       </div>
     );
   }
-
-  // Listen for PASSWORD_RECOVERY event
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "PASSWORD_RECOVERY") {
-        // Show the password reset form when PASSWORD_RECOVERY event is detected
-        setShowResetForm(true);
-        toast({
-          title: "Ready to reset",
-          description: "You can now set your new password.",
-        });
-      }
-    });
-
-    // Cleanup subscription on unmount
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [supabase, toast]);
-
-  // Check if user is authenticated via the reset password flow
-  useEffect(() => {
-    const checkResetPasswordFlow = async () => {
-      // If we have a hash in the URL, it means the user clicked on a reset password link
-      const hash = window.location.hash;
-      if (hash && hash.includes("type=recovery")) {
-        setShowResetForm(true);
-      } else if (!user && !hash) {
-        // If no hash and no user, redirect to forgot-password
-        toast({
-          variant: "destructive",
-          title: "Access denied",
-          description: "You need a valid reset link to access this page.",
-        });
-        router.push("/forgot-password");
-      }
-    };
-
-    checkResetPasswordFlow();
-  }, [router, user, toast]);
 
   // Handle password update
   async function handlePasswordUpdate(e: React.FormEvent) {

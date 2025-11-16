@@ -5,52 +5,29 @@
  *
  * tl;dr - this is where all the tRPC server stuff is created and plugged in.
  */
-import { Database } from "@shared-types/database.types";
-import { createServerClient } from "@supabase/ssr";
 import { User } from "@supabase/supabase-js";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { type CreateNextContextOptions } from "@trpc/server/adapters/next";
 import superjson from "superjson";
 import { appConfig } from "@/config/app";
+import { supabaseServer } from "@/lib/clients/supabase";
 
 interface AuthContext {
   user: User | null;
-  supabase: ReturnType<typeof createServerClient<Database>>;
 }
 
-const createInnerTRPCContext = ({ user, supabase }: AuthContext) => {
+const createInnerTRPCContext = ({ user }: AuthContext) => {
   return {
     user,
-    supabase,
   };
 };
 
 export const createTRPCContext = async (opts: CreateNextContextOptions) => {
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return opts.req.cookies[name];
-        },
-        set(name: string, value: string, options: any) {
-          // Handle cookie setting if needed
-          opts.res.setHeader("Set-Cookie", `${name}=${value}`);
-        },
-        remove(name: string, options: any) {
-          // Handle cookie removal if needed
-          opts.res.setHeader("Set-Cookie", `${name}=; Max-Age=0`);
-        },
-      },
-    },
-  );
-
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await supabaseServer.auth.getUser();
 
-  return createInnerTRPCContext({ user, supabase });
+  return createInnerTRPCContext({ user });
 };
 
 const t = initTRPC.context<typeof createTRPCContext>().create({
@@ -69,7 +46,6 @@ const isAuthed = t.middleware(({ next, ctx }) => {
   return next({
     ctx: {
       user: ctx.user,
-      supabase: ctx.supabase,
     },
   });
 });
@@ -97,7 +73,6 @@ const isAdmin = t.middleware(({ next, ctx }) => {
   return next({
     ctx: {
       user: ctx.user,
-      supabase: ctx.supabase,
     },
   });
 });

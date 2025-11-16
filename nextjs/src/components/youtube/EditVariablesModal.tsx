@@ -80,26 +80,32 @@ export default function EditVariablesModal({
   }, [variables]);
 
   const handleValueChange = (key: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        value,
-      },
-    }));
+    setFormData((prev) => {
+      if (!prev[key]) return prev;
+      return {
+        ...prev,
+        [key]: {
+          ...prev[key],
+          value,
+        },
+      };
+    });
   };
 
   const handleTypeChange = (
     key: string,
     type: 'text' | 'number' | 'date' | 'url'
   ) => {
-    setFormData((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        type,
-      },
-    }));
+    setFormData((prev) => {
+      if (!prev[key]) return prev;
+      return {
+        ...prev,
+        [key]: {
+          ...prev[key],
+          type,
+        },
+      };
+    });
   };
 
   const handleSave = async () => {
@@ -139,7 +145,7 @@ export default function EditVariablesModal({
     if (!groupedVariables[value.templateName]) {
       groupedVariables[value.templateName] = {};
     }
-    groupedVariables[value.templateName][key] = value;
+    groupedVariables[value.templateName]![key] = value;
   });
 
   return (

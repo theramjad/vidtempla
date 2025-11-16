@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { api } from '@/utils/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { Database } from '@shared-types/database.types';
 import {
   Table,
   TableBody,
@@ -124,7 +125,7 @@ export default function ChannelsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {channels.map((channel) => (
+              {channels?.map((channel: Database['public']['Tables']['youtube_channels']['Row']) => (
                 <TableRow key={channel.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">

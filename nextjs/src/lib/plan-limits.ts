@@ -169,5 +169,5 @@ export async function hasTeamFeaturesAccess(
 ): Promise<boolean> {
   const planTier = await getUserPlanTier(userId, supabase);
   const features = getPlanFeatures(planTier);
-  return features.teamFeatures || false;
+  return 'teamFeatures' in features ? features.teamFeatures : false;
 }

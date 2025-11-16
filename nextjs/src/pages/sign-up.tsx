@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/component";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { appConfig } from "@/config/app";
+import Link from "next/link";
 
 export default function Page() {
   const router = useRouter();
@@ -147,12 +148,12 @@ export default function Page() {
                 </button>
               </div>
               <div className="text-center">
-                <a
+                <Link
                   href="/sign-in"
                   className="text-sm text-emerald-600 hover:text-emerald-500"
                 >
                   Already have an account? Sign in
-                </a>
+                </Link>
               </div>
             </form>
           </>
