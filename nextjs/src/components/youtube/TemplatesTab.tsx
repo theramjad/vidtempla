@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { api } from '@/utils/api';
+import type { RouterOutputs } from '@/utils/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -40,11 +41,13 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, Edit2, Trash2 } from 'lucide-react';
 import UpdateImpactDialog from './UpdateImpactDialog';
 
+type Template = RouterOutputs['admin']['youtube']['templates']['list'][number];
+
 export default function TemplatesTab() {
   const { toast } = useToast();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [formData, setFormData] = useState({ name: '', content: '' });
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -171,7 +174,7 @@ export default function TemplatesTab() {
     }
   };
 
-  const openEditDialog = (template: any) => {
+  const openEditDialog = (template: Template) => {
     setSelectedTemplate(template);
     setFormData({ name: template.name, content: template.content });
     setOriginalContent(template.content);

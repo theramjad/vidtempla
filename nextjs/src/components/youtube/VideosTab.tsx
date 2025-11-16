@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { api } from '@/utils/api';
+import type { RouterOutputs } from '@/utils/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,8 @@ import EditVariablesModal from './EditVariablesModal';
 import PreviewModal from './PreviewModal';
 import HistoryDrawer from './HistoryDrawer';
 
+type VideoWithRelations = RouterOutputs['admin']['youtube']['videos']['list'][number];
+
 export default function VideosTab() {
   const { toast } = useToast();
   const [filters, setFilters] = useState({ channelId: 'all', containerId: 'all', search: '' });
@@ -43,7 +46,7 @@ export default function VideosTab() {
   const [editVariablesOpen, setEditVariablesOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+  const [selectedVideo, setSelectedVideo] = useState<VideoWithRelations | null>(null);
   const [selectedContainerId, setSelectedContainerId] = useState('');
 
   const { data: channels } = api.admin.youtube.channels.list.useQuery();
@@ -83,22 +86,22 @@ export default function VideosTab() {
     }
   };
 
-  const openAssignDialog = (video: any) => {
+  const openAssignDialog = (video: VideoWithRelations) => {
     setSelectedVideo(video);
     setAssignDialogOpen(true);
   };
 
-  const openEditVariables = (video: any) => {
+  const openEditVariables = (video: VideoWithRelations) => {
     setSelectedVideo(video);
     setEditVariablesOpen(true);
   };
 
-  const openPreview = (video: any) => {
+  const openPreview = (video: VideoWithRelations) => {
     setSelectedVideo(video);
     setPreviewOpen(true);
   };
 
-  const openHistory = (video: any) => {
+  const openHistory = (video: VideoWithRelations) => {
     setSelectedVideo(video);
     setHistoryOpen(true);
   };
@@ -316,7 +319,7 @@ export default function VideosTab() {
         {selectedVideo && (
           <EditVariablesModal
             videoId={selectedVideo.id}
-            videoTitle={selectedVideo.title}
+            videoTitle={selectedVideo.title ?? 'Untitled Video'}
             open={editVariablesOpen}
             onOpenChange={setEditVariablesOpen}
             onSuccess={refetch}
@@ -327,7 +330,7 @@ export default function VideosTab() {
         {selectedVideo && (
           <PreviewModal
             videoId={selectedVideo.id}
-            videoTitle={selectedVideo.title}
+            videoTitle={selectedVideo.title ?? 'Untitled Video'}
             open={previewOpen}
             onOpenChange={setPreviewOpen}
             onSuccess={refetch}
@@ -338,7 +341,7 @@ export default function VideosTab() {
         {selectedVideo && (
           <HistoryDrawer
             videoId={selectedVideo.id}
-            videoTitle={selectedVideo.title}
+            videoTitle={selectedVideo.title ?? 'Untitled Video'}
             open={historyOpen}
             onOpenChange={setHistoryOpen}
             onSuccess={refetch}

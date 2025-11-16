@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/utils/api';
+import type { RouterOutputs } from '@/utils/api';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -24,6 +25,8 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+
+type VideoVariable = RouterOutputs['admin']['youtube']['videos']['getVariables'][number];
 
 interface EditVariablesModalProps {
   videoId: string;
@@ -65,13 +68,14 @@ export default function EditVariablesModal({
   useEffect(() => {
     if (variables) {
       const initialData: typeof formData = {};
-      variables.forEach((variable: any) => {
+      variables.forEach((variable: VideoVariable) => {
         const key = `${variable.template_id}-${variable.variable_name}`;
+        const variableType = variable.variable_type as 'text' | 'number' | 'date' | 'url';
         initialData[key] = {
           templateId: variable.template_id,
           name: variable.variable_name,
           value: variable.variable_value || '',
-          type: (variable.variable_type as any) || 'text',
+          type: variableType || 'text',
           templateName: variable.template?.name || 'Unknown Template',
         };
       });
@@ -194,7 +198,7 @@ export default function EditVariablesModal({
                         <Label htmlFor={`type-${key}`}>Type</Label>
                         <Select
                           value={variable.type}
-                          onValueChange={(value: any) =>
+                          onValueChange={(value: 'text' | 'number' | 'date' | 'url') =>
                             handleTypeChange(key, value)
                           }
                         >

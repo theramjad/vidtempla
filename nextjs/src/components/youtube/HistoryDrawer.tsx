@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { api } from '@/utils/api';
+import type { RouterOutputs } from '@/utils/api';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -26,6 +27,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+
+type HistoryVersion = RouterOutputs['admin']['youtube']['videos']['getHistory'][number];
 
 interface HistoryDrawerProps {
   videoId: string;
@@ -102,7 +105,7 @@ export default function HistoryDrawer({
               <p className="text-muted-foreground">No version history available.</p>
             </div>
           ) : (
-            history.map((version: any, index: number) => {
+            history.map((version: HistoryVersion, index: number) => {
               const isExpanded = expandedVersions.has(version.id);
               const isCurrent = index === 0;
 
@@ -126,11 +129,6 @@ export default function HistoryDrawer({
                       <p className="text-sm text-muted-foreground mt-1">
                         {new Date(version.created_at).toLocaleString()}
                       </p>
-                      {version.user && (
-                        <p className="text-xs text-muted-foreground">
-                          by {version.user.email || 'Unknown'}
-                        </p>
-                      )}
                     </div>
 
                     <div className="flex gap-2">
