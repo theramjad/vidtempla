@@ -10,6 +10,7 @@ import {
   fetchChannelInfo,
 } from '@/lib/clients/youtube';
 import { encrypt } from '@/utils/encryption';
+import { checkChannelLimit } from '@/lib/plan-limits';
 
 export default async function handler(
   req: NextApiRequest,
@@ -85,6 +86,17 @@ export default async function handler(
         })
         .eq('id', existingChannel.id);
     } else {
+      // Check channel limit before adding a new channel
+      const limitCheck = await checkChannelLimit(session.user.id, supabase);
+
+      if (!limitCheck.canAddChannel) {
+        return res.redirect(
+          `/admin/youtube?error=${encodeURIComponent(
+            `Channel limit reached (${limitCheck.limit} ${limitCheck.limit === 1 ? 'channel' : 'channels'} on ${limitCheck.planTier} plan). Please upgrade to add more channels.`
+          )}`
+        );
+      }
+
       // Insert new channel
       await supabase.from('youtube_channels').insert({
         user_id: session.user.id,
