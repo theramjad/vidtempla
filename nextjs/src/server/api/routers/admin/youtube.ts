@@ -614,6 +614,10 @@ export const youtubeRouter = createTRPCRouter({
           });
         }
 
+        if (!video.container.template_order || video.container.template_order.length === 0) {
+          return { description: '' };
+        }
+
         // Get templates in order
         const { data: templates } = await supabaseServer
           .from('templates')
@@ -627,7 +631,7 @@ export const youtubeRouter = createTRPCRouter({
         // Sort templates according to template_order
         const sortedTemplates = video.container.template_order
           .map((id: string) => templates.find((t) => t.id === id))
-          .filter(Boolean);
+          .filter((t): t is { id: string; content: string } => t !== undefined);
 
         // Get all variables for this video
         const { data: variables } = await supabaseServer

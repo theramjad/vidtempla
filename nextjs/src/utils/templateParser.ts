@@ -14,8 +14,8 @@ export function parseVariables(content: string): string[] {
   let match;
 
   while ((match = regex.exec(content)) !== null) {
-    const variableName = match[1].trim();
-    if (!matches.includes(variableName)) {
+    const variableName = match[1]?.trim();
+    if (variableName && !matches.includes(variableName)) {
       matches.push(variableName);
     }
   }
