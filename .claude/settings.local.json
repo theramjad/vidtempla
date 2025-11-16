@@ -4,7 +4,13 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(npx inngest-cli@latest dev)"
+      "Bash(npx inngest-cli@latest dev)",
+      "Bash(supabase db diff:*)",
+      "Bash(supabase migration:*)",
+      "Bash(npx supabase:*)",
+      "Bash(shared-types/database.types.ts)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": []
