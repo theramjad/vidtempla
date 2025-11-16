@@ -35,14 +35,25 @@ export default async function handler(
   try {
     // Get raw body for signature validation
     const rawBody = await getRawBody(req);
-    const signature = req.headers["webhook-signature"] as string;
 
-    if (!signature) {
-      return res.status(400).json({ error: "Missing webhook signature" });
+    // Polar sends three headers for webhook validation
+    const webhookId = req.headers["webhook-id"] as string;
+    const webhookSignature = req.headers["webhook-signature"] as string;
+    const webhookTimestamp = req.headers["webhook-timestamp"] as string;
+
+    if (!webhookId || !webhookSignature || !webhookTimestamp) {
+      return res.status(400).json({ error: "Missing webhook headers" });
     }
 
-    // Validate webhook signature
-    const event = validateEvent(rawBody, signature, POLAR_WEBHOOK_SECRET);
+    // Create headers object for validation
+    const headers = {
+      "webhook-id": webhookId,
+      "webhook-signature": webhookSignature,
+      "webhook-timestamp": webhookTimestamp,
+    };
+
+    // Validate webhook signature - the function expects headers object, not just signature
+    const event = validateEvent(rawBody, headers, POLAR_WEBHOOK_SECRET);
 
     if (!event) {
       return res.status(400).json({ error: "Invalid webhook signature" });
@@ -142,45 +153,62 @@ async function handleSubscriptionEvent(event: {
 }) {
   const subscription = event.data as {
     id: string;
-    customer_id: string;
+    customerId: string;
     product: { name: string };
     status: string;
-    current_period_start: string;
-    current_period_end: string;
-    cancel_at_period_end: boolean;
+    currentPeriodStart: string;
+    currentPeriodEnd: string;
+    cancelAtPeriodEnd: boolean;
+    metadata?: {
+      userId?: string;
+      planTier?: string;
+    };
   };
 
   // Map product name to plan tier
   const planTier = mapProductToPlanTier(subscription.product.name);
   const status = mapSubscriptionStatus(subscription.status);
 
-  // Find user by polar_customer_id
-  const { data: existingSubscription } = await supabaseServer
+  console.log(`Processing subscription for customer: ${subscription.customerId}, plan: ${planTier}`);
+
+  // Try to find subscription by polar_customer_id first, then by user_id from metadata
+  let existingSubscription = await supabaseServer
     .from("subscriptions")
     .select("id, user_id")
-    .eq("polar_customer_id", subscription.customer_id)
+    .eq("polar_customer_id", subscription.customerId)
     .single();
 
-  if (existingSubscription) {
+  // If not found by polar_customer_id, try to find by user_id from metadata
+  if (!existingSubscription.data && subscription.metadata?.userId) {
+    console.log(`Trying to find subscription by userId: ${subscription.metadata.userId}`);
+    existingSubscription = await supabaseServer
+      .from("subscriptions")
+      .select("id, user_id")
+      .eq("user_id", subscription.metadata.userId)
+      .single();
+  }
+
+  if (existingSubscription.data) {
     // Update existing subscription
     await supabaseServer
       .from("subscriptions")
       .update({
         polar_subscription_id: subscription.id,
+        polar_customer_id: subscription.customerId,  // Set this now!
         plan_tier: planTier,
         status: status,
-        current_period_start: subscription.current_period_start,
-        current_period_end: subscription.current_period_end,
-        cancel_at_period_end: subscription.cancel_at_period_end,
+        current_period_start: subscription.currentPeriodStart,
+        current_period_end: subscription.currentPeriodEnd,
+        cancel_at_period_end: subscription.cancelAtPeriodEnd,
       })
-      .eq("id", existingSubscription.id);
+      .eq("id", existingSubscription.data.id);
 
     console.log(
-      `Updated subscription ${existingSubscription.id} for user ${existingSubscription.user_id}`
+      `Updated subscription ${existingSubscription.data.id} for user ${existingSubscription.data.user_id} to ${planTier}`
     );
   } else {
     console.warn(
-      `No subscription found for polar_customer_id: ${subscription.customer_id}`
+      `No subscription found for polar_customer_id: ${subscription.customerId} or userId: ${subscription.metadata?.userId}`
     );
   }
 }
@@ -215,21 +243,21 @@ async function handleOrderCreated(event: {
 }) {
   const order = event.data as {
     id: string;
-    customer_id: string;
+    customerId: string;  // camelCase!
     amount: number;
     currency: string;
-    subscription_id?: string;
+    subscriptionId?: string;  // camelCase!
   };
 
   // Find user by polar_customer_id
   const { data: userSubscription } = await supabaseServer
     .from("subscriptions")
     .select("user_id, id")
-    .eq("polar_customer_id", order.customer_id)
+    .eq("polar_customer_id", order.customerId)
     .single();
 
   if (!userSubscription) {
-    console.warn(`No user found for polar_customer_id: ${order.customer_id}`);
+    console.warn(`No user found for polar_customer_id: ${order.customerId}`);
     return;
   }
 
@@ -237,11 +265,11 @@ async function handleOrderCreated(event: {
   await supabaseServer.from("orders").insert({
     user_id: userSubscription.user_id,
     polar_order_id: order.id,
-    polar_customer_id: order.customer_id,
+    polar_customer_id: order.customerId,
     amount: order.amount,
     currency: order.currency,
     status: "pending",
-    subscription_id: order.subscription_id
+    subscription_id: order.subscriptionId
       ? userSubscription.id
       : (null as never),
   });
