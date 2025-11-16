@@ -33,18 +33,16 @@ export const appConfig = {
     showSettings: true,
     navigation: [
       {
-        title: "YouTube Manager",
-        subItems: [
-          { title: "Dashboard", url: "/admin/youtube" },
-        ],
-      },
-      {
-        title: "Settings",
-        url: "/admin/settings",
+        title: "Dashboard",
+        url: "/admin/youtube",
       },
       {
         title: "Pricing",
         url: "/admin/pricing",
+      },
+      {
+        title: "Settings",
+        url: "/admin/settings",
       },
     ],
   },
