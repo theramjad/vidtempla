@@ -2,10 +2,9 @@ import { cn } from "@/lib/utils";
 import * as React from "react";
 import { Button } from "./button";
 
-interface ButtonGroupProps extends React.HTMLAttributes<HTMLDivElement> {
+interface ButtonGroupProps extends React.PropsWithChildren<React.HTMLAttributes<HTMLDivElement>> {
   value?: string;
   onValueChange?: (value: string) => void;
-  children?: React.ReactNode;
 }
 
 interface ButtonGroupItemProps

@@ -11,7 +11,8 @@
       "Bash(shared-types/database.types.ts)",
       "Bash(npm install:*)",
       "Bash(npm run dev:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npm view:*)"
     ],
     "deny": [],
     "ask": []
