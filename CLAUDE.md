@@ -3,6 +3,9 @@
 ## Project Overview
 This is an admin dashboard template built with Next.js 15, TypeScript, Supabase, and tRPC. It provides a complete foundation for building admin interfaces. The user will be building upon this template.
 
+## Git Commit
+Git commit anytime you make a big change, and for big changes, also split up into smaller logical commits as well. You should do this automatically without asking me for permission every single time. Your commits should be detailed in a way that you understand, in case you need to look back at the Git commit history.
+
 ## Tech Stack & Architecture
 - **Frontend**: Next.js 15, React 18, TypeScript
 - **Styling**: Tailwind CSS, Radix UI components
