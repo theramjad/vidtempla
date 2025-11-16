@@ -33,7 +33,7 @@ const pricingTiers = [
     highlighted: false,
   },
   {
-    name: 'Premium',
+    name: 'Pro',
     price: '$20',
     period: 'per month',
     description: 'For content creators managing one channel',
@@ -45,7 +45,7 @@ const pricingTiers = [
       'Version history & rollback',
       'Priority support',
     ],
-    buttonText: 'Upgrade to Premium',
+    buttonText: 'Upgrade to Pro',
     buttonVariant: 'default' as const,
     highlighted: true,
   },
@@ -55,7 +55,7 @@ const pricingTiers = [
     period: 'per month',
     description: 'For agencies and businesses with multiple channels',
     features: [
-      'Everything in Premium',
+      'Everything in Pro',
       'Unlimited YouTube channels',
       'Team collaboration',
       'Bulk operations',
@@ -91,7 +91,7 @@ export default function PricingPage() {
     },
   });
 
-  const handleUpgrade = async (planTier: 'premium' | 'business') => {
+  const handleUpgrade = async (planTier: 'pro' | 'business') => {
     setCheckoutLoading(planTier);
     createCheckout.mutate({ planTier });
   };
@@ -198,8 +198,8 @@ export default function PricingPage() {
                     size="lg"
                     disabled={buttonDisabled || isLoading || planLoading}
                     onClick={() => {
-                      if (tierName === 'premium' || tierName === 'business') {
-                        handleUpgrade(tierName as 'premium' | 'business');
+                      if (tierName === 'pro' || tierName === 'business') {
+                        handleUpgrade(tierName as 'pro' | 'business');
                       }
                     }}
                   >

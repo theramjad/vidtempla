@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { validateEvent } from "@polar-sh/sdk/webhooks";
-import { POLAR_WEBHOOK_SECRET } from "~/lib/polar-server";
-import { supabaseServer } from "~/lib/clients/supabase";
-import type { PlanTier, SubscriptionStatus } from "~/lib/polar";
+import { POLAR_WEBHOOK_SECRET } from "@/lib/polar-server";
+import { supabaseServer } from "@/lib/clients/supabase";
+import type { PlanTier, SubscriptionStatus } from "@/lib/polar";
 
 /**
  * Read raw body from request
@@ -296,7 +296,7 @@ async function handleOrderRefunded(event: {
  */
 function mapProductToPlanTier(productName: string): PlanTier {
   const name = productName.toLowerCase();
-  if (name.includes("premium")) return "premium";
+  if (name.includes("pro")) return "pro";
   if (name.includes("business")) return "business";
   return "free";
 }

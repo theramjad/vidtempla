@@ -26,7 +26,7 @@ if (
 /**
  * Plan tier type definition
  */
-export type PlanTier = "free" | "premium" | "business";
+export type PlanTier = "free" | "pro" | "business";
 
 /**
  * Subscription status type definition
@@ -40,21 +40,22 @@ export type SubscriptionStatus =
 
 /**
  * Plan configuration with Polar product IDs
- * TODO: Replace these with your actual Polar product/price IDs
+ * NOTE: These should be your Polar Product IDs from https://polar.sh
+ * You can find these in your Polar dashboard under Products
  */
 export const PLAN_CONFIG = {
   free: {
     name: "Free",
-    priceId: null, // Free tier doesn't have a Polar product
+    productId: null, // Free tier doesn't have a Polar product
     features: {
       videoLimit: 5,
       channelLimit: 1,
       autoUpdate: false,
     },
   },
-  premium: {
-    name: "Premium",
-    priceId: "POLAR_PREMIUM_PRICE_ID", // Replace with actual Polar price ID
+  pro: {
+    name: "Pro",
+    productId: process.env.POLAR_PRO_PRODUCT_ID || null,
     features: {
       videoLimit: Infinity,
       channelLimit: 1,
@@ -63,7 +64,7 @@ export const PLAN_CONFIG = {
   },
   business: {
     name: "Business",
-    priceId: "POLAR_BUSINESS_PRICE_ID", // Replace with actual Polar price ID
+    productId: process.env.POLAR_BUSINESS_PRODUCT_ID || null,
     features: {
       videoLimit: Infinity,
       channelLimit: Infinity,

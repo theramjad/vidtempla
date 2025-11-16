@@ -6,8 +6,9 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { TRPCError } from "@trpc/server";
-import { polar } from "~/lib/polar-server";
-import { PLAN_CONFIG, type PlanTier } from "~/lib/polar";
+import { polar } from "@/lib/polar-server";
+import { PLAN_CONFIG, type PlanTier } from "@/lib/polar";
+import { supabaseServer } from "@/lib/clients/supabase";
 
 export const billingRouter = createTRPCRouter({
   /**
@@ -32,7 +33,7 @@ export const billingRouter = createTRPCRouter({
 
     // If no subscription exists, create a free tier subscription
     if (!subscription) {
-      const { data: newSubscription, error: insertError } = await ctx.supabase
+      const { data: newSubscription, error: insertError } = await supabaseServer
         .from("subscriptions")
         .insert({
           user_id: ctx.user.id,
@@ -61,17 +62,17 @@ export const billingRouter = createTRPCRouter({
   createCheckoutSession: protectedProcedure
     .input(
       z.object({
-        planTier: z.enum(["premium", "business"]),
+        planTier: z.enum(["pro", "business"]),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
         // Get plan configuration
         const planConfig = PLAN_CONFIG[input.planTier];
-        if (!planConfig.priceId) {
+        if (!planConfig.productId) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Invalid plan tier",
+            message: "Invalid plan tier or product ID not configured",
           });
         }
 
@@ -83,8 +84,8 @@ export const billingRouter = createTRPCRouter({
           .single();
 
         // Create checkout session with Polar
-        const checkoutSession = await polar.checkouts.custom.create({
-          productPriceId: planConfig.priceId,
+        const checkoutSession = await polar.checkouts.create({
+          products: [planConfig.productId],
           successUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/admin/settings?checkout=success`,
           customerEmail: ctx.user.email,
           metadata: {

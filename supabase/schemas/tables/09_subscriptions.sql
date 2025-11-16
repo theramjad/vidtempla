@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     polar_subscription_id TEXT UNIQUE,
     polar_customer_id TEXT,
-    plan_tier TEXT NOT NULL DEFAULT 'free' CHECK (plan_tier IN ('free', 'premium', 'business')),
+    plan_tier TEXT NOT NULL DEFAULT 'free' CHECK (plan_tier IN ('free', 'pro', 'business')),
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'canceled', 'past_due', 'trialing', 'incomplete')),
     current_period_start TIMESTAMPTZ,
     current_period_end TIMESTAMPTZ,
