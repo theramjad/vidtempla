@@ -195,7 +195,7 @@ export async function fetchChannelVideos(
   pageToken?: string
 ): Promise<{ videos: YouTubeVideo[]; nextPageToken?: string }> {
   const response = await axios.get<{
-    items: Array<{ id: { videoId: string }; snippet: any }>;
+    items: Array<{ id: { videoId: string }; snippet: { title: string; description: string; publishedAt: string } }>;
     nextPageToken?: string;
   }>(`${YOUTUBE_API_BASE}/search`, {
     params: {

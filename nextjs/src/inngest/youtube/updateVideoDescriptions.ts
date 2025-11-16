@@ -15,8 +15,13 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // Helper to get valid access token
 async function getValidAccessToken(
-  channel: any,
-  supabase: any
+  channel: {
+    id: string;
+    access_token_encrypted: string | null;
+    refresh_token_encrypted: string | null;
+    token_expires_at: string | null;
+  },
+  supabase: ReturnType<typeof createClient<Database>>
 ): Promise<string> {
   if (!channel.access_token_encrypted || !channel.refresh_token_encrypted) {
     throw new Error('Channel tokens not found');
@@ -124,7 +129,7 @@ export const updateVideoDescriptions = inngestClient.createFunction(
           // Build variables map
           const variablesMap: Record<string, string> = {};
           if (video.variables) {
-            video.variables.forEach((v: any) => {
+            video.variables.forEach((v: { variable_name: string; variable_value: string | null }) => {
               variablesMap[v.variable_name] = v.variable_value || '';
             });
           }

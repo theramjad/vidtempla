@@ -18,55 +18,6 @@ import { inngestClient } from '@/lib/clients/inngest';
 import { supabaseServer } from '@/lib/clients/supabase';
 import type { Database } from '@shared-types/database.types';
 
-// Helper function to get valid access token (refresh if needed)
-async function getValidAccessToken(
-  channel: {
-    access_token_encrypted: string | null;
-    refresh_token_encrypted: string | null;
-    token_expires_at: string | null;
-    id: string;
-  },
-  supabaseServer: any
-): Promise<string> {
-  if (!channel.access_token_encrypted || !channel.refresh_token_encrypted) {
-    throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message: 'Channel tokens not found',
-    });
-  }
-
-  const accessToken = decrypt(channel.access_token_encrypted);
-  const expiresAt = channel.token_expires_at
-    ? new Date(channel.token_expires_at)
-    : null;
-
-  // Check if token is expired (with 5 minute buffer)
-  const now = new Date();
-  const bufferTime = 5 * 60 * 1000; // 5 minutes
-
-  if (expiresAt && expiresAt.getTime() - now.getTime() < bufferTime) {
-    // Token is expired or about to expire, refresh it
-    const refreshToken = decrypt(channel.refresh_token_encrypted);
-    const newTokens = await refreshAccessToken(refreshToken);
-
-    // Update tokens in database
-    const newExpiresAt = new Date();
-    newExpiresAt.setSeconds(newExpiresAt.getSeconds() + newTokens.expires_in);
-
-    await supabaseServer
-      .from('youtube_channels')
-      .update({
-        access_token_encrypted: encrypt(newTokens.access_token),
-        token_expires_at: newExpiresAt.toISOString(),
-      })
-      .eq('id', channel.id);
-
-    return newTokens.access_token;
-  }
-
-  return accessToken;
-}
-
 export const youtubeRouter = createTRPCRouter({
   // ==================== Channel Management ====================
 
@@ -170,7 +121,11 @@ export const youtubeRouter = createTRPCRouter({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const updateData: any = {};
+        const updateData: {
+          name?: string;
+          template_order?: string[];
+          separator?: string;
+        } = {};
         if (input.name) updateData.name = input.name;
         if (input.templateIds) updateData.template_order = input.templateIds;
         if (input.separator !== undefined) updateData.separator = input.separator;
@@ -290,7 +245,10 @@ export const youtubeRouter = createTRPCRouter({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const updateData: any = {};
+        const updateData: {
+          name?: string;
+          content?: string;
+        } = {};
         if (input.name) updateData.name = input.name;
         if (input.content !== undefined) updateData.content = input.content;
 
@@ -514,7 +472,13 @@ export const youtubeRouter = createTRPCRouter({
             .in('id', container.template_order);
 
           if (templates) {
-            const variablesToCreate: any[] = [];
+            const variablesToCreate: Array<{
+              video_id: string;
+              template_id: string;
+              variable_name: string;
+              variable_value: string;
+              variable_type: string;
+            }> = [];
 
             templates.forEach((template) => {
               const variables = parseVariables(template.content);

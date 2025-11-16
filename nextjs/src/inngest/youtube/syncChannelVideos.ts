@@ -100,7 +100,14 @@ export const syncChannelVideos = inngestClient.createFunction(
 
     // Step 4: Fetch all videos from YouTube (handle pagination)
     const allVideos = await step.run('fetch-youtube-videos', async () => {
-      const videos: any[] = [];
+      const videos: Array<{
+        id: string;
+        snippet: {
+          title: string;
+          description: string;
+          publishedAt: string;
+        };
+      }> = [];
       let pageToken: string | undefined = undefined;
 
       do {

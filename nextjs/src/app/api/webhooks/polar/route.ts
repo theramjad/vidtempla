@@ -40,7 +40,13 @@ export const POST = Webhooks({
     },
 
     onOrderCreated: async (payload) => {
-        const order = payload.data as any;
+        const order = payload.data as {
+            id: string;
+            customerId: string;
+            subscriptionId?: string;
+            amount?: number;
+            currency?: string;
+        };
         console.log(`Processing order.created for customer: ${order.customerId}`);
 
         // Find user by polar_customer_id
@@ -118,7 +124,16 @@ export const POST = Webhooks({
  * Handle subscription events (created, updated, active)
  */
 async function handleSubscriptionEvent(
-    subscription: any,
+    subscription: {
+        id: string;
+        customerId: string;
+        product: { name: string };
+        status: string;
+        currentPeriodStart: Date | null;
+        currentPeriodEnd: Date | null;
+        cancelAtPeriodEnd: boolean;
+        metadata?: { userId?: string };
+    },
     eventType: string
 ) {
     // Map product name to plan tier
@@ -153,8 +168,8 @@ async function handleSubscriptionEvent(
                 polar_customer_id: subscription.customerId,
                 plan_tier: planTier,
                 status: status,
-                current_period_start: subscription.currentPeriodStart,
-                current_period_end: subscription.currentPeriodEnd,
+                current_period_start: subscription.currentPeriodStart?.toISOString() ?? null,
+                current_period_end: subscription.currentPeriodEnd?.toISOString() ?? null,
                 cancel_at_period_end: subscription.cancelAtPeriodEnd,
             })
             .eq("id", existingSubscription.data.id);
