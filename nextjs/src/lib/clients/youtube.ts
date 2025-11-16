@@ -1,6 +1,10 @@
 /**
  * YouTube Data API v3 client
  * Handles OAuth flow and API interactions
+ *
+ * Note: Uses custom type definitions instead of the googleapis package
+ * to avoid the large bundle size (198 MB). These types match the official
+ * YouTube API responses for the specific endpoints this app uses.
  */
 
 import axios from 'axios';
@@ -9,6 +13,10 @@ const YOUTUBE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const YOUTUBE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 
+/**
+ * Custom type for OAuth 2.0 token response
+ * Matches Google's standard OAuth token format
+ */
 interface OAuthTokenResponse {
   access_token: string;
   refresh_token?: string;
@@ -17,6 +25,10 @@ interface OAuthTokenResponse {
   token_type: string;
 }
 
+/**
+ * Custom type for YouTube channel resource
+ * Subset of official API response with commonly used fields
+ */
 interface YouTubeChannel {
   id: string;
   snippet: {
@@ -35,6 +47,10 @@ interface YouTubeChannel {
   };
 }
 
+/**
+ * Custom type for YouTube video resource
+ * Subset of official API response with commonly used fields
+ */
 interface YouTubeVideo {
   id: string;
   snippet: {
