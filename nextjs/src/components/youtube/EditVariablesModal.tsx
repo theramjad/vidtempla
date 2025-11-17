@@ -253,11 +253,11 @@ export default function EditVariablesModal({
                 <div className="flex justify-center py-4">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              ) : preview ? (
+              ) : preview?.description ? (
                 <div className="rounded-md border bg-muted/50 p-4">
                   <Label>Preview</Label>
                   <Textarea
-                    value={preview}
+                    value={preview.description}
                     readOnly
                     className="mt-2 resize-y min-h-[200px] bg-background"
                     rows={10}
