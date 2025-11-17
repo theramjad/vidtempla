@@ -5,6 +5,6 @@ import { EventSchemas, Inngest } from "inngest";
 // We keep the ID consistent across apps so functions can be served from
 // multiple runtimes without duplication.
 export const inngestClient = new Inngest({
-  id: "admin-template",
+  id: "vid-templa",
   schemas: new EventSchemas().fromRecord<InngestEvents>(),
 }); 

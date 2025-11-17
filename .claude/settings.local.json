@@ -12,7 +12,8 @@
       "Bash(npm install:*)",
       "Bash(npm run dev:*)",
       "Bash(npm run build:*)",
-      "Bash(npm view:*)"
+      "Bash(npm view:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

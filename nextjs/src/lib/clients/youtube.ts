@@ -45,6 +45,11 @@ interface YouTubeChannel {
     videoCount: string;
     viewCount: string;
   };
+  contentDetails?: {
+    relatedPlaylists: {
+      uploads: string;
+    };
+  };
 }
 
 /**
@@ -173,7 +178,7 @@ export async function fetchChannelInfo(
       `${YOUTUBE_API_BASE}/channels`,
       {
         params: {
-          part: 'snippet,statistics',
+          part: 'snippet,statistics,contentDetails',
           mine: true,
         },
         headers: {
@@ -203,32 +208,75 @@ export async function fetchChannelInfo(
 }
 
 /**
- * Fetches all videos from a channel with pagination
+ * Gets the uploads playlist ID for a channel
+ * This is needed to fetch all videos including private/unlisted ones
+ */
+export async function getUploadsPlaylistId(
+  channelId: string,
+  accessToken: string
+): Promise<string> {
+  const response = await axios.get<{ items: YouTubeChannel[] }>(
+    `${YOUTUBE_API_BASE}/channels`,
+    {
+      params: {
+        part: 'contentDetails',
+        id: channelId,
+      },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  const uploadsPlaylistId = response.data.items[0]?.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploadsPlaylistId) {
+    throw new Error('Could not find uploads playlist for channel');
+  }
+
+  return uploadsPlaylistId;
+}
+
+/**
+ * Fetches all videos from a channel with pagination using PlaylistItems API
+ * This approach gets ALL videos including private and unlisted ones, with no 500 result limit
  */
 export async function fetchChannelVideos(
   channelId: string,
   accessToken: string,
-  pageToken?: string
+  pageToken?: string,
+  uploadsPlaylistId?: string
 ): Promise<{ videos: YouTubeVideo[]; nextPageToken?: string }> {
+  // Get the uploads playlist ID if not provided
+  const playlistId = uploadsPlaylistId || await getUploadsPlaylistId(channelId, accessToken);
+
+  // Fetch videos from the uploads playlist
   const response = await axios.get<{
-    items: Array<{ id: { videoId: string }; snippet: { title: string; description: string; publishedAt: string } }>;
+    items: Array<{
+      contentDetails: { videoId: string };
+      snippet: { title: string; description: string; publishedAt: string };
+    }>;
     nextPageToken?: string;
-  }>(`${YOUTUBE_API_BASE}/search`, {
+  }>(`${YOUTUBE_API_BASE}/playlistItems`, {
     params: {
-      part: 'snippet',
-      channelId,
-      type: 'video',
+      part: 'contentDetails,snippet',
+      playlistId,
       maxResults: 50,
       pageToken,
-      order: 'date',
     },
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
   });
 
-  // Fetch full video details including description
-  const videoIds = response.data.items.map((item) => item.id.videoId).join(',');
+  // Fetch full video details including complete description
+  const videoIds = response.data.items.map((item) => item.contentDetails.videoId).join(',');
+
+  if (!videoIds) {
+    return {
+      videos: [],
+      nextPageToken: response.data.nextPageToken,
+    };
+  }
 
   const detailsResponse = await axios.get<{ items: YouTubeVideo[] }>(
     `${YOUTUBE_API_BASE}/videos`,

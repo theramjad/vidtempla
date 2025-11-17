@@ -10,6 +10,7 @@ import {
   refreshAccessToken,
   fetchChannelVideos,
   fetchChannelInfo,
+  getUploadsPlaylistId,
 } from '@/lib/clients/youtube';
 import type { Database } from '@shared-types/database.types';
 import { checkVideoLimit } from '@/lib/plan-limits';
@@ -98,7 +99,12 @@ export const syncChannelVideos = inngestClient.createFunction(
       }
     });
 
-    // Step 4: Fetch all videos from YouTube (handle pagination)
+    // Step 4: Get uploads playlist ID (needed for PlaylistItems API)
+    const uploadsPlaylistId = await step.run('get-uploads-playlist', async () => {
+      return await getUploadsPlaylistId(channel.channel_id, accessToken);
+    });
+
+    // Step 5: Fetch all videos from YouTube (handle pagination)
     const allVideos = await step.run('fetch-youtube-videos', async () => {
       const videos: Array<{
         id: string;
@@ -114,7 +120,8 @@ export const syncChannelVideos = inngestClient.createFunction(
         const response = await fetchChannelVideos(
           channel.channel_id,
           accessToken,
-          pageToken
+          pageToken,
+          uploadsPlaylistId
         );
 
         videos.push(...response.videos);
@@ -124,7 +131,7 @@ export const syncChannelVideos = inngestClient.createFunction(
       return videos;
     });
 
-    // Step 5: Sync videos to database
+    // Step 6: Sync videos to database
     await step.run('sync-videos-to-db', async () => {
       const videoIds = allVideos.map((v) => v.id);
 
@@ -196,7 +203,7 @@ export const syncChannelVideos = inngestClient.createFunction(
         }
       }
 
-      // Step 6: Detect and delete videos that no longer exist on YouTube
+      // Detect and delete videos that no longer exist on YouTube
       const videosToDelete = Array.from(existingVideoIds).filter(
         (id) => !videoIds.includes(id)
       );
