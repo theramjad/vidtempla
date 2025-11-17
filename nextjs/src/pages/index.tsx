@@ -40,12 +40,12 @@ export default function LandingPage() {
               </a>
             </div>
             <div className="flex items-center space-x-4">
-              <Link href="/auth/login">
+              <Link href="/sign-in">
                 <Button variant="ghost" size="sm">
                   Sign In
                 </Button>
               </Link>
-              <Link href="/auth/login">
+              <Link href="/sign-in">
                 <Button size="sm">
                   Get Started
                 </Button>
@@ -70,7 +70,7 @@ export default function LandingPage() {
             Keep your content fresh without the manual work.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/auth/login">
+            <Link href="/sign-in">
               <Button size="lg" className="w-full sm:w-auto">
                 Get Started Free
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -237,7 +237,7 @@ export default function LandingPage() {
               </ul>
             </CardContent>
             <CardFooter>
-              <Link href="/auth/login" className="w-full">
+              <Link href="/sign-in" className="w-full">
                 <Button variant="outline" className="w-full">
                   Get Started
                 </Button>
@@ -287,7 +287,7 @@ export default function LandingPage() {
               </ul>
             </CardContent>
             <CardFooter>
-              <Link href="/auth/login" className="w-full">
+              <Link href="/sign-in" className="w-full">
                 <Button className="w-full">
                   Get Started
                 </Button>
@@ -334,7 +334,7 @@ export default function LandingPage() {
               </ul>
             </CardContent>
             <CardFooter>
-              <Link href="/auth/login" className="w-full">
+              <Link href="/sign-in" className="w-full">
                 <Button variant="outline" className="w-full">
                   Get Started
                 </Button>
@@ -436,7 +436,7 @@ export default function LandingPage() {
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
             Join content creators who save hours every week managing their video descriptions.
           </p>
-          <Link href="/auth/login">
+          <Link href="/sign-in">
             <Button size="lg">
               Get Started Free
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -453,7 +453,7 @@ export default function LandingPage() {
               © 2024 YTDM. All rights reserved.
             </div>
             <div className="flex items-center space-x-6">
-              <Link href="/auth/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 Sign In
               </Link>
               <Link href="/admin" className="text-sm text-muted-foreground hover:text-foreground transition-colors">

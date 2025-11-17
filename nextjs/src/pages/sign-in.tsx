@@ -150,7 +150,7 @@ export default function Page() {
           title: "Success",
           description: "Signed in successfully!",
         });
-        router.push("/admin");
+        router.push("/admin/youtube");
       } else {
         toast({
           variant: "destructive",
