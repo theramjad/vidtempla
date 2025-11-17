@@ -28,7 +28,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Trash2, RefreshCw, Plus } from 'lucide-react';
+import { Loader2, Unplug, RefreshCw, Plus } from 'lucide-react';
 import Image from 'next/image';
 
 export default function ChannelsTab() {
@@ -173,7 +173,7 @@ export default function ChannelsTab() {
                             {deletingId === channel.id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <Trash2 className="h-4 w-4" />
+                              <Unplug className="h-4 w-4" />
                             )}
                           </Button>
                         </AlertDialogTrigger>
