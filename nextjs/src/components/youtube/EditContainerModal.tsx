@@ -45,17 +45,17 @@ export default function EditContainerModal({
   const [showImpactDialog, setShowImpactDialog] = useState(false);
   const [affectedVideoCount, setAffectedVideoCount] = useState(0);
 
-  const { data: container } = api.admin.youtube.containers.list.useQuery(undefined, {
+  const { data: container } = api.dashboard.youtube.containers.list.useQuery(undefined, {
     enabled: open,
     select: (containers) => containers.find((c) => c.id === containerId),
   });
 
-  const { data: allTemplates } = api.admin.youtube.templates.list.useQuery(undefined, {
+  const { data: allTemplates } = api.dashboard.youtube.templates.list.useQuery(undefined, {
     enabled: open,
   });
 
-  const updateMutation = api.admin.youtube.containers.update.useMutation();
-  const getAffectedVideosMutation = api.admin.youtube.containers.getAffectedVideos.useMutation();
+  const updateMutation = api.dashboard.youtube.containers.update.useMutation();
+  const getAffectedVideosMutation = api.dashboard.youtube.containers.getAffectedVideos.useMutation();
 
   // Initialize form data
   useEffect(() => {

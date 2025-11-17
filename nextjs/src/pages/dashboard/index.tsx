@@ -3,7 +3,7 @@ import { GetServerSideProps } from "next";
 export const getServerSideProps: GetServerSideProps = async () => {
   return {
     redirect: {
-      destination: "/admin/youtube/",
+      destination: "/dashboard/youtube/",
       permanent: false,
     },
   };

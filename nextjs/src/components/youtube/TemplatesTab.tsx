@@ -61,11 +61,11 @@ export default function TemplatesTab() {
     containers: Array<{ id: string; name: string; videoCount: number }>;
   }>({ videoCount: 0, containers: [] });
 
-  const { data: templates, isLoading, refetch } = api.admin.youtube.templates.list.useQuery();
-  const createMutation = api.admin.youtube.templates.create.useMutation();
-  const updateMutation = api.admin.youtube.templates.update.useMutation();
-  const deleteMutation = api.admin.youtube.templates.delete.useMutation();
-  const getAffectedVideosMutation = api.admin.youtube.templates.getAffectedVideos.useMutation();
+  const { data: templates, isLoading, refetch } = api.dashboard.youtube.templates.list.useQuery();
+  const createMutation = api.dashboard.youtube.templates.create.useMutation();
+  const updateMutation = api.dashboard.youtube.templates.update.useMutation();
+  const deleteMutation = api.dashboard.youtube.templates.delete.useMutation();
+  const getAffectedVideosMutation = api.dashboard.youtube.templates.getAffectedVideos.useMutation();
 
   const handleCreate = async () => {
     if (!formData.name.trim()) {

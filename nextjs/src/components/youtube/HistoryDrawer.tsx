@@ -48,12 +48,12 @@ export default function HistoryDrawer({
   const { toast } = useToast();
   const [expandedVersions, setExpandedVersions] = useState<Set<string>>(new Set());
 
-  const { data: history, isLoading, refetch } = api.admin.youtube.videos.getHistory.useQuery(
+  const { data: history, isLoading, refetch } = api.dashboard.youtube.videos.getHistory.useQuery(
     { videoId },
     { enabled: open }
   );
 
-  const rollbackMutation = api.admin.youtube.videos.rollback.useMutation();
+  const rollbackMutation = api.dashboard.youtube.videos.rollback.useMutation();
 
   const toggleExpanded = (historyId: string) => {
     setExpandedVersions((prev) => {

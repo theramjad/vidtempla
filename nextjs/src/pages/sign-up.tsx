@@ -69,7 +69,7 @@ export default function Page() {
         title: "Success",
         description: "Signed up successfully!",
       });
-      router.push("/admin");
+      router.push("/dashboard");
     } else {
       setError("No data returned from sign up");
     }
@@ -84,7 +84,7 @@ export default function Page() {
               You're already signed in
             </h2>
             <button
-              onClick={() => router.push("/admin")}
+              onClick={() => router.push("/dashboard")}
               className="group relative flex w-full justify-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
             >
               Go to Dashboard

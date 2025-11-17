@@ -86,7 +86,7 @@ export const billingRouter = createTRPCRouter({
         // Create checkout session with Polar
         const checkoutSession = await polar.checkouts.create({
           products: [planConfig.productId],
-          successUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/admin/settings?checkout=success`,
+          successUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/settings?checkout=success`,
           customerEmail: ctx.user.email,
           metadata: {
             userId: ctx.user.id,

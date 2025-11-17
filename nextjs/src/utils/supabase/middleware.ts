@@ -50,10 +50,10 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Check if user is an admin for dashboard access
-  if (user && request.nextUrl.pathname.startsWith("/admin")) {
+  if (user && request.nextUrl.pathname.startsWith("/dashboard")) {
     const userEmail = user.email;
     const isAdmin = userEmail && appConfig.auth.adminEmails.includes(userEmail);
-    
+
     if (!isAdmin) {
       // User is authenticated but not an admin, redirect to unauthorized page
       const url = request.nextUrl.clone();

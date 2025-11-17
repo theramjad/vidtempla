@@ -24,18 +24,18 @@ export default function SettingsPage() {
 
   // Fetch current subscription
   const { data: currentPlan, isLoading: planLoading } =
-    api.admin.billing.getCurrentPlan.useQuery();
+    api.dashboard.billing.getCurrentPlan.useQuery();
 
   // Fetch usage stats
   const { data: usageStats, isLoading: usageLoading } =
-    api.admin.billing.getUsageStats.useQuery();
+    api.dashboard.billing.getUsageStats.useQuery();
 
   // Fetch recent orders
   const { data: orders, isLoading: ordersLoading } =
-    api.admin.billing.getOrders.useQuery();
+    api.dashboard.billing.getOrders.useQuery();
 
   // Get customer portal URL
-  const getPortalUrl = api.admin.billing.getCustomerPortalUrl.useQuery(
+  const getPortalUrl = api.dashboard.billing.getCustomerPortalUrl.useQuery(
     undefined,
     {
       enabled: false, // Don't fetch automatically
@@ -63,7 +63,7 @@ export default function SettingsPage() {
         description: 'Your subscription has been successfully activated.',
       });
       // Clear the query parameter
-      router.replace('/admin/settings', undefined, { shallow: true });
+      router.replace('/dashboard/settings', undefined, { shallow: true });
     }
   }, [router]);
 
@@ -215,7 +215,7 @@ export default function SettingsPage() {
               )}
             </CardContent>
             <CardFooter className="flex gap-2">
-              <Link href="/admin/pricing" className="flex-1">
+              <Link href="/dashboard/pricing" className="flex-1">
                 <Button variant="outline" className="w-full">
                   View All Plans
                 </Button>

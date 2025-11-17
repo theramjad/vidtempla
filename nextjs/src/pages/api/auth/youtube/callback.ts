@@ -27,13 +27,13 @@ export default async function handler(
     if (error) {
       console.error('OAuth error:', error);
       return res.redirect(
-        '/admin/youtube?error=' + encodeURIComponent(error as string)
+        '/dashboard/youtube?error=' + encodeURIComponent(error as string)
       );
     }
 
     if (!code || typeof code !== 'string') {
       return res.redirect(
-        '/admin/youtube?error=no_code'
+        '/dashboard/youtube?error=no_code'
       );
     }
 
@@ -46,7 +46,7 @@ export default async function handler(
     } = await supabase.auth.getSession();
 
     if (!session) {
-      return res.redirect('/sign-in?redirect=/admin/youtube');
+      return res.redirect('/sign-in?redirect=/dashboard/youtube');
     }
 
     // Exchange code for tokens
@@ -91,7 +91,7 @@ export default async function handler(
 
       if (!limitCheck.canAddChannel) {
         return res.redirect(
-          `/admin/youtube?error=${encodeURIComponent(
+          `/dashboard/youtube?error=${encodeURIComponent(
             `Channel limit reached (${limitCheck.limit} ${limitCheck.limit === 1 ? 'channel' : 'channels'} on ${limitCheck.planTier} plan). Please upgrade to add more channels.`
           )}`
         );
@@ -110,12 +110,12 @@ export default async function handler(
       });
     }
 
-    // Redirect to YouTube admin page with success message
-    return res.redirect('/admin/youtube?success=true');
+    // Redirect to YouTube dashboard page with success message
+    return res.redirect('/dashboard/youtube?success=true');
   } catch (error) {
     console.error('Error in YouTube OAuth callback:', error);
     return res.redirect(
-      '/admin/youtube?error=' +
+      '/dashboard/youtube?error=' +
         encodeURIComponent(
           error instanceof Error ? error.message : 'Unknown error'
         )

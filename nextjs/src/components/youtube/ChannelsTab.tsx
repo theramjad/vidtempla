@@ -36,9 +36,9 @@ export default function ChannelsTab() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
 
-  const { data: channels, isLoading, refetch } = api.admin.youtube.channels.list.useQuery();
-  const disconnectMutation = api.admin.youtube.channels.disconnect.useMutation();
-  const syncMutation = api.admin.youtube.channels.syncVideos.useMutation();
+  const { data: channels, isLoading, refetch } = api.dashboard.youtube.channels.list.useQuery();
+  const disconnectMutation = api.dashboard.youtube.channels.disconnect.useMutation();
+  const syncMutation = api.dashboard.youtube.channels.syncVideos.useMutation();
 
   const handleConnect = () => {
     window.location.href = '/api/auth/youtube/initiate';

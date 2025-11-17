@@ -150,7 +150,7 @@ export default function Page() {
           title: "Success",
           description: "Signed in successfully!",
         });
-        router.push("/admin/youtube");
+        router.push("/dashboard/youtube");
       } else {
         toast({
           variant: "destructive",
@@ -184,7 +184,7 @@ export default function Page() {
           </CardHeader>
           <CardContent className="text-center space-y-3">
             <Button
-              onClick={() => router.push("/admin")}
+              onClick={() => router.push("/dashboard")}
               className="w-full"
             >
               Go to Dashboard

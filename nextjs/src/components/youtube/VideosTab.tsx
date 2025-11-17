@@ -49,8 +49,8 @@ export default function VideosTab() {
   const [selectedVideo, setSelectedVideo] = useState<VideoWithRelations | null>(null);
   const [selectedContainerId, setSelectedContainerId] = useState('');
 
-  const { data: channels } = api.admin.youtube.channels.list.useQuery();
-  const { data: containers } = api.admin.youtube.containers.list.useQuery();
+  const { data: channels } = api.dashboard.youtube.channels.list.useQuery();
+  const { data: containers } = api.dashboard.youtube.containers.list.useQuery();
 
   // Convert "all" to empty string for the API query
   const apiFilters = {
@@ -58,8 +58,8 @@ export default function VideosTab() {
     containerId: filters.containerId === 'all' ? '' : filters.containerId,
     search: filters.search,
   };
-  const { data: videos, isLoading, refetch } = api.admin.youtube.videos.list.useQuery(apiFilters);
-  const assignMutation = api.admin.youtube.videos.assignToContainer.useMutation();
+  const { data: videos, isLoading, refetch } = api.dashboard.youtube.videos.list.useQuery(apiFilters);
+  const assignMutation = api.dashboard.youtube.videos.assignToContainer.useMutation();
 
   const handleAssign = async () => {
     if (!selectedVideo || !selectedContainerId) return;

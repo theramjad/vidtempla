@@ -456,7 +456,7 @@ export default function LandingPage() {
               <Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 Sign In
               </Link>
-              <Link href="/admin" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 Dashboard
               </Link>
             </div>

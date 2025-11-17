@@ -52,10 +52,10 @@ export default function ContainersTab() {
   });
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const { data: containers, isLoading, refetch } = api.admin.youtube.containers.list.useQuery();
-  const { data: templates } = api.admin.youtube.templates.list.useQuery();
-  const createMutation = api.admin.youtube.containers.create.useMutation();
-  const deleteMutation = api.admin.youtube.containers.delete.useMutation();
+  const { data: containers, isLoading, refetch } = api.dashboard.youtube.containers.list.useQuery();
+  const { data: templates } = api.dashboard.youtube.templates.list.useQuery();
+  const createMutation = api.dashboard.youtube.containers.create.useMutation();
+  const deleteMutation = api.dashboard.youtube.containers.delete.useMutation();
 
   const handleCreate = async () => {
     if (!formData.name.trim()) {

@@ -1,4 +1,4 @@
-import { adminRouter } from "./routers/admin";
+import { dashboardRouter } from "./routers/dashboard";
 import { createTRPCRouter } from "./trpc";
 
 /**
@@ -7,7 +7,7 @@ import { createTRPCRouter } from "./trpc";
  * All routers added in /api/routers should be manually added here
  */
 export const appRouter = createTRPCRouter({
-  admin: adminRouter,
+  dashboard: dashboardRouter,
 });
 
 // export type definition of API

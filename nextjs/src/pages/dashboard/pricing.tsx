@@ -74,10 +74,10 @@ export default function PricingPage() {
 
   // Fetch current subscription
   const { data: currentPlan, isLoading: planLoading } =
-    api.admin.billing.getCurrentPlan.useQuery();
+    api.dashboard.billing.getCurrentPlan.useQuery();
 
   // Create checkout session mutation
-  const createCheckout = api.admin.billing.createCheckoutSession.useMutation({
+  const createCheckout = api.dashboard.billing.createCheckoutSession.useMutation({
     onSuccess: (data) => {
       // Redirect to Polar checkout
       window.location.href = data.checkoutUrl;

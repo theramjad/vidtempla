@@ -29,20 +29,20 @@ export const appConfig = {
 
   // Dashboard configuration
   dashboard: {
-    defaultRoute: "/admin/youtube",
+    defaultRoute: "/dashboard/youtube",
     showSettings: true,
     navigation: [
       {
         title: "Dashboard",
-        url: "/admin/youtube",
+        url: "/dashboard/youtube",
       },
       {
         title: "Pricing",
-        url: "/admin/pricing",
+        url: "/dashboard/pricing",
       },
       {
         title: "Settings",
-        url: "/admin/settings",
+        url: "/dashboard/settings",
       },
     ],
   },

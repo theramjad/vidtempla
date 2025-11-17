@@ -47,7 +47,7 @@ export default function DashboardSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <p
-              onClick={() => router.push("/admin")}
+              onClick={() => router.push("/dashboard")}
               className="text-foreground-muted cursor-pointer px-2 pt-2 text-2xl font-bold"
             >
               {appConfig.brand.name}

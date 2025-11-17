@@ -38,9 +38,9 @@ export default function PreviewModal({
     data: preview,
     isLoading,
     refetch,
-  } = api.admin.youtube.videos.preview.useQuery({ videoId }, { enabled: open });
+  } = api.dashboard.youtube.videos.preview.useQuery({ videoId }, { enabled: open });
 
-  const updateMutation = api.admin.youtube.videos.updateToYouTube.useMutation();
+  const updateMutation = api.dashboard.youtube.videos.updateToYouTube.useMutation();
 
   const handleUpdateToYouTube = async () => {
     if (!preview?.description) return;

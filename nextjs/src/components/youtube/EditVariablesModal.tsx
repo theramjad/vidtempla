@@ -57,12 +57,12 @@ export default function EditVariablesModal({
     >
   >({});
 
-  const { data: variables, isLoading } = api.admin.youtube.videos.getVariables.useQuery(
+  const { data: variables, isLoading } = api.dashboard.youtube.videos.getVariables.useQuery(
     { videoId },
     { enabled: open }
   );
 
-  const updateMutation = api.admin.youtube.videos.updateVariables.useMutation();
+  const updateMutation = api.dashboard.youtube.videos.updateVariables.useMutation();
 
   // Initialize form data when variables are loaded
   useEffect(() => {
