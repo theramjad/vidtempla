@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Play, Edit, History } from 'lucide-react';
-import EditVariablesModal from './EditVariablesModal';
+import EditVariablesSheet from './EditVariablesSheet';
 import HistoryDrawer from './HistoryDrawer';
 
 type VideoWithRelations = RouterOutputs['admin']['youtube']['videos']['list'][number];
@@ -300,9 +300,9 @@ export default function VideosTab() {
           </DialogContent>
         </Dialog>
 
-        {/* Edit Variables Modal */}
+        {/* Edit Variables Sheet */}
         {selectedVideo && (
-          <EditVariablesModal
+          <EditVariablesSheet
             videoId={selectedVideo.id}
             videoTitle={selectedVideo.title ?? 'Untitled Video'}
             open={editVariablesOpen}

@@ -34,7 +34,7 @@ import { Loader2, ChevronDown } from 'lucide-react';
 
 type VideoVariable = RouterOutputs['admin']['youtube']['videos']['getVariables'][number];
 
-interface EditVariablesModalProps {
+interface EditVariablesSheetProps {
   videoId: string;
   videoTitle: string;
   open: boolean;
@@ -42,13 +42,13 @@ interface EditVariablesModalProps {
   onSuccess?: () => void;
 }
 
-export default function EditVariablesModal({
+export default function EditVariablesSheet({
   videoId,
   videoTitle,
   open,
   onOpenChange,
   onSuccess,
-}: EditVariablesModalProps) {
+}: EditVariablesSheetProps) {
   const { toast } = useToast();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [formData, setFormData] = useState<
