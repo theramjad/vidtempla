@@ -26,11 +26,14 @@ interface OAuthTokenResponse {
 }
 
 /**
- * Custom type for YouTube channel resource
- * Subset of official API response with commonly used fields
+ * Custom types for YouTube channel resource
+ * Subsets of official API response with commonly used fields
  */
-interface YouTubeChannel {
+interface YouTubeChannelBase {
   id: string;
+}
+
+interface YouTubeChannelSnippetStats extends YouTubeChannelBase {
   snippet: {
     title: string;
     description: string;
@@ -45,12 +48,18 @@ interface YouTubeChannel {
     videoCount: string;
     viewCount: string;
   };
-  contentDetails?: {
+}
+
+interface YouTubeChannelContentDetails extends YouTubeChannelBase {
+  contentDetails: {
     relatedPlaylists: {
       uploads: string;
     };
   };
 }
+
+// Used where we request `snippet,statistics,contentDetails`
+type YouTubeChannelFull = YouTubeChannelSnippetStats & YouTubeChannelContentDetails;
 
 /**
  * Custom type for YouTube video resource
@@ -172,9 +181,9 @@ export async function refreshAccessToken(
  */
 export async function fetchChannelInfo(
   accessToken: string
-): Promise<YouTubeChannel> {
+): Promise<YouTubeChannelFull> {
   try {
-    const response = await axios.get<{ items: YouTubeChannel[] }>(
+    const response = await axios.get<{ items: YouTubeChannelFull[] }>(
       `${YOUTUBE_API_BASE}/channels`,
       {
         params: {
@@ -215,7 +224,7 @@ export async function getUploadsPlaylistId(
   channelId: string,
   accessToken: string
 ): Promise<string> {
-  const response = await axios.get<{ items: YouTubeChannel[] }>(
+  const response = await axios.get<{ items: YouTubeChannelContentDetails[] }>(
     `${YOUTUBE_API_BASE}/channels`,
     {
       params: {
