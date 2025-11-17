@@ -166,13 +166,15 @@ export default function EditVariablesSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Edit Variables</SheetTitle>
-          <SheetDescription>{videoTitle}</SheetDescription>
-        </SheetHeader>
+      <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto p-0">
+        <div className="sticky top-0 z-10 bg-background border-b px-6 py-4">
+          <SheetHeader>
+            <SheetTitle>Edit Variables</SheetTitle>
+            <SheetDescription className="line-clamp-1">{videoTitle}</SheetDescription>
+          </SheetHeader>
+        </div>
 
-        <div className="space-y-6 mt-6">
+        <div className="px-6 py-6 space-y-8">
           {isLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -186,15 +188,19 @@ export default function EditVariablesSheet({
             </div>
           ) : (
             Object.entries(groupedVariables).map(([templateName, vars]) => (
-              <div key={templateName} className="space-y-3">
-                <h3 className="font-medium text-sm text-muted-foreground">
-                  {templateName}
-                </h3>
-                <div className="space-y-3 pl-4 border-l-2 border-muted">
+              <div key={templateName} className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-px flex-1 bg-border" />
+                  <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                    {templateName}
+                  </h3>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                <div className="space-y-6">
                   {Object.entries(vars).map(([key, variable]) => (
-                    <div key={key} className="grid grid-cols-3 gap-4">
-                      <div className="col-span-2">
-                        <Label htmlFor={`var-${key}`}>
+                    <div key={key} className="space-y-3">
+                      <div>
+                        <Label htmlFor={`var-${key}`} className="text-base">
                           {'{{'} {variable.name} {'}}'}
                         </Label>
                         <Textarea
@@ -202,19 +208,21 @@ export default function EditVariablesSheet({
                           value={variable.value}
                           onChange={(e) => handleValueChange(key, e.target.value)}
                           placeholder={`Enter ${variable.name}`}
-                          className="resize-y min-h-[50px]"
-                          rows={1}
+                          className="resize-y min-h-[80px] mt-2"
+                          rows={2}
                         />
                       </div>
-                      <div>
-                        <Label htmlFor={`type-${key}`}>Type</Label>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor={`type-${key}`} className="text-sm text-muted-foreground">
+                          Type:
+                        </Label>
                         <Select
                           value={variable.type}
                           onValueChange={(value: 'text' | 'number' | 'date' | 'url') =>
                             handleTypeChange(key, value)
                           }
                         >
-                          <SelectTrigger id={`type-${key}`}>
+                          <SelectTrigger id={`type-${key}`} className="w-32">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -234,55 +242,64 @@ export default function EditVariablesSheet({
         </div>
 
         {Object.keys(formData).length > 0 && (
-          <Collapsible
-            open={isPreviewOpen}
-            onOpenChange={setIsPreviewOpen}
-            className="space-y-2"
-          >
-            <CollapsibleTrigger asChild>
-              <Button variant="outline" className="w-full justify-between">
-                <span>Preview Description</span>
-                <ChevronDown
-                  className={`h-4 w-4 transition-transform ${
-                    isPreviewOpen ? 'rotate-180' : ''
-                  }`}
-                />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-2">
-              {isPreviewLoading ? (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : preview?.description ? (
-                <div className="rounded-md border bg-muted/50 p-4">
-                  <Label>Preview</Label>
-                  <Textarea
-                    value={preview.description}
-                    readOnly
-                    className="mt-2 resize-y min-h-[200px] bg-background"
-                    rows={10}
+          <div className="px-6 pb-6">
+            <Collapsible
+              open={isPreviewOpen}
+              onOpenChange={setIsPreviewOpen}
+              className="space-y-3"
+            >
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" size="lg" className="w-full justify-between">
+                  <span className="font-medium">Preview Description</span>
+                  <ChevronDown
+                    className={`h-5 w-5 transition-transform duration-200 ${
+                      isPreviewOpen ? 'rotate-180' : ''
+                    }`}
                   />
-                </div>
-              ) : null}
-            </CollapsibleContent>
-          </Collapsible>
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-3">
+                {isPreviewLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : preview?.description ? (
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <Textarea
+                      value={preview.description}
+                      readOnly
+                      className="resize-y min-h-[200px] bg-background border-0 focus-visible:ring-0"
+                      rows={10}
+                    />
+                  </div>
+                ) : null}
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
         )}
 
-        <SheetFooter className="mt-6">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={updateMutation.isPending || Object.keys(formData).length === 0}
-          >
-            {updateMutation.isPending && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            Save Variables
-          </Button>
-        </SheetFooter>
+        <div className="sticky bottom-0 z-10 bg-background border-t px-6 py-4">
+          <SheetFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="flex-1 sm:flex-initial"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={updateMutation.isPending || Object.keys(formData).length === 0}
+              size="lg"
+              className="flex-1 sm:flex-initial"
+            >
+              {updateMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Save Variables
+            </Button>
+          </SheetFooter>
+        </div>
       </SheetContent>
     </Sheet>
   );
