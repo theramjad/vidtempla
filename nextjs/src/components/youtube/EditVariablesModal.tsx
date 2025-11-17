@@ -1,5 +1,5 @@
 /**
- * Edit Variables Modal Component
+ * Edit Variables Sheet Component
  * Allows users to edit video-specific variable values
  */
 
@@ -10,12 +10,13 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from '@/components/ui/sheet';
 import {
   Select,
   SelectContent,
@@ -164,14 +165,14 @@ export default function EditVariablesModal({
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit Variables</DialogTitle>
-          <p className="text-sm text-muted-foreground">{videoTitle}</p>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Edit Variables</SheetTitle>
+          <SheetDescription>{videoTitle}</SheetDescription>
+        </SheetHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-6 mt-6">
           {isLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -268,7 +269,7 @@ export default function EditVariablesModal({
           </Collapsible>
         )}
 
-        <DialogFooter>
+        <SheetFooter className="mt-6">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
@@ -281,8 +282,8 @@ export default function EditVariablesModal({
             )}
             Save Variables
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
