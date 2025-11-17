@@ -11,6 +11,7 @@ import { decrypt, encrypt } from '@/utils/encryption';
 import { refreshAccessToken, fetchChannelVideos } from '@/lib/clients/youtube';
 import {
   parseVariables,
+  parseUserVariables,
   buildDescription,
   findMissingVariables,
 } from '@/utils/templateParser';
@@ -480,7 +481,7 @@ export const youtubeRouter = createTRPCRouter({
             }> = [];
 
             templates.forEach((template) => {
-              const variables = parseVariables(template.content);
+              const variables = parseUserVariables(template.content);
               variables.forEach((varName) => {
                 variablesToCreate.push({
                   video_id: input.videoId,
@@ -616,7 +617,8 @@ export const youtubeRouter = createTRPCRouter({
         const description = buildDescription(
           sortedTemplates,
           variablesMap,
-          video.container.separator
+          video.container.separator,
+          video.video_id // Pass YouTube video ID for default variables
         );
 
         return { description };

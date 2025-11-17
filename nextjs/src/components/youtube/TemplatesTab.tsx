@@ -41,7 +41,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, Edit2, Trash2 } from 'lucide-react';
 import UpdateImpactDialog from './UpdateImpactDialog';
 
-type Template = RouterOutputs['admin']['youtube']['templates']['list'][number];
+type Template = RouterOutputs['dashboard']['youtube']['templates']['list'][number];
 
 export default function TemplatesTab() {
   const { toast } = useToast();
@@ -303,9 +303,14 @@ export default function TemplatesTab() {
                   rows={10}
                   className="font-mono text-sm"
                 />
-                <p className="text-sm text-muted-foreground mt-2">
-                  Use {'{{variable_name}}'} syntax. Variables will be auto-detected.
-                </p>
+                <div className="mt-2 space-y-1">
+                  <p className="text-sm text-muted-foreground">
+                    Use {'{{variable_name}}'} syntax. Variables will be auto-detected.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Available default variables: <code className="px-1.5 py-0.5 bg-muted rounded">{'{{video-id}}'}</code>
+                  </p>
+                </div>
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
@@ -344,6 +349,14 @@ export default function TemplatesTab() {
                   rows={10}
                   className="font-mono text-sm"
                 />
+                <div className="mt-2 space-y-1">
+                  <p className="text-sm text-muted-foreground">
+                    Use {'{{variable_name}}'} syntax. Variables will be auto-detected.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Available default variables: <code className="px-1.5 py-0.5 bg-muted rounded">{'{{video-id}}'}</code>
+                  </p>
+                </div>
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setEditDialogOpen(false)}>

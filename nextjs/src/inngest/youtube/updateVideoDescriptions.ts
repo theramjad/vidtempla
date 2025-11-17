@@ -138,7 +138,8 @@ export const updateVideoDescriptions = inngestClient.createFunction(
           const newDescription = buildDescription(
             orderedTemplates,
             variablesMap,
-            video.container.separator
+            video.container.separator,
+            video.video_id // Pass YouTube video ID for default variables
           );
 
           // Only update if description changed

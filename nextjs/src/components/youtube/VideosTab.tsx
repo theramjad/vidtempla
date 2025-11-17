@@ -36,7 +36,7 @@ import { Loader2, Play, Edit, History } from 'lucide-react';
 import EditVariablesSheet from './EditVariablesSheet';
 import HistoryDrawer from './HistoryDrawer';
 
-type VideoWithRelations = RouterOutputs['admin']['youtube']['videos']['list'][number];
+type VideoWithRelations = RouterOutputs['dashboard']['youtube']['videos']['list'][number];
 
 export default function VideosTab() {
   const { toast } = useToast();

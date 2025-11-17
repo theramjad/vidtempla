@@ -28,7 +28,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 
-type HistoryVersion = RouterOutputs['admin']['youtube']['videos']['getHistory'][number];
+type HistoryVersion = RouterOutputs['dashboard']['youtube']['videos']['getHistory'][number];
 
 interface HistoryDrawerProps {
   videoId: string;
