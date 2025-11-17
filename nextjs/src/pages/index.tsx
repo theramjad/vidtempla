@@ -25,7 +25,7 @@ export default function LandingPage() {
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center">
               <Link href="/" className="text-2xl font-bold text-primary">
-                YTDM
+                VidTempla
               </Link>
             </div>
             <div className="hidden md:flex items-center space-x-8">
@@ -206,7 +206,7 @@ export default function LandingPage() {
           <Card>
             <CardHeader>
               <CardTitle>Free</CardTitle>
-              <CardDescription>Perfect for trying out YTDM</CardDescription>
+              <CardDescription>Perfect for trying out VidTempla</CardDescription>
               <div className="mt-4">
                 <span className="text-4xl font-bold">$0</span>
                 <span className="text-muted-foreground">/forever</span>
@@ -356,7 +356,7 @@ export default function LandingPage() {
             Frequently asked questions
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Everything you need to know about YTDM
+            Everything you need to know about VidTempla
           </p>
         </div>
 
@@ -378,7 +378,7 @@ export default function LandingPage() {
             </AccordionTrigger>
             <AccordionContent>
               Yes! With Pro and Business plans, you can enable automatic updates. When you modify a template or container,
-              YTDM will automatically push the updated descriptions to all associated videos on YouTube. This happens in
+              VidTempla will automatically push the updated descriptions to all associated videos on YouTube. This happens in
               the background via our job processing system.
             </AccordionContent>
           </AccordionItem>
@@ -399,7 +399,7 @@ export default function LandingPage() {
             </AccordionTrigger>
             <AccordionContent>
               Absolutely. We use YouTube&apos;s official OAuth authentication, which means we never see your password.
-              Your access tokens are encrypted and stored securely. You can revoke YTDM&apos;s access at any time through
+              Your access tokens are encrypted and stored securely. You can revoke VidTempla&apos;s access at any time through
               your Google account settings.
             </AccordionContent>
           </AccordionItem>
@@ -420,7 +420,7 @@ export default function LandingPage() {
               Can I try it before upgrading?
             </AccordionTrigger>
             <AccordionContent>
-              Yes! Start with our Free plan to test YTDM with up to 5 videos. No credit card required. When you&apos;re ready
+              Yes! Start with our Free plan to test VidTempla with up to 5 videos. No credit card required. When you&apos;re ready
               to scale, upgrade to Pro or Business to unlock unlimited videos and automatic updates.
             </AccordionContent>
           </AccordionItem>
@@ -450,7 +450,7 @@ export default function LandingPage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-sm text-muted-foreground">
-              © 2024 YTDM. All rights reserved.
+              © 2024 VidTempla. All rights reserved.
             </div>
             <div className="flex items-center space-x-6">
               <Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground transition-colors">

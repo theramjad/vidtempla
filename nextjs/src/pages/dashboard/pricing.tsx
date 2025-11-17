@@ -17,7 +17,7 @@ const pricingTiers = [
     name: 'Free',
     price: '$0',
     period: 'forever',
-    description: 'Perfect for trying out YTDM',
+    description: 'Perfect for trying out VidTempla',
     features: [
       'Up to 5 videos',
       '1 YouTube channel',

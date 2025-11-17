@@ -7,14 +7,14 @@
 
 export const appConfig = {
   // Basic app information
-  name: "YTDM",
+  name: "VidTempla",
   description: "Manage YouTube video descriptions with dynamic templates",
   supportEmail: "support@yourdomain.com",
 
   // Branding
   brand: {
-    name: "YTDM",
-    shortName: "YTDM",
+    name: "VidTempla",
+    shortName: "VidTempla",
     tagline: "Manage YouTube descriptions with ease",
   },
 
