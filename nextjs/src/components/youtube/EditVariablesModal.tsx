@@ -23,8 +23,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronDown } from 'lucide-react';
 
 type VideoVariable = RouterOutputs['admin']['youtube']['videos']['getVariables'][number];
 
@@ -44,6 +49,7 @@ export default function EditVariablesModal({
   onSuccess,
 }: EditVariablesModalProps) {
   const { toast } = useToast();
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [formData, setFormData] = useState<
     Record<
       string,
@@ -60,6 +66,11 @@ export default function EditVariablesModal({
   const { data: variables, isLoading } = api.dashboard.youtube.videos.getVariables.useQuery(
     { videoId },
     { enabled: open }
+  );
+
+  const { data: preview, isLoading: isPreviewLoading } = api.dashboard.youtube.videos.preview.useQuery(
+    { videoId },
+    { enabled: open && isPreviewOpen }
   );
 
   const updateMutation = api.dashboard.youtube.videos.updateVariables.useMutation();
@@ -127,8 +138,8 @@ export default function EditVariablesModal({
       });
 
       toast({
-        title: 'Variables updated',
-        description: 'Video variables have been updated successfully.',
+        title: 'Variables saved and update queued',
+        description: 'Video variables have been saved and YouTube update is in progress.',
       });
 
       onSuccess?.();
@@ -220,6 +231,42 @@ export default function EditVariablesModal({
             ))
           )}
         </div>
+
+        {Object.keys(formData).length > 0 && (
+          <Collapsible
+            open={isPreviewOpen}
+            onOpenChange={setIsPreviewOpen}
+            className="space-y-2"
+          >
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" className="w-full justify-between">
+                <span>Preview Description</span>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${
+                    isPreviewOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2">
+              {isPreviewLoading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : preview ? (
+                <div className="rounded-md border bg-muted/50 p-4">
+                  <Label>Preview</Label>
+                  <Textarea
+                    value={preview}
+                    readOnly
+                    className="mt-2 resize-y min-h-[200px] bg-background"
+                    rows={10}
+                  />
+                </div>
+              ) : null}
+            </CollapsibleContent>
+          </Collapsible>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

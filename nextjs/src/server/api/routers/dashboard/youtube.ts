@@ -554,7 +554,14 @@ export const youtubeRouter = createTRPCRouter({
         }
 
         // Trigger Inngest event to update this video's description
-        // Placeholder for now
+        await inngestClient.send({
+          name: 'youtube/videos.update',
+          data: {
+            videoIds: [input.videoId],
+            userId: ctx.user.id,
+          },
+        });
+
         return { success: true };
       }),
 

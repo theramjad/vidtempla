@@ -32,9 +32,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Play, Edit, Eye, History } from 'lucide-react';
+import { Loader2, Play, Edit, History } from 'lucide-react';
 import EditVariablesModal from './EditVariablesModal';
-import PreviewModal from './PreviewModal';
 import HistoryDrawer from './HistoryDrawer';
 
 type VideoWithRelations = RouterOutputs['admin']['youtube']['videos']['list'][number];
@@ -44,7 +43,6 @@ export default function VideosTab() {
   const [filters, setFilters] = useState({ channelId: 'all', containerId: 'all', search: '' });
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [editVariablesOpen, setEditVariablesOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<VideoWithRelations | null>(null);
   const [selectedContainerId, setSelectedContainerId] = useState('');
@@ -94,11 +92,6 @@ export default function VideosTab() {
   const openEditVariables = (video: VideoWithRelations) => {
     setSelectedVideo(video);
     setEditVariablesOpen(true);
-  };
-
-  const openPreview = (video: VideoWithRelations) => {
-    setSelectedVideo(video);
-    setPreviewOpen(true);
   };
 
   const openHistory = (video: VideoWithRelations) => {
@@ -246,14 +239,6 @@ export default function VideosTab() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => openPreview(video)}
-                              title="Preview Description"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
                               onClick={() => openHistory(video)}
                               title="Version History"
                             >
@@ -322,17 +307,6 @@ export default function VideosTab() {
             videoTitle={selectedVideo.title ?? 'Untitled Video'}
             open={editVariablesOpen}
             onOpenChange={setEditVariablesOpen}
-            onSuccess={refetch}
-          />
-        )}
-
-        {/* Preview Modal */}
-        {selectedVideo && (
-          <PreviewModal
-            videoId={selectedVideo.id}
-            videoTitle={selectedVideo.title ?? 'Untitled Video'}
-            open={previewOpen}
-            onOpenChange={setPreviewOpen}
             onSuccess={refetch}
           />
         )}
