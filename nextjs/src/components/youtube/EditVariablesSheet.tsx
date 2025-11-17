@@ -166,109 +166,108 @@ export default function EditVariablesSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto p-0">
-        <div className="sticky top-0 z-10 bg-background border-b px-6 py-4">
+      <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto p-0 flex flex-col">
+        <div className="shrink-0 px-8 py-6 border-b">
           <SheetHeader>
-            <SheetTitle>Edit Variables</SheetTitle>
-            <SheetDescription className="line-clamp-1">{videoTitle}</SheetDescription>
+            <SheetTitle className="text-2xl">Edit Variables</SheetTitle>
+            <SheetDescription className="text-base mt-1">{videoTitle}</SheetDescription>
           </SheetHeader>
         </div>
 
-        <div className="px-6 py-6 space-y-8">
+        <div className="flex-1 overflow-y-auto px-8 py-6">
           {isLoading ? (
-            <div className="flex justify-center py-8">
+            <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : Object.keys(groupedVariables).length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">
+            <div className="flex items-center justify-center py-12">
+              <p className="text-muted-foreground text-center max-w-sm">
                 No variables to edit. Assign this video to a container with templates
                 containing variables.
               </p>
             </div>
           ) : (
-            Object.entries(groupedVariables).map(([templateName, vars]) => (
-              <div key={templateName} className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+            <div className="space-y-8">
+              {Object.entries(groupedVariables).map(([templateName, vars]) => (
+                <div key={templateName} className="space-y-5">
+                  <h3 className="text-xs font-medium text-foreground/60 uppercase tracking-wider px-1">
                     {templateName}
                   </h3>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-                <div className="space-y-6">
-                  {Object.entries(vars).map(([key, variable]) => (
-                    <div key={key} className="space-y-3">
-                      <div>
-                        <Label htmlFor={`var-${key}`} className="text-base">
-                          {'{{'} {variable.name} {'}}'}
-                        </Label>
-                        <Textarea
-                          id={`var-${key}`}
-                          value={variable.value}
-                          onChange={(e) => handleValueChange(key, e.target.value)}
-                          placeholder={`Enter ${variable.name}`}
-                          className="resize-y min-h-[80px] mt-2"
-                          rows={2}
-                        />
+                  <div className="space-y-5">
+                    {Object.entries(vars).map(([key, variable]) => (
+                      <div key={key} className="rounded-lg border bg-card p-5 space-y-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor={`var-${key}`} className="text-sm font-medium">
+                              {'{{'} {variable.name} {'}}'}
+                            </Label>
+                            <Select
+                              value={variable.type}
+                              onValueChange={(value: 'text' | 'number' | 'date' | 'url') =>
+                                handleTypeChange(key, value)
+                              }
+                            >
+                              <SelectTrigger id={`type-${key}`} className="w-28 h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="text">Text</SelectItem>
+                                <SelectItem value="number">Number</SelectItem>
+                                <SelectItem value="date">Date</SelectItem>
+                                <SelectItem value="url">URL</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Textarea
+                            id={`var-${key}`}
+                            value={variable.value}
+                            onChange={(e) => handleValueChange(key, e.target.value)}
+                            placeholder={`Enter ${variable.name}...`}
+                            className="resize-none min-h-[100px] text-sm"
+                            rows={3}
+                          />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor={`type-${key}`} className="text-sm text-muted-foreground">
-                          Type:
-                        </Label>
-                        <Select
-                          value={variable.type}
-                          onValueChange={(value: 'text' | 'number' | 'date' | 'url') =>
-                            handleTypeChange(key, value)
-                          }
-                        >
-                          <SelectTrigger id={`type-${key}`} className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="text">Text</SelectItem>
-                            <SelectItem value="number">Number</SelectItem>
-                            <SelectItem value="date">Date</SelectItem>
-                            <SelectItem value="url">URL</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
 
         {Object.keys(formData).length > 0 && (
-          <div className="px-6 pb-6">
+          <div className="shrink-0 px-8 pb-6">
             <Collapsible
               open={isPreviewOpen}
               onOpenChange={setIsPreviewOpen}
               className="space-y-3"
             >
               <CollapsibleTrigger asChild>
-                <Button variant="outline" size="lg" className="w-full justify-between">
-                  <span className="font-medium">Preview Description</span>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between h-10 text-sm font-medium hover:bg-accent"
+                >
+                  <span>Preview Description</span>
                   <ChevronDown
-                    className={`h-5 w-5 transition-transform duration-200 ${
+                    className={`h-4 w-4 transition-transform duration-200 ${
                       isPreviewOpen ? 'rotate-180' : ''
                     }`}
                   />
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-3">
+              <CollapsibleContent className="pt-2">
                 {isPreviewLoading ? (
                   <div className="flex justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
                 ) : preview?.description ? (
-                  <div className="rounded-lg border bg-muted/30 p-4">
+                  <div className="rounded-lg border bg-muted/40 p-4">
                     <Textarea
                       value={preview.description}
                       readOnly
-                      className="resize-y min-h-[200px] bg-background border-0 focus-visible:ring-0"
-                      rows={10}
+                      className="resize-none min-h-[200px] bg-transparent border-0 focus-visible:ring-0 text-sm"
+                      rows={8}
                     />
                   </div>
                 ) : null}
@@ -277,27 +276,26 @@ export default function EditVariablesSheet({
           </div>
         )}
 
-        <div className="sticky bottom-0 z-10 bg-background border-t px-6 py-4">
-          <SheetFooter className="gap-2">
+        <div className="shrink-0 border-t bg-background px-8 py-5">
+          <div className="flex items-center gap-3">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
-              className="flex-1 sm:flex-initial"
+              className="flex-1"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSave}
               disabled={updateMutation.isPending || Object.keys(formData).length === 0}
-              size="lg"
-              className="flex-1 sm:flex-initial"
+              className="flex-1"
             >
               {updateMutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Save Variables
+              Update Variables
             </Button>
-          </SheetFooter>
+          </div>
         </div>
       </SheetContent>
     </Sheet>
