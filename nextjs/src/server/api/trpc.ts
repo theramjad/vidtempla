@@ -10,7 +10,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { type CreateNextContextOptions } from "@trpc/server/adapters/next";
 import superjson from "superjson";
 import { appConfig } from "@/config/app";
-import { supabaseServer } from "@/lib/clients/supabase";
+import createClient from "@/utils/supabase/api";
 
 interface AuthContext {
   user: User | null;
@@ -23,9 +23,12 @@ const createInnerTRPCContext = ({ user }: AuthContext) => {
 };
 
 export const createTRPCContext = async (opts: CreateNextContextOptions) => {
+  // Create Supabase client from request cookies to get authenticated user
+  const supabase = createClient(opts.req, opts.res);
+
   const {
     data: { user },
-  } = await supabaseServer.auth.getUser();
+  } = await supabase.auth.getUser();
 
   return createInnerTRPCContext({ user });
 };
