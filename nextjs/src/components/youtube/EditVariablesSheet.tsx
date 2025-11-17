@@ -189,8 +189,7 @@ export default function EditVariablesSheet({
           ) : (
             Object.entries(groupedVariables).map(([templateName, vars]) => (
               <div key={templateName} className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-px flex-1 bg-border" />
+                <div className="flex items-center gap-3">
                   <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
                     {templateName}
                   </h3>
