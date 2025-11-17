@@ -144,9 +144,6 @@ export default function EditVariablesSheet({
           <SheetHeader>
             <SheetTitle className="text-xl font-semibold">Edit Variables</SheetTitle>
             <SheetDescription className="text-sm mt-1.5 line-clamp-2">{videoTitle}</SheetDescription>
-            <p className="text-xs text-muted-foreground mt-2">
-              Default variables like <code className="px-1.5 py-0.5 bg-muted rounded">{'{{video-id}}'}</code> are automatically provided
-            </p>
           </SheetHeader>
         </div>
 
