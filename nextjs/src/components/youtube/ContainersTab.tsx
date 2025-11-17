@@ -48,7 +48,7 @@ export default function ContainersTab() {
   const [formData, setFormData] = useState({
     name: '',
     templateIds: [] as string[],
-    separator: '\n\n'
+    separator: '---'
   });
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -73,7 +73,7 @@ export default function ContainersTab() {
         title: 'Container created',
         description: 'Your container has been created successfully.',
       });
-      setFormData({ name: '', templateIds: [], separator: '\n\n' });
+      setFormData({ name: '', templateIds: [], separator: '---' });
       setCreateDialogOpen(false);
       refetch();
     } catch (error) {
@@ -227,7 +227,7 @@ export default function ContainersTab() {
                     id="separator"
                     value={formData.separator}
                     onChange={(e) => setFormData({ ...formData, separator: e.target.value })}
-                    placeholder="Enter separator (use \n for newline)"
+                    placeholder="Enter custom separator text"
                     className="font-mono text-sm"
                   />
                   <div className="flex gap-2">
@@ -235,29 +235,13 @@ export default function ContainersTab() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setFormData({ ...formData, separator: '\n\n' })}
+                      onClick={() => setFormData({ ...formData, separator: '---' })}
                     >
-                      Double Newline
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setFormData({ ...formData, separator: '\n\n\n' })}
-                    >
-                      Triple Newline
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setFormData({ ...formData, separator: '\n\n—————\n\n' })}
-                    >
-                      Line Separator
+                      Triple Dash (---)
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    This text will appear between templates. Use \n for line breaks.
+                    Enter custom text to separate templates (e.g., "---", "• • •", or any text)
                   </p>
                 </div>
               </div>
