@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS video_variables (
     template_id uuid NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
     variable_name text NOT NULL,
     variable_value text,
-    variable_type text CHECK (variable_type IN ('text', 'number', 'date', 'url')),
     created_at timestamptz DEFAULT now() NOT NULL,
     updated_at timestamptz DEFAULT now() NOT NULL,
     UNIQUE(video_id, template_id, variable_name)

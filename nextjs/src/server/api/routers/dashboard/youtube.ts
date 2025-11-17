@@ -477,7 +477,6 @@ export const youtubeRouter = createTRPCRouter({
               template_id: string;
               variable_name: string;
               variable_value: string;
-              variable_type: string;
             }> = [];
 
             templates.forEach((template) => {
@@ -488,7 +487,6 @@ export const youtubeRouter = createTRPCRouter({
                   template_id: template.id,
                   variable_name: varName,
                   variable_value: '',
-                  variable_type: 'text',
                 });
               });
             });
@@ -529,7 +527,6 @@ export const youtubeRouter = createTRPCRouter({
               templateId: z.string().uuid(),
               name: z.string(),
               value: z.string(),
-              type: z.enum(['text', 'number', 'date', 'url']),
             })
           ),
         })
@@ -545,7 +542,6 @@ export const youtubeRouter = createTRPCRouter({
                 template_id: variable.templateId,
                 variable_name: variable.name,
                 variable_value: variable.value,
-                variable_type: variable.type,
               },
               {
                 onConflict: 'video_id,template_id,variable_name',

@@ -51,7 +51,6 @@ export default function EditVariablesSheet({
         templateId: string;
         name: string;
         value: string;
-        type: 'text' | 'number' | 'date' | 'url';
         templateName: string;
       }
     >
@@ -75,12 +74,10 @@ export default function EditVariablesSheet({
       const initialData: typeof formData = {};
       variables.forEach((variable: VideoVariable) => {
         const key = `${variable.template_id}-${variable.variable_name}`;
-        const variableType = variable.variable_type as 'text' | 'number' | 'date' | 'url';
         initialData[key] = {
           templateId: variable.template_id,
           name: variable.variable_name,
           value: variable.variable_value || '',
-          type: variableType || 'text',
           templateName: variable.template?.name || 'Unknown Template',
         };
       });
@@ -107,7 +104,6 @@ export default function EditVariablesSheet({
         templateId: v.templateId,
         name: v.name,
         value: v.value,
-        type: v.type,
       }));
 
       await updateMutation.mutateAsync({
@@ -176,7 +172,7 @@ export default function EditVariablesSheet({
                   </div>
                   <div className="space-y-3">
                     {Object.entries(vars).map(([key, variable]) => (
-                      <div key={key} className="rounded-lg border bg-card hover:shadow-md transition-shadow duration-200">
+                      <div key={key} className="rounded-lg border bg-card">
                         <div className="p-4 space-y-3">
                           <Label
                             htmlFor={`var-${key}`}
@@ -230,7 +226,7 @@ export default function EditVariablesSheet({
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
                 ) : preview?.description ? (
-                  <div className="rounded-lg border bg-background shadow-sm">
+                  <div className="rounded-lg border bg-background">
                     <Textarea
                       value={preview.description}
                       readOnly

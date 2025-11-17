@@ -222,7 +222,6 @@ export type Database = {
           template_id: string
           updated_at: string
           variable_name: string
-          variable_type: string | null
           variable_value: string | null
           video_id: string
         }
@@ -232,7 +231,6 @@ export type Database = {
           template_id: string
           updated_at?: string
           variable_name: string
-          variable_type?: string | null
           variable_value?: string | null
           video_id: string
         }
@@ -242,7 +240,6 @@ export type Database = {
           template_id?: string
           updated_at?: string
           variable_name?: string
-          variable_type?: string | null
           variable_value?: string | null
           video_id?: string
         }
