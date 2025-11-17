@@ -86,18 +86,10 @@ export default function ChannelsTab() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>YouTube Channels</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              Connect your YouTube channels to manage video descriptions
-            </p>
-          </div>
-          <Button onClick={handleConnect}>
-            <Plus className="mr-2 h-4 w-4" />
-            Connect Channel
-          </Button>
-        </div>
+        <CardTitle>YouTube Channels</CardTitle>
+        <p className="text-sm text-muted-foreground mt-1">
+          Connect your YouTube channels to manage video descriptions
+        </p>
       </CardHeader>
       <CardContent className="p-0">
         {isLoading ? (

@@ -122,140 +122,10 @@ export default function ContainersTab() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Containers</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              Containers are collections of templates applied to videos
-            </p>
-          </div>
-          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Container
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create Container</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Container Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g., Product Videos"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="separator">Template Separator</Label>
-                  <div className="space-y-2">
-                    <Input
-                      id="separator"
-                      value={formData.separator}
-                      onChange={(e) => setFormData({ ...formData, separator: e.target.value })}
-                      placeholder="Enter separator (use \n for newline)"
-                      className="font-mono text-sm"
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setFormData({ ...formData, separator: '\n\n' })}
-                      >
-                        Double Newline
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setFormData({ ...formData, separator: '\n\n\n' })}
-                      >
-                        Triple Newline
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setFormData({ ...formData, separator: '\n\n—————\n\n' })}
-                      >
-                        Line Separator
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      This text will appear between templates. Use \n for line breaks.
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <Label>Select Templates</Label>
-                  <div className="border rounded-md p-3 space-y-2 max-h-60 overflow-y-auto">
-                    {templates && templates.length > 0 ? (
-                      templates.map((template) => {
-                        const orderIndex = formData.templateIds.indexOf(template.id);
-                        const isSelected = orderIndex !== -1;
-                        return (
-                          <label
-                            key={template.id}
-                            className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleTemplate(template.id)}
-                              className="rounded"
-                            />
-                            {isSelected && (
-                              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-medium">
-                                {orderIndex + 1}
-                              </span>
-                            )}
-                            <span>{template.name}</span>
-                          </label>
-                        );
-                      })
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No templates available. Create templates first.</p>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Templates will be applied in the order selected
-                  </p>
-
-                  {formData.templateIds.length > 0 && (
-                    <div className="mt-4 p-3 bg-muted rounded-md">
-                      <p className="text-sm font-medium mb-2">Template Order Preview:</p>
-                      <ol className="text-sm space-y-1">
-                        {formData.templateIds.map((templateId, index) => {
-                          const template = templates?.find((t) => t.id === templateId);
-                          return (
-                            <li key={templateId} className="flex items-center gap-2">
-                              <span className="font-medium text-primary">{index + 1}.</span>
-                              <span>{template?.name || 'Unknown Template'}</span>
-                            </li>
-                          );
-                        })}
-                      </ol>
-                    </div>
-                  )}
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreate} disabled={createMutation.isPending}>
-                    {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Create
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+        <CardTitle>Containers</CardTitle>
+        <p className="text-sm text-muted-foreground mt-1">
+          Containers are collections of templates applied to videos
+        </p>
       </CardHeader>
       <CardContent className="p-0">
         {isLoading ? (
@@ -333,6 +203,128 @@ export default function ContainersTab() {
             </TableBody>
           </Table>
         )}
+
+        {/* Create Dialog */}
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Container</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="name">Container Name</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Product Videos"
+                />
+              </div>
+              <div>
+                <Label htmlFor="separator">Template Separator</Label>
+                <div className="space-y-2">
+                  <Input
+                    id="separator"
+                    value={formData.separator}
+                    onChange={(e) => setFormData({ ...formData, separator: e.target.value })}
+                    placeholder="Enter separator (use \n for newline)"
+                    className="font-mono text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFormData({ ...formData, separator: '\n\n' })}
+                    >
+                      Double Newline
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFormData({ ...formData, separator: '\n\n\n' })}
+                    >
+                      Triple Newline
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFormData({ ...formData, separator: '\n\n—————\n\n' })}
+                    >
+                      Line Separator
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    This text will appear between templates. Use \n for line breaks.
+                  </p>
+                </div>
+              </div>
+              <div>
+                <Label>Select Templates</Label>
+                <div className="border rounded-md p-3 space-y-2 max-h-60 overflow-y-auto">
+                  {templates && templates.length > 0 ? (
+                    templates.map((template) => {
+                      const orderIndex = formData.templateIds.indexOf(template.id);
+                      const isSelected = orderIndex !== -1;
+                      return (
+                        <label
+                          key={template.id}
+                          className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleTemplate(template.id)}
+                            className="rounded"
+                          />
+                          {isSelected && (
+                            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-medium">
+                              {orderIndex + 1}
+                            </span>
+                          )}
+                          <span>{template.name}</span>
+                        </label>
+                      );
+                    })
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No templates available. Create templates first.</p>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Templates will be applied in the order selected
+                </p>
+
+                {formData.templateIds.length > 0 && (
+                  <div className="mt-4 p-3 bg-muted rounded-md">
+                    <p className="text-sm font-medium mb-2">Template Order Preview:</p>
+                    <ol className="text-sm space-y-1">
+                      {formData.templateIds.map((templateId, index) => {
+                        const template = templates?.find((t) => t.id === templateId);
+                        return (
+                          <li key={templateId} className="flex items-center gap-2">
+                            <span className="font-medium text-primary">{index + 1}.</span>
+                            <span>{template?.name || 'Unknown Template'}</span>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreate} disabled={createMutation.isPending}>
+                  {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Create
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Edit Container Modal */}
         {selectedContainerId && (
