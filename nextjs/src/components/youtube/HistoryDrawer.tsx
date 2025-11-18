@@ -53,6 +53,14 @@ export default function HistoryDrawer({
     { enabled: open }
   );
 
+  const { data: videoList } = api.dashboard.youtube.videos.list.useQuery({}, { enabled: open });
+  const currentVideo = videoList?.find((v) => v.id === videoId);
+
+  const { data: variables } = api.dashboard.youtube.videos.getVariables.useQuery(
+    { videoId },
+    { enabled: open }
+  );
+
   const rollbackMutation = api.dashboard.youtube.videos.rollback.useMutation();
 
   const toggleExpanded = (historyId: string) => {
@@ -69,12 +77,19 @@ export default function HistoryDrawer({
 
   const handleRollback = async (historyId: string, versionNumber: number) => {
     try {
-      await rollbackMutation.mutateAsync({ videoId, historyId });
+      const result = await rollbackMutation.mutateAsync({ videoId, historyId });
 
-      toast({
-        title: 'Rollback successful',
-        description: `Rolled back to version ${versionNumber}. This created a new version.`,
-      });
+      if (result.delinkedContainer) {
+        toast({
+          title: 'Rollback successful',
+          description: `Rolled back to version ${versionNumber}. Video delinked from container and ${result.variablesCleared} variable(s) cleared.`,
+        });
+      } else {
+        toast({
+          title: 'Rollback successful',
+          description: `Rolled back to version ${versionNumber}.`,
+        });
+      }
 
       refetch();
       onSuccess?.();
@@ -155,10 +170,35 @@ export default function HistoryDrawer({
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle>Rollback to Version {version.version_number}?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will create a new version with the content from version{' '}
-                                {version.version_number}. The current version will be preserved
-                                in history.
+                              <AlertDialogDescription className="space-y-3">
+                                <p>
+                                  This will restore the description from{' '}
+                                  {new Date(version.created_at).toLocaleString()}.
+                                </p>
+
+                                {currentVideo?.container && (
+                                  <div className="rounded-md border border-yellow-600/20 bg-yellow-600/10 p-3 space-y-2">
+                                    <p className="font-semibold text-yellow-600 dark:text-yellow-500">
+                                      ⚠️ Warning:
+                                    </p>
+                                    <ul className="list-disc pl-6 space-y-1 text-sm">
+                                      <li>Video will be removed from its container</li>
+                                      {variables && variables.length > 0 && (
+                                        <li>{variables.length} variable value(s) will be cleared</li>
+                                      )}
+                                      <li>Description will be updated on YouTube</li>
+                                    </ul>
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                      You can re-assign to a container later if needed.
+                                    </p>
+                                  </div>
+                                )}
+
+                                {!currentVideo?.container && (
+                                  <p className="text-sm">
+                                    The description will be updated on YouTube.
+                                  </p>
+                                )}
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -172,7 +212,7 @@ export default function HistoryDrawer({
                                 {rollbackMutation.isPending && (
                                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 )}
-                                Rollback
+                                {currentVideo?.container ? 'Restore Anyway' : 'Restore'}
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>

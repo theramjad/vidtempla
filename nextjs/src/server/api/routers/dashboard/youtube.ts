@@ -661,11 +661,63 @@ export const youtubeRouter = createTRPCRouter({
           });
         }
 
+        // Get current video state (for return metadata)
+        const { data: video } = await supabaseServer
+          .from('youtube_videos')
+          .select('container_id')
+          .eq('id', input.videoId)
+          .single();
+
+        const { data: variables } = await supabaseServer
+          .from('video_variables')
+          .select('id')
+          .eq('video_id', input.videoId);
+
+        const hadContainer = !!video?.container_id;
+        const variableCount = variables?.length || 0;
+
+        // DELINK: Set container_id to NULL if video is currently in a container
+        if (hadContainer) {
+          const { error: delinkError } = await supabaseServer
+            .from('youtube_videos')
+            .update({ container_id: null })
+            .eq('id', input.videoId);
+
+          if (delinkError) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to delink video from container',
+            });
+          }
+        }
+
+        // CLEAR VARIABLES: Delete all video_variables for this video
+        if (variableCount > 0) {
+          const { error: deleteVarsError } = await supabaseServer
+            .from('video_variables')
+            .delete()
+            .eq('video_id', input.videoId);
+
+          if (deleteVarsError) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to clear video variables',
+            });
+          }
+        }
+
         // Update video's current description
-        await supabaseServer
+        const { error: updateError } = await supabaseServer
           .from('youtube_videos')
           .update({ current_description: history.description })
           .eq('id', input.videoId);
+
+        if (updateError) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to update video description',
+          });
+        }
 
         // Trigger Inngest event to update on YouTube
         // The Inngest job will create the history entry after successful update
@@ -677,7 +729,11 @@ export const youtubeRouter = createTRPCRouter({
           },
         });
 
-        return { success: true };
+        return {
+          success: true,
+          delinkedContainer: hadContainer,
+          variablesCleared: variableCount,
+        };
       }),
 
     updateToYouTube: adminProcedure
