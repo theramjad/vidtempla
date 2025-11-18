@@ -378,7 +378,7 @@ export const youtubeRouter = createTRPCRouter({
           .from('youtube_videos')
           .select(`
             *,
-            channel:youtube_channels!inner(id, title, user_id),
+            channel:youtube_channels!inner(id, title, user_id, channel_id),
             container:containers(id, name)
           `)
           .eq('channel.user_id', ctx.user.id);
@@ -409,7 +409,7 @@ export const youtubeRouter = createTRPCRouter({
         .from('youtube_videos')
         .select(`
           *,
-          channel:youtube_channels!inner(id, title, user_id)
+          channel:youtube_channels!inner(id, title, user_id, channel_id)
         `)
         .eq('channel.user_id', ctx.user.id)
         .is('container_id', null)
