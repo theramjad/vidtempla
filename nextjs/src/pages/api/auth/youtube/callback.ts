@@ -11,6 +11,7 @@ import {
 } from '@/lib/clients/youtube';
 import { encrypt } from '@/utils/encryption';
 import { checkChannelLimit } from '@/lib/plan-limits';
+import { inngestClient } from '@/lib/clients/inngest';
 
 export default async function handler(
   req: NextApiRequest,
@@ -85,6 +86,15 @@ export default async function handler(
           subscriber_count: parseInt(channelInfo.statistics.subscriberCount),
         })
         .eq('id', existingChannel.id);
+
+      // Trigger automatic sync for reconnected channel
+      await inngestClient.send({
+        name: 'youtube/channel.sync',
+        data: {
+          channelId: existingChannel.id,
+          userId: session.user.id,
+        },
+      });
     } else {
       // Check channel limit before adding a new channel
       const limitCheck = await checkChannelLimit(session.user.id, supabase);
@@ -98,16 +108,31 @@ export default async function handler(
       }
 
       // Insert new channel
-      await supabase.from('youtube_channels').insert({
-        user_id: session.user.id,
-        channel_id: channelInfo.id,
-        title: channelInfo.snippet.title,
-        thumbnail_url: channelInfo.snippet.thumbnails.high.url,
-        subscriber_count: parseInt(channelInfo.statistics.subscriberCount),
-        access_token_encrypted: encryptedAccessToken,
-        refresh_token_encrypted: encryptedRefreshToken,
-        token_expires_at: expiresAt.toISOString(),
-      });
+      const { data: newChannel } = await supabase
+        .from('youtube_channels')
+        .insert({
+          user_id: session.user.id,
+          channel_id: channelInfo.id,
+          title: channelInfo.snippet.title,
+          thumbnail_url: channelInfo.snippet.thumbnails.high.url,
+          subscriber_count: parseInt(channelInfo.statistics.subscriberCount),
+          access_token_encrypted: encryptedAccessToken,
+          refresh_token_encrypted: encryptedRefreshToken,
+          token_expires_at: expiresAt.toISOString(),
+        })
+        .select('id')
+        .single();
+
+      // Trigger automatic sync for newly connected channel
+      if (newChannel) {
+        await inngestClient.send({
+          name: 'youtube/channel.sync',
+          data: {
+            channelId: newChannel.id,
+            userId: session.user.id,
+          },
+        });
+      }
     }
 
     // Redirect to YouTube dashboard page with success message
