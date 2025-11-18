@@ -189,19 +189,44 @@ export default function VideosTab() {
                 {videos.map((video) => (
                   <TableRow key={video.id}>
                     <TableCell>
-                      <img
-                        src={`https://img.youtube.com/vi/${video.video_id}/default.jpg`}
-                        alt={video.title || 'Video thumbnail'}
-                        className="w-24 h-auto rounded"
-                      />
+                      <a
+                        href={`https://youtube.com/watch?v=${video.video_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block transition-opacity hover:opacity-80"
+                      >
+                        <img
+                          src={`https://img.youtube.com/vi/${video.video_id}/default.jpg`}
+                          alt={video.title || 'Video thumbnail'}
+                          className="w-24 h-auto rounded"
+                        />
+                      </a>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <a
+                        href={`https://youtube.com/watch?v=${video.video_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 hover:underline"
+                      >
                         <Play className="h-4 w-4 text-muted-foreground" />
                         <span className="font-medium">{video.title}</span>
-                      </div>
+                      </a>
                     </TableCell>
-                    <TableCell>{video.channel?.title}</TableCell>
+                    <TableCell>
+                      {video.channel?.channel_id ? (
+                        <a
+                          href={`https://youtube.com/channel/${video.channel.channel_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:underline"
+                        >
+                          {video.channel.title}
+                        </a>
+                      ) : (
+                        video.channel?.title
+                      )}
+                    </TableCell>
                     <TableCell>
                       {video.container ? (
                         <span className="px-2 py-1 bg-primary/10 text-primary rounded text-sm">

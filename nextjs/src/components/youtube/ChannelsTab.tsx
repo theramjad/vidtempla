@@ -121,7 +121,23 @@ export default function ChannelsTab() {
                 <TableRow key={channel.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      {channel.thumbnail_url && (
+                      {channel.thumbnail_url && channel.channel_id && (
+                        <a
+                          href={`https://youtube.com/channel/${channel.channel_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block transition-opacity hover:opacity-80"
+                        >
+                          <Image
+                            src={channel.thumbnail_url}
+                            alt={channel.title || 'Channel'}
+                            width={40}
+                            height={40}
+                            className="rounded-full"
+                          />
+                        </a>
+                      )}
+                      {channel.thumbnail_url && !channel.channel_id && (
                         <Image
                           src={channel.thumbnail_url}
                           alt={channel.title || 'Channel'}
@@ -130,7 +146,18 @@ export default function ChannelsTab() {
                           className="rounded-full"
                         />
                       )}
-                      <span className="font-medium">{channel.title}</span>
+                      {channel.channel_id ? (
+                        <a
+                          href={`https://youtube.com/channel/${channel.channel_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium hover:underline"
+                        >
+                          {channel.title}
+                        </a>
+                      ) : (
+                        <span className="font-medium">{channel.title}</span>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
