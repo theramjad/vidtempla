@@ -12,15 +12,15 @@ export function Navbar() {
             </Link>
           </div>
           <div className="hidden md:flex items-center space-x-8">
-            <a href="/#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <Link href="/#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Features
-            </a>
-            <a href="/#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            </Link>
+            <Link href="/#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Pricing
-            </a>
-            <a href="/#faq" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            </Link>
+            <Link href="/#faq" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               FAQ
-            </a>
+            </Link>
           </div>
           <div className="flex items-center space-x-4">
             <Link href="/sign-in">
