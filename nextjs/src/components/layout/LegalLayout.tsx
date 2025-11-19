@@ -22,7 +22,7 @@ export function LegalLayout({ children, title, lastUpdated }: LegalLayoutProps) 
               <p className="text-sm text-muted-foreground mb-8">
                 Last Updated: {lastUpdated}
               </p>
-              <div className="prose prose-lg max-w-none dark:prose-invert prose-headings:font-bold prose-h2:text-3xl prose-h2:mt-8 prose-h2:mb-4 prose-h3:text-2xl prose-h3:mt-6 prose-h3:mb-3 prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-p:text-base prose-p:leading-7">
+              <div className="space-y-6 [&>h2]:text-3xl [&>h2]:font-bold [&>h2]:mt-8 [&>h2]:mb-4 [&>h3]:text-2xl [&>h3]:font-bold [&>h3]:mt-6 [&>h3]:mb-3 [&>p]:text-base [&>p]:leading-7 [&>p]:mb-4 [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:mb-4 [&>ul>li]:mb-2 [&>ol]:list-decimal [&>ol]:pl-6 [&>ol]:mb-4 [&>ol>li]:mb-2 [&_a]:text-primary [&_a]:underline hover:[&_a]:no-underline">
                 {children}
               </div>
             </div>
