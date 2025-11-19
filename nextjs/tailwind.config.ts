@@ -8,5 +8,6 @@ export default {
   plugins: [
     // ... other plugins
     require("tailwind-scrollbar")({ nocompatible: true }),
+    require("@tailwindcss/typography"),
   ],
 } satisfies Config;
