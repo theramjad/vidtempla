@@ -239,8 +239,8 @@ export default function PricingPage() {
             </CardContent>
           </Card>
         </div>
-        </div>
-      </DashboardLayout>
+      </div>
+    </DashboardLayout>
     </>
   );
 }

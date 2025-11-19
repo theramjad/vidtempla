@@ -295,8 +295,8 @@ export default function SettingsPage() {
             </Card>
           )}
         </div>
-        </div>
-      </DashboardLayout>
+      </div>
+    </DashboardLayout>
     </>
   );
 }

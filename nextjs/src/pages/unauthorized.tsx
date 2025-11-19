@@ -40,7 +40,7 @@ export default function UnauthorizedPage() {
           </Button>
         </CardContent>
       </Card>
-      </div>
+    </div>
     </>
   );
 }

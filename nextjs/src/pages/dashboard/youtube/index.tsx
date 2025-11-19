@@ -83,8 +83,8 @@ export default function YouTubePage() {
             <TemplatesTab />
           </TabsContent>
         </Tabs>
-        </div>
-      </DashboardLayout>
+      </div>
+    </DashboardLayout>
     </>
   );
 }

@@ -177,7 +177,7 @@ export default function Page() {
       </Head>
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         {user && !userLoading ? (
-        <Card className="w-full max-w-md">
+          <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4">
               <CheckCircle className="h-16 w-16 text-green-500" />
@@ -203,8 +203,8 @@ export default function Page() {
             </Button>
           </CardContent>
         </Card>
-      ) : (
-        <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-6 shadow-md">
+        ) : (
+          <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-6 shadow-md">
           <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
             Sign In
           </h2>
@@ -276,7 +276,7 @@ export default function Page() {
                 )}
               </form>
             )}
-        </div>
+          </div>
         )}
       </div>
     </>

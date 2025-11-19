@@ -285,7 +285,7 @@ export default function RefundPolicy() {
           <Link href="/legal/privacy-policy">Privacy Policy</Link>
         </li>
       </ul>
-      </LegalLayout>
+    </LegalLayout>
     </>
   );
 }
