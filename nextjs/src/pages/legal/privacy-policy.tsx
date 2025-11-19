@@ -1,9 +1,14 @@
+import Head from "next/head";
 import { LegalLayout } from "@/components/layout/LegalLayout";
 import Link from "next/link";
 
 export default function PrivacyPolicy() {
   return (
-    <LegalLayout title="Privacy Policy" lastUpdated="November 19, 2025">
+    <>
+      <Head>
+        <title>Privacy Policy | VidTempla</title>
+      </Head>
+      <LegalLayout title="Privacy Policy" lastUpdated="November 19, 2025">
       <h2>Introduction</h2>
       <p>
         Welcome to VidTempla. We respect your privacy and are committed to protecting your personal data.
@@ -193,6 +198,7 @@ export default function PrivacyPolicy() {
           <Link href="/legal/refund-policy">Refund Policy</Link>
         </li>
       </ul>
-    </LegalLayout>
+      </LegalLayout>
+    </>
   );
 }

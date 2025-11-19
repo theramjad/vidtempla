@@ -1,3 +1,4 @@
+import Head from "next/head";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/useUser";
 import { createClient } from "@/utils/supabase/component";
@@ -170,8 +171,12 @@ export default function Page() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      {user && !userLoading ? (
+    <>
+      <Head>
+        <title>Sign In | VidTempla</title>
+      </Head>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        {user && !userLoading ? (
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4">
@@ -272,7 +277,8 @@ export default function Page() {
               </form>
             )}
         </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 }

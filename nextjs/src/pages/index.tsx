@@ -1,3 +1,4 @@
+import Head from "next/head";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,8 +21,13 @@ import {
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
+    <>
+      <Head>
+        <title>VidTempla</title>
+        <meta name="description" content="Manage YouTube descriptions at scale with dynamic templates and variables" />
+      </Head>
+      <div className="min-h-screen bg-background">
+        <Navbar />
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
@@ -415,6 +421,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <Footer />
-    </div>
+      </div>
+    </>
   );
 }

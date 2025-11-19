@@ -1,9 +1,14 @@
+import Head from "next/head";
 import { LegalLayout } from "@/components/layout/LegalLayout";
 import Link from "next/link";
 
 export default function TermsOfService() {
   return (
-    <LegalLayout title="Terms of Service" lastUpdated="November 19, 2025">
+    <>
+      <Head>
+        <title>Terms of Service | VidTempla</title>
+      </Head>
+      <LegalLayout title="Terms of Service" lastUpdated="November 19, 2025">
       <h2>Agreement to Terms</h2>
       <p>
         By accessing or using VidTempla ("the Service"), you agree to be bound by these Terms of Service
@@ -278,6 +283,7 @@ export default function TermsOfService() {
           <Link href="/legal/refund-policy">Refund Policy</Link>
         </li>
       </ul>
-    </LegalLayout>
+      </LegalLayout>
+    </>
   );
 }

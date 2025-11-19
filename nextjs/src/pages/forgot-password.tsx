@@ -1,3 +1,4 @@
+import Head from "next/head";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/utils/supabase/component";
 import Link from "next/link";
@@ -16,7 +17,11 @@ export default function Page() {
   // Check if password reset is enabled
   if (!appConfig.auth.enablePasswordReset) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <>
+        <Head>
+          <title>Forgot Password | VidTempla</title>
+        </Head>
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-6 shadow-md">
           <div className="flex flex-col items-center space-y-6">
             <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
@@ -34,6 +39,7 @@ export default function Page() {
           </div>
         </div>
       </div>
+      </>
     );
   }
 
@@ -74,7 +80,11 @@ export default function Page() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+    <>
+      <Head>
+        <title>Forgot Password | VidTempla</title>
+      </Head>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-6 shadow-md">
         <div>
           <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
@@ -123,6 +133,6 @@ export default function Page() {
           </div>
         </form>
       </div>
-    </div>
+    </>
   );
 }

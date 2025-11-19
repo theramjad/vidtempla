@@ -3,6 +3,7 @@
  * Subscription tiers and pricing information
  */
 
+import Head from 'next/head';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -98,8 +99,12 @@ export default function PricingPage() {
   const currentPlanTier = currentPlan?.plan_tier?.toLowerCase() || 'free';
 
   return (
-    <DashboardLayout>
-      <div className="container mx-auto py-6 space-y-6">
+    <>
+      <Head>
+        <title>Pricing | VidTempla</title>
+      </Head>
+      <DashboardLayout>
+        <div className="container mx-auto py-6 space-y-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold tracking-tight">Pricing Plans</h1>
           <p className="text-muted-foreground mt-2">
@@ -234,7 +239,8 @@ export default function PricingPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
+    </>
   );
 }

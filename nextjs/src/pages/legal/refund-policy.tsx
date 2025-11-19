@@ -1,9 +1,14 @@
+import Head from "next/head";
 import { LegalLayout } from "@/components/layout/LegalLayout";
 import Link from "next/link";
 
 export default function RefundPolicy() {
   return (
-    <LegalLayout title="Refund Policy" lastUpdated="November 19, 2025">
+    <>
+      <Head>
+        <title>Refund Policy | VidTempla</title>
+      </Head>
+      <LegalLayout title="Refund Policy" lastUpdated="November 19, 2025">
       <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-6 mb-8">
         <h3 className="text-xl font-bold text-blue-900 dark:text-blue-100 mb-3">
           Our 30-Day Money-Back Guarantee
@@ -280,6 +285,7 @@ export default function RefundPolicy() {
           <Link href="/legal/privacy-policy">Privacy Policy</Link>
         </li>
       </ul>
-    </LegalLayout>
+      </LegalLayout>
+    </>
   );
 }

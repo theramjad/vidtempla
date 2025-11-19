@@ -3,6 +3,7 @@
  * User account settings and preferences
  */
 
+import Head from 'next/head';
 import { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -99,8 +100,12 @@ export default function SettingsPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="container mx-auto py-6 space-y-6">
+    <>
+      <Head>
+        <title>Settings | VidTempla</title>
+      </Head>
+      <DashboardLayout>
+        <div className="container mx-auto py-6 space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
           <p className="text-muted-foreground">
@@ -290,7 +295,8 @@ export default function SettingsPage() {
             </Card>
           )}
         </div>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
+    </>
   );
 }

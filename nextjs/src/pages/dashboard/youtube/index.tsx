@@ -3,6 +3,7 @@
  * Main page with tabs for channels, templates, containers, and videos
  */
 
+import Head from 'next/head';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import DashboardLayout from '@/components/layout/DashboardLayout';
@@ -43,8 +44,12 @@ export default function YouTubePage() {
   }, [router.query, toast]);
 
   return (
-    <DashboardLayout>
-      <div className="container mx-auto py-6 space-y-6">
+    <>
+      <Head>
+        <title>YouTube Manager | VidTempla</title>
+      </Head>
+      <DashboardLayout>
+        <div className="container mx-auto py-6 space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
             YouTube Description Manager
@@ -78,7 +83,8 @@ export default function YouTubePage() {
             <TemplatesTab />
           </TabsContent>
         </Tabs>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
+    </>
   );
 }
