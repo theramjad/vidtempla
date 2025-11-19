@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export default function PrivacyPolicy() {
   return (
-    <LegalLayout title="Privacy Policy" lastUpdated="January 19, 2025">
+    <LegalLayout title="Privacy Policy" lastUpdated="November 19, 2025">
       <h2>Introduction</h2>
       <p>
         Welcome to VidTempla. We respect your privacy and are committed to protecting your personal data.

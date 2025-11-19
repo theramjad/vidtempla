@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export default function RefundPolicy() {
   return (
-    <LegalLayout title="Refund Policy" lastUpdated="January 19, 2025">
+    <LegalLayout title="Refund Policy" lastUpdated="November 19, 2025">
       <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-6 mb-8">
         <h3 className="text-xl font-bold text-blue-900 dark:text-blue-100 mb-3">
           Our 30-Day Money-Back Guarantee

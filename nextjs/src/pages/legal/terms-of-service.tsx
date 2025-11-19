@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export default function TermsOfService() {
   return (
-    <LegalLayout title="Terms of Service" lastUpdated="January 19, 2025">
+    <LegalLayout title="Terms of Service" lastUpdated="November 19, 2025">
       <h2>Agreement to Terms</h2>
       <p>
         By accessing or using VidTempla ("the Service"), you agree to be bound by these Terms of Service
