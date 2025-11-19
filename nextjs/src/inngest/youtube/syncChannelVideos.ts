@@ -29,6 +29,14 @@ export const syncChannelVideos = inngestClient.createFunction(
     // Initialize Supabase client with service role
     const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
 
+    // Step 0: Set sync status to 'syncing'
+    await step.run('set-syncing-status', async () => {
+      await supabase
+        .from('youtube_channels')
+        .update({ sync_status: 'syncing' })
+        .eq('id', channelId);
+    });
+
     // Step 1: Fetch channel from database and decrypt tokens
     const channel = await step.run('fetch-channel', async () => {
       const { data, error } = await supabase
@@ -210,11 +218,14 @@ export const syncChannelVideos = inngestClient.createFunction(
       };
     });
 
-    // Step 7: Update last_synced_at timestamp
+    // Step 7: Update last_synced_at timestamp and set status to idle
     await step.run('update-sync-timestamp', async () => {
       await supabase
         .from('youtube_channels')
-        .update({ last_synced_at: new Date().toISOString() })
+        .update({
+          last_synced_at: new Date().toISOString(),
+          sync_status: 'idle'
+        })
         .eq('id', channelId);
     });
 

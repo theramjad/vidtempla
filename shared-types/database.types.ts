@@ -302,6 +302,7 @@ export type Database = {
           last_synced_at: string | null
           refresh_token_encrypted: string | null
           subscriber_count: number | null
+          sync_status: string | null
           thumbnail_url: string | null
           title: string | null
           token_expires_at: string | null
@@ -316,6 +317,7 @@ export type Database = {
           last_synced_at?: string | null
           refresh_token_encrypted?: string | null
           subscriber_count?: number | null
+          sync_status?: string | null
           thumbnail_url?: string | null
           title?: string | null
           token_expires_at?: string | null
@@ -330,6 +332,7 @@ export type Database = {
           last_synced_at?: string | null
           refresh_token_encrypted?: string | null
           subscriber_count?: number | null
+          sync_status?: string | null
           thumbnail_url?: string | null
           title?: string | null
           token_expires_at?: string | null
@@ -465,27 +468,6 @@ export type Database = {
         Update: {
           created_at?: string
           format?: string
-          id?: string
-          type?: Database["storage"]["Enums"]["buckettype"]
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      buckets_vectors: {
-        Row: {
-          created_at: string
-          id: string
-          type: Database["storage"]["Enums"]["buckettype"]
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id: string
-          type?: Database["storage"]["Enums"]["buckettype"]
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
           id?: string
           type?: Database["storage"]["Enums"]["buckettype"]
           updated_at?: string
@@ -776,50 +758,6 @@ export type Database = {
           },
         ]
       }
-      vector_indexes: {
-        Row: {
-          bucket_id: string
-          created_at: string
-          data_type: string
-          dimension: number
-          distance_metric: string
-          id: string
-          metadata_configuration: Json | null
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          bucket_id: string
-          created_at?: string
-          data_type: string
-          dimension: number
-          distance_metric: string
-          id?: string
-          metadata_configuration?: Json | null
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          bucket_id?: string
-          created_at?: string
-          data_type?: string
-          dimension?: number
-          distance_metric?: string
-          id?: string
-          metadata_configuration?: Json | null
-          name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "vector_indexes_bucket_id_fkey"
-            columns: ["bucket_id"]
-            isOneToOne: false
-            referencedRelation: "buckets_vectors"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
@@ -973,7 +911,7 @@ export type Database = {
       }
     }
     Enums: {
-      buckettype: "STANDARD" | "ANALYTICS" | "VECTOR"
+      buckettype: "STANDARD" | "ANALYTICS"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1107,7 +1045,7 @@ export const Constants = {
   },
   storage: {
     Enums: {
-      buckettype: ["STANDARD", "ANALYTICS", "VECTOR"],
+      buckettype: ["STANDARD", "ANALYTICS"],
     },
   },
 } as const

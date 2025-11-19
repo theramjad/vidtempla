@@ -3,7 +3,7 @@
  * Manage connected YouTube channels
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '@/utils/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +30,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Unplug, RefreshCw, Plus } from 'lucide-react';
 import Image from 'next/image';
+import { DateTime } from 'luxon';
 
 export default function ChannelsTab() {
   const { toast } = useToast();
@@ -39,6 +40,29 @@ export default function ChannelsTab() {
   const { data: channels, isLoading, refetch } = api.dashboard.youtube.channels.list.useQuery();
   const disconnectMutation = api.dashboard.youtube.channels.disconnect.useMutation();
   const syncMutation = api.dashboard.youtube.channels.syncVideos.useMutation();
+
+  // Auto-refresh when any channel is syncing
+  useEffect(() => {
+    const hasSyncingChannels = channels?.some(
+      (channel) => channel.sync_status === 'syncing'
+    );
+
+    if (hasSyncingChannels) {
+      // Refresh every 15 seconds while syncing
+      const interval = setInterval(() => {
+        refetch();
+      }, 15000);
+
+      return () => clearInterval(interval);
+    }
+  }, [channels, refetch]);
+
+  const formatTimestamp = (timestamp: string | null) => {
+    if (!timestamp) return 'Never';
+
+    const dt = DateTime.fromISO(timestamp);
+    return dt.toLocaleString(DateTime.DATETIME_MED);
+  };
 
   const handleConnect = () => {
     window.location.href = '/api/auth/youtube/initiate';
@@ -164,9 +188,9 @@ export default function ChannelsTab() {
                     {channel.subscriber_count?.toLocaleString() || '—'}
                   </TableCell>
                   <TableCell>
-                    {channel.last_synced_at
-                      ? new Date(channel.last_synced_at).toLocaleDateString()
-                      : 'Never'}
+                    <span className="text-sm">
+                      {formatTimestamp(channel.last_synced_at)}
+                    </span>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
@@ -174,9 +198,9 @@ export default function ChannelsTab() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleSync(channel.id)}
-                        disabled={syncingId === channel.id}
+                        disabled={syncingId === channel.id || channel.sync_status === 'syncing'}
                       >
-                        {syncingId === channel.id ? (
+                        {syncingId === channel.id || channel.sync_status === 'syncing' ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                           <RefreshCw className="h-4 w-4" />

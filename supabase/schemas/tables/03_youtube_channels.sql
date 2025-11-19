@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS youtube_channels (
     access_token_encrypted text,
     refresh_token_encrypted text,
     token_expires_at timestamptz,
+    sync_status text DEFAULT 'idle' CHECK (sync_status IN ('idle', 'syncing', 'error')),
     last_synced_at timestamptz,
     created_at timestamptz DEFAULT now() NOT NULL,
     updated_at timestamptz DEFAULT now() NOT NULL
@@ -19,6 +20,7 @@ CREATE TABLE IF NOT EXISTS youtube_channels (
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_youtube_channels_user_id ON youtube_channels(user_id);
 CREATE INDEX IF NOT EXISTS idx_youtube_channels_channel_id ON youtube_channels(channel_id);
+CREATE INDEX IF NOT EXISTS idx_youtube_channels_sync_status ON youtube_channels(sync_status);
 
 -- RLS Policies
 ALTER TABLE youtube_channels ENABLE ROW LEVEL SECURITY;
