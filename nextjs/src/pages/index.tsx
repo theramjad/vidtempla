@@ -450,7 +450,7 @@ export default function LandingPage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-sm text-muted-foreground">
-              © 2024 VidTempla. All rights reserved.
+              © 2025 VidTempla. All rights reserved.
             </div>
             <div className="flex items-center space-x-6">
               <Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
