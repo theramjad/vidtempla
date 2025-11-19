@@ -96,6 +96,8 @@ export default function ChannelsTab() {
         title: 'Sync started',
         description: 'Videos are being synced in the background.',
       });
+      // Immediately refetch to show syncing status
+      await refetch();
     } catch (error) {
       toast({
         title: 'Error',
