@@ -13,7 +13,6 @@ import {
   getUploadsPlaylistId,
 } from '@/lib/clients/youtube';
 import type { Database } from '@shared-types/database.types';
-import { checkVideoLimit } from '@/lib/plan-limits';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -145,29 +144,17 @@ export const syncChannelVideos = inngestClient.createFunction(
         existingVideos?.map((v) => v.video_id) || []
       );
 
-      // Track new videos added and skipped due to limits
+      // Track new videos added
       let newVideosAdded = 0;
-      let videosSkippedDueToLimit = 0;
 
-      // Process each video
+      // Process each video - sync ALL videos regardless of plan limits
+      // Plan limits are only enforced when assigning/updating video descriptions
       for (const ytVideo of allVideos) {
         const videoId = ytVideo.id;
         const isNewVideo = !existingVideoIds.has(videoId);
 
         if (isNewVideo) {
-          // Check video limit before adding new video
-          const limitCheck = await checkVideoLimit(userId, supabase);
-
-          if (!limitCheck.canAddVideo) {
-            // User has reached their video limit, skip this video
-            videosSkippedDueToLimit++;
-            console.warn(
-              `Skipping video ${videoId} for user ${userId}: Video limit reached (${limitCheck.currentCount}/${limitCheck.limit} on ${limitCheck.planTier} plan)`
-            );
-            continue;
-          }
-
-          // Insert new video
+          // Insert new video without checking limits
           const { data: insertedVideo, error: insertError } = await supabase
             .from('youtube_videos')
             .insert({
@@ -220,7 +207,6 @@ export const syncChannelVideos = inngestClient.createFunction(
         total: allVideos.length,
         new: newVideosAdded,
         deleted: videosToDelete.length,
-        skippedDueToLimit: videosSkippedDueToLimit,
       };
     });
 

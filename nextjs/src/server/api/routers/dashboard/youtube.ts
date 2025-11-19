@@ -18,6 +18,7 @@ import {
 import { inngestClient } from '@/lib/clients/inngest';
 import { supabaseServer } from '@/lib/clients/supabase';
 import type { Database } from '@shared-types/database.types';
+import { checkVideoLimit } from '@/lib/plan-limits';
 
 export const youtubeRouter = createTRPCRouter({
   // ==================== Channel Management ====================
@@ -440,6 +441,33 @@ export const youtubeRouter = createTRPCRouter({
             code: 'BAD_REQUEST',
             message: 'Video is already assigned to a container',
           });
+        }
+
+        // Check if user has reached their assigned video limit
+        // We count videos that are already assigned to containers
+        const { data: channels } = await supabaseServer
+          .from('youtube_channels')
+          .select('id')
+          .eq('user_id', ctx.user.id);
+
+        const channelIds = channels?.map((c) => c.id) || [];
+
+        if (channelIds.length > 0) {
+          const { count: assignedCount } = await supabaseServer
+            .from('youtube_videos')
+            .select('id', { count: 'exact', head: true })
+            .in('channel_id', channelIds)
+            .not('container_id', 'is', null);
+
+          const limitCheck = await checkVideoLimit(ctx.user.id, supabaseServer);
+
+          // If adding this video would exceed the limit, reject
+          if ((assignedCount || 0) >= limitCheck.limit) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: `You have reached your assigned video limit (${limitCheck.limit} videos on the ${limitCheck.planTier} plan). Please upgrade your plan to assign more videos to containers.`,
+            });
+          }
         }
 
         // Get the container's templates
