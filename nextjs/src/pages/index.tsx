@@ -334,19 +334,20 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <Accordion type="single" collapsible className="max-w-3xl mx-auto">
-            <AccordionItem value="item-1">
-              <AccordionTrigger className="text-left">
-                How does the template system work?
-              </AccordionTrigger>
-              <AccordionContent>
-                Templates use variables like {"`{{product_name}}`"} or {"`{{link}}`"} that you can customize for each video.
-                When you update a template, all videos using that template can be automatically updated with the new content
-                while keeping their unique variable values.
-              </AccordionContent>
-            </AccordionItem>
+          <div className="max-w-4xl mx-auto bg-card/50 backdrop-blur-xl border rounded-2xl shadow-lg overflow-hidden">
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="item-1">
+                <AccordionTrigger className="text-left">
+                  How does the template system work?
+                </AccordionTrigger>
+                <AccordionContent>
+                  Templates use variables like {"`{{product_name}}`"} or {"`{{link}}`"} that you can customize for each video.
+                  When you update a template, all videos using that template can be automatically updated with the new content
+                  while keeping their unique variable values.
+                </AccordionContent>
+              </AccordionItem>
 
-            <AccordionItem value="item-2">
+              <AccordionItem value="item-2">
               <AccordionTrigger className="text-left">
                 Can I try it before upgrading?
               </AccordionTrigger>
@@ -461,6 +462,7 @@ export default function LandingPage() {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
+          </div>
         </section>
 
         {/* CTA Section */}
