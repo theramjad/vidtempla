@@ -538,13 +538,26 @@ export const youtubeRouter = createTRPCRouter({
           .from('video_variables')
           .select(`
             *,
-            template:templates(id, name)
+            template:templates(id, name, content)
           `)
           .eq('video_id', input.videoId);
 
         if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
 
-        return data;
+        // Get video and container info for preview
+        const { data: video } = await supabaseServer
+          .from('youtube_videos')
+          .select(`
+            video_id,
+            container:containers(id, template_order, separator)
+          `)
+          .eq('id', input.videoId)
+          .single();
+
+        return {
+          variables: data,
+          video: video || null,
+        };
       }),
 
     updateVariables: adminProcedure
@@ -588,68 +601,6 @@ export const youtubeRouter = createTRPCRouter({
         });
 
         return { success: true };
-      }),
-
-    preview: adminProcedure
-      .input(z.object({ videoId: z.string().uuid() }))
-      .query(async ({ ctx, input }) => {
-        // Get video with container
-        const { data: video } = await supabaseServer
-          .from('youtube_videos')
-          .select(`
-            *,
-            container:containers(id, template_order, separator)
-          `)
-          .eq('id', input.videoId)
-          .single();
-
-        if (!video || !video.container) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Video must be assigned to a container first',
-          });
-        }
-
-        if (!video.container.template_order || video.container.template_order.length === 0) {
-          return { description: '' };
-        }
-
-        // Get templates in order
-        const { data: templates } = await supabaseServer
-          .from('templates')
-          .select('id, content')
-          .in('id', video.container.template_order);
-
-        if (!templates) {
-          return { description: '' };
-        }
-
-        // Sort templates according to template_order
-        const sortedTemplates = video.container.template_order
-          .map((id: string) => templates.find((t) => t.id === id))
-          .filter((t): t is { id: string; content: string } => t !== undefined);
-
-        // Get all variables for this video
-        const { data: variables } = await supabaseServer
-          .from('video_variables')
-          .select('variable_name, variable_value')
-          .eq('video_id', input.videoId);
-
-        // Build variables map
-        const variablesMap: Record<string, string> = {};
-        variables?.forEach((v) => {
-          variablesMap[v.variable_name] = v.variable_value || '';
-        });
-
-        // Build description with container's separator
-        const description = buildDescription(
-          sortedTemplates,
-          variablesMap,
-          video.container.separator,
-          video.video_id // Pass YouTube video ID for default variables
-        );
-
-        return { description };
       }),
 
     getHistory: adminProcedure

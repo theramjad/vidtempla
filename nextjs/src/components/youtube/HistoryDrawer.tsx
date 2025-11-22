@@ -56,10 +56,11 @@ export default function HistoryDrawer({
   const { data: videoList } = api.dashboard.youtube.videos.list.useQuery({}, { enabled: open });
   const currentVideo = videoList?.find((v) => v.id === videoId);
 
-  const { data: variables } = api.dashboard.youtube.videos.getVariables.useQuery(
+  const { data: variablesData } = api.dashboard.youtube.videos.getVariables.useQuery(
     { videoId },
     { enabled: open }
   );
+  const variables = variablesData?.variables;
 
   const rollbackMutation = api.dashboard.youtube.videos.rollback.useMutation();
 

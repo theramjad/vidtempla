@@ -3,7 +3,7 @@
  * Allows users to edit video-specific variable values
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { api } from '@/utils/api';
 import type { RouterOutputs } from '@/utils/api';
 import { Button } from '@/components/ui/button';
@@ -24,8 +24,10 @@ import {
 } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ChevronDown } from 'lucide-react';
+import { buildDescription } from '@/utils/templateParser';
 
-type VideoVariable = RouterOutputs['dashboard']['youtube']['videos']['getVariables'][number];
+type VideoVariableData = RouterOutputs['dashboard']['youtube']['videos']['getVariables'];
+type VideoVariable = NonNullable<VideoVariableData['variables']>[number];
 
 interface EditVariablesSheetProps {
   videoId: string;
@@ -56,23 +58,18 @@ export default function EditVariablesSheet({
     >
   >({});
 
-  const { data: variables, isLoading } = api.dashboard.youtube.videos.getVariables.useQuery(
+  const { data: variablesData, isLoading } = api.dashboard.youtube.videos.getVariables.useQuery(
     { videoId },
     { enabled: open }
-  );
-
-  const { data: preview, isLoading: isPreviewLoading } = api.dashboard.youtube.videos.preview.useQuery(
-    { videoId },
-    { enabled: open && isPreviewOpen }
   );
 
   const updateMutation = api.dashboard.youtube.videos.updateVariables.useMutation();
 
   // Initialize form data when variables are loaded
   useEffect(() => {
-    if (variables) {
+    if (variablesData?.variables) {
       const initialData: typeof formData = {};
-      variables.forEach((variable: VideoVariable) => {
+      variablesData.variables.forEach((variable: VideoVariable) => {
         const key = `${variable.template_id}-${variable.variable_name}`;
         initialData[key] = {
           templateId: variable.template_id,
@@ -83,7 +80,7 @@ export default function EditVariablesSheet({
       });
       setFormData(initialData);
     }
-  }, [variables]);
+  }, [variablesData]);
 
   const handleValueChange = (key: string, value: string) => {
     setFormData((prev) => {
@@ -127,6 +124,51 @@ export default function EditVariablesSheet({
       });
     }
   };
+
+  // Compute preview using current form data
+  const previewDescription = useMemo(() => {
+    if (!variablesData?.variables || !variablesData?.video?.container) {
+      return '';
+    }
+
+    const container = variablesData.video.container;
+    if (!container.template_order || container.template_order.length === 0) {
+      return '';
+    }
+
+    // Build templates array in the correct order
+    const templateMap = new Map<string, { id: string; content: string }>();
+    variablesData.variables.forEach((v) => {
+      if (v.template?.id && v.template?.content && !templateMap.has(v.template.id)) {
+        templateMap.set(v.template.id, {
+          id: v.template.id,
+          content: v.template.content,
+        });
+      }
+    });
+
+    const sortedTemplates = container.template_order
+      .map((id: string) => templateMap.get(id))
+      .filter((t): t is { id: string; content: string } => t !== undefined);
+
+    if (sortedTemplates.length === 0) {
+      return '';
+    }
+
+    // Build variables map from current form data
+    const variablesMap: Record<string, string> = {};
+    Object.values(formData).forEach((v) => {
+      variablesMap[v.name] = v.value;
+    });
+
+    // Build description with container's separator
+    return buildDescription(
+      sortedTemplates,
+      variablesMap,
+      container.separator || '\n\n',
+      variablesData.video.video_id
+    );
+  }, [variablesData, formData]);
 
   // Group variables by template
   const groupedVariables: Record<string, typeof formData> = {};
@@ -220,20 +262,22 @@ export default function EditVariablesSheet({
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-1">
-                {isPreviewLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : preview?.description ? (
+                {previewDescription ? (
                   <div className="rounded-lg border bg-background">
                     <Textarea
-                      value={preview.description}
+                      value={previewDescription}
                       readOnly
                       className="resize-none min-h-[200px] bg-transparent border-0 focus-visible:ring-0 text-sm p-4"
                       rows={8}
                     />
                   </div>
-                ) : null}
+                ) : (
+                  <div className="flex justify-center py-8">
+                    <p className="text-muted-foreground text-sm">
+                      No preview available. Assign video to a container with templates.
+                    </p>
+                  </div>
+                )}
               </CollapsibleContent>
             </Collapsible>
           </div>
