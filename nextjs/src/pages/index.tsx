@@ -348,12 +348,11 @@ export default function LandingPage() {
 
             <AccordionItem value="item-2">
               <AccordionTrigger className="text-left">
-                Can I update descriptions automatically?
+                Can I try it before upgrading?
               </AccordionTrigger>
               <AccordionContent>
-                Yes! With Pro and Business plans, you can enable automatic updates. When you modify a template or container,
-                VidTempla will automatically push the updated descriptions to all associated videos on YouTube. This happens in
-                the background via our job processing system.
+                Yes! Start with our Free plan to test VidTempla with up to 5 videos. No credit card required. When you&apos;re ready
+                to scale, upgrade to Pro or Business to unlock unlimited videos and automatic updates.
               </AccordionContent>
             </AccordionItem>
 
@@ -369,6 +368,16 @@ export default function LandingPage() {
 
             <AccordionItem value="item-4">
               <AccordionTrigger className="text-left">
+                Can I use this with multiple YouTube channels?
+              </AccordionTrigger>
+              <AccordionContent>
+                Yes! The Free and Pro plans include 1 YouTube channel, perfect for individual creators. The Business plan supports
+                unlimited channels, making it ideal for agencies managing multiple clients or brands with several YouTube channels.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-5">
+              <AccordionTrigger className="text-left">
                 Is my YouTube account secure?
               </AccordionTrigger>
               <AccordionContent>
@@ -378,39 +387,7 @@ export default function LandingPage() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-5">
-              <AccordionTrigger className="text-left">
-                What happens if I make a mistake?
-              </AccordionTrigger>
-              <AccordionContent>
-                Every description change is versioned and tracked. You can view the complete history of changes for any video
-                and rollback to any previous version with a single click. This gives you confidence to experiment without
-                fear of losing your content.
-              </AccordionContent>
-            </AccordionItem>
-
             <AccordionItem value="item-6">
-              <AccordionTrigger className="text-left">
-                Can I try it before upgrading?
-              </AccordionTrigger>
-              <AccordionContent>
-                Yes! Start with our Free plan to test VidTempla with up to 5 videos. No credit card required. When you&apos;re ready
-                to scale, upgrade to Pro or Business to unlock unlimited videos and automatic updates.
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="item-7">
-              <AccordionTrigger className="text-left">
-                What are containers and how do they work?
-              </AccordionTrigger>
-              <AccordionContent>
-                Containers let you combine multiple templates into a single description. For example, you might have separate
-                templates for your intro, product details, and social links. A container groups these together with customizable
-                ordering and separators, making it easy to create consistent, structured descriptions across all your videos.
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="item-8">
               <AccordionTrigger className="text-left">
                 How can I trust this application?
               </AccordionTrigger>
@@ -429,6 +406,28 @@ export default function LandingPage() {
               </AccordionContent>
             </AccordionItem>
 
+            <AccordionItem value="item-7">
+              <AccordionTrigger className="text-left">
+                What are containers and how do they work?
+              </AccordionTrigger>
+              <AccordionContent>
+                Containers let you combine multiple templates into a single description. For example, you might have separate
+                templates for your intro, product details, and social links. A container groups these together with customizable
+                ordering and separators, making it easy to create consistent, structured descriptions across all your videos.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-8">
+              <AccordionTrigger className="text-left">
+                Can I update descriptions automatically?
+              </AccordionTrigger>
+              <AccordionContent>
+                Yes! With Pro and Business plans, you can enable automatic updates. When you modify a template or container,
+                VidTempla will automatically push the updated descriptions to all associated videos on YouTube. This happens in
+                the background via our job processing system.
+              </AccordionContent>
+            </AccordionItem>
+
             <AccordionItem value="item-9">
               <AccordionTrigger className="text-left">
                 How long does it take for changes to appear on YouTube?
@@ -442,11 +441,12 @@ export default function LandingPage() {
 
             <AccordionItem value="item-10">
               <AccordionTrigger className="text-left">
-                Can I use this with multiple YouTube channels?
+                What happens if I make a mistake?
               </AccordionTrigger>
               <AccordionContent>
-                Yes! The Free and Pro plans include 1 YouTube channel, perfect for individual creators. The Business plan supports
-                unlimited channels, making it ideal for agencies managing multiple clients or brands with several YouTube channels.
+                Every description change is versioned and tracked. You can view the complete history of changes for any video
+                and rollback to any previous version with a single click. This gives you confidence to experiment without
+                fear of losing your content.
               </AccordionContent>
             </AccordionItem>
 
