@@ -1,4 +1,4 @@
-# YouTube Description Manager
+# VidTempla
 
 A powerful admin dashboard for managing YouTube video descriptions at scale using dynamic templates and variables.
 
@@ -42,8 +42,8 @@ A powerful admin dashboard for managing YouTube video descriptions at scale usin
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/youtube-description-updater.git
-cd youtube-description-updater
+git clone https://github.com/theramjad/vidtempla.git
+cd vidtempla
 ```
 
 ### 2. Set Up Supabase
@@ -97,19 +97,7 @@ INNGEST_EVENT_KEY=local
 INNGEST_SIGNING_KEY=local
 ```
 
-### 5. Update Admin Email
-
-Edit `nextjs/src/config/app.ts` and add your email to the `adminEmails` array:
-
-```typescript
-auth: {
-  adminEmails: [
-    "your-email@example.com", // Replace with your email
-  ],
-}
-```
-
-### 6. Install Dependencies and Run
+### 5. Install Dependencies and Run
 
 ```bash
 # Install dependencies
@@ -125,180 +113,6 @@ npm run dev
 
 The app will be available at [http://localhost:3000](http://localhost:3000)
 
-## Usage Guide
-
-### 1. Sign Up / Sign In
-
-- Navigate to the app and sign up with the email you added to `adminEmails`
-- Verify your email via the Supabase inbucket at http://localhost:54324
-
-### 2. Connect YouTube Channel
-
-- Go to **Channels** tab
-- Click "Connect Channel"
-- Authorize with your YouTube account
-- Your channel will appear in the list
-
-### 3. Create Templates
-
-- Go to **Templates** tab
-- Click "Create Template"
-- Write your template using `{{variable_name}}` syntax:
-
-```
-Check out this amazing product!
-
-Price: {{price}}
-Discount Code: {{coupon_code}}
-Product Link: {{product_link}}
-
-Don't miss out!
-```
-
-- Variables are auto-detected and displayed
-
-### 4. Create Containers
-
-- Go to **Containers** tab
-- Click "Create Container"
-- Select templates to include (they'll be concatenated in order)
-- A container might include templates like: "Intro" + "Product Details" + "Call to Action"
-
-### 5. Assign Videos to Containers
-
-- Go to **Videos** tab
-- Find unassigned videos
-- Click "Assign" and select a container
-- **Important**: Container assignment is permanent and cannot be changed
-
-### 6. Edit Variables (Coming Soon)
-
-In a future update, you'll be able to:
-- Edit variable values for each video
-- Preview the final description
-- Update YouTube descriptions in bulk
-- View version history
-- Rollback to previous versions
-
-## Project Structure
-
-```
-youtube-description-updater/
-├── nextjs/                    # Main Next.js application
-│   ├── src/
-│   │   ├── components/        # React components
-│   │   │   ├── ui/           # Radix UI components
-│   │   │   ├── layout/       # Layout components
-│   │   │   └── youtube/      # YouTube feature components
-│   │   ├── config/           # App configuration
-│   │   ├── pages/            # Next.js pages
-│   │   │   ├── admin/        # Admin pages
-│   │   │   └── api/          # API routes
-│   │   ├── server/           # tRPC server and routers
-│   │   ├── utils/            # Utility functions
-│   │   └── lib/              # Library clients (YouTube API)
-│   └── package.json
-├── shared-types/             # Shared TypeScript types
-│   └── database.types.ts     # Generated Supabase types
-├── supabase/                # Supabase configuration
-│   ├── migrations/          # Database migrations
-│   └── schemas/             # Schema definition files
-└── PLAN.md                  # Detailed implementation plan
-```
-
-## Database Schema
-
-### Core Tables
-
-- **youtube_channels**: Connected YouTube channels with OAuth tokens
-- **templates**: Description templates with variables
-- **containers**: Collections of templates in specific order
-- **youtube_videos**: Video metadata and container assignments
-- **video_variables**: Variable values per video-template combination
-- **description_history**: Version history for all description changes
-
-### Key Relationships
-
-- Videos belong to ONE container (immutable)
-- Containers can have MULTIPLE templates
-- Templates can be used in MULTIPLE containers
-- Variables are unique per video + template combination
-
-## API Routes
-
-### tRPC Procedures
-
-All API routes are type-safe via tRPC:
-
-- **Channels**: list, initiateOAuth, disconnect, syncVideos
-- **Templates**: list, create, update, delete, parseVariables
-- **Containers**: list, create, update, delete
-- **Videos**: list, unassigned, assignToContainer, getVariables, updateVariables, preview, getHistory, rollback
-
-## Security
-
-- **Admin-Only Access**: All routes protected by email-based admin check
-- **Row-Level Security**: Supabase RLS ensures users only see their data
-- **Token Encryption**: OAuth tokens encrypted using AES-256-GCM
-- **Immutable Assignments**: Container assignments cannot be changed once set
-
-## Development
-
-### Running Migrations
-
-```bash
-cd supabase
-supabase migration up
-```
-
-### Generating Types
-
-```bash
-npx supabase gen types typescript --local > ../shared-types/database.types.ts
-```
-
-### Adding New Features
-
-1. Update schema files in `supabase/schemas/`
-2. Generate migration: `supabase db diff -f migration_name`
-3. Apply migration: `supabase migration up`
-4. Regenerate types
-5. Update tRPC procedures in `nextjs/src/server/api/routers/admin/youtube.ts`
-6. Create/update UI components
-
-## Next Steps
-
-The following features are planned for future updates:
-
-- [ ] Variable editing UI with bulk update capability
-- [ ] Preview modal showing final description
-- [ ] Version history viewer with diff comparison
-- [ ] Rollback functionality
-- [ ] Inngest background jobs for:
-  - Syncing channel videos
-  - Updating YouTube descriptions
-  - Scheduled periodic syncs
-- [ ] Advanced variable types (rich text, dropdowns, etc.)
-- [ ] Template inheritance and nesting
-- [ ] Conditional logic in templates
-- [ ] A/B testing for descriptions
-- [ ] Analytics and success tracking
-
-## Troubleshooting
-
-### "Channel tokens not found" error
-- Reconnect your YouTube channel
-- Check that OAuth tokens are properly encrypted
-
-### Videos not showing up
-- Click "Sync Now" on your channel
-- Check Supabase logs for errors
-- Ensure YouTube API quota is not exceeded
-
-### Type errors after schema changes
-- Regenerate TypeScript types: `npx supabase gen types typescript --local > ../shared-types/database.types.ts`
-- Restart Next.js dev server
-
 ## Contributing
 
 1. Fork the repository
@@ -308,15 +122,8 @@ The following features are planned for future updates:
 
 ## License
 
-MIT License - feel free to use this project for your own purposes!
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
 
-## Support
+See the [LICENSE.md](./LICENSE.md) file for the full license text.
 
-For issues and questions:
-- Check the [PLAN.md](./PLAN.md) file for implementation details
-- Review the [CLAUDE.md](./CLAUDE.md) file for development guidelines
-- Open an issue on GitHub
-
----
-
-**Built with [Claude Code](https://claude.com/claude-code)**
+For more information, visit: https://www.gnu.org/licenses/agpl-3.0.en.html
