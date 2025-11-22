@@ -398,6 +398,60 @@ export default function LandingPage() {
               to scale, upgrade to Pro or Business to unlock unlimited videos and automatic updates.
             </AccordionContent>
           </AccordionItem>
+
+          <AccordionItem value="item-7">
+            <AccordionTrigger className="text-left">
+              What are containers and how do they work?
+            </AccordionTrigger>
+            <AccordionContent>
+              Containers let you combine multiple templates into a single description. For example, you might have separate
+              templates for your intro, product details, and social links. A container groups these together with customizable
+              ordering and separators, making it easy to create consistent, structured descriptions across all your videos.
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="item-8">
+            <AccordionTrigger className="text-left">
+              How do I connect my YouTube channel?
+            </AccordionTrigger>
+            <AccordionContent>
+              After signing up, navigate to the YouTube section in your dashboard and click &quot;Connect Channel&quot;. You&apos;ll be
+              redirected to Google&apos;s secure OAuth page to authorize VidTempla. Once connected, we&apos;ll automatically sync your
+              videos and you can start managing descriptions immediately.
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="item-9">
+            <AccordionTrigger className="text-left">
+              How long does it take for changes to appear on YouTube?
+            </AccordionTrigger>
+            <AccordionContent>
+              Description updates are pushed to YouTube&apos;s API in real-time and typically appear within seconds. For bulk
+              operations, updates are processed in the background and you&apos;ll receive a notification when complete. You can
+              always check the sync status in your dashboard.
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="item-10">
+            <AccordionTrigger className="text-left">
+              Can I use this with multiple YouTube channels?
+            </AccordionTrigger>
+            <AccordionContent>
+              Yes! The Free and Pro plans include 1 YouTube channel, perfect for individual creators. The Business plan supports
+              unlimited channels, making it ideal for agencies managing multiple clients or brands with several YouTube channels.
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="item-11">
+            <AccordionTrigger className="text-left">
+              What happens to my data if I downgrade or cancel?
+            </AccordionTrigger>
+            <AccordionContent>
+              Your data remains safe and accessible. If you downgrade, you&apos;ll keep access to all your templates and history,
+              but features like automatic updates may be disabled. If you cancel, your data is retained for 90 days, giving you
+              time to export or reactivate. You can request a complete data export at any time.
+            </AccordionContent>
+          </AccordionItem>
         </Accordion>
       </section>
 
