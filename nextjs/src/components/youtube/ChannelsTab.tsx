@@ -94,7 +94,7 @@ export default function ChannelsTab() {
       await syncMutation.mutateAsync({ channelId });
       toast({
         title: 'Sync started',
-        description: 'Videos are being synced in the background.',
+        description: 'Videos are being synced in the background. This may take a few minutes.',
       });
       // Immediately refetch to show syncing status
       await refetch();
