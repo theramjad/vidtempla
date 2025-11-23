@@ -125,7 +125,7 @@ export default function TermsOfService() {
 
       <h3>Our Property</h3>
       <p>
-        The Service, including its software, design, features, and documentation, is owned by VidTempla
+        The Service, including its software, design, features, and documentation, is owned by Ray Amjad LTD (Company Number 14506459)
         and protected by copyright, trademark, and other intellectual property laws. You may not copy,
         modify, or create derivative works without our express permission.
       </p>
@@ -180,7 +180,7 @@ export default function TermsOfService() {
 
       <h3>Limitation of Liability</h3>
       <p>
-        TO THE MAXIMUM EXTENT PERMITTED BY LAW, VIDTEMPLA SHALL NOT BE LIABLE FOR:
+        TO THE MAXIMUM EXTENT PERMITTED BY LAW, RAY AMJAD LTD SHALL NOT BE LIABLE FOR:
       </p>
       <ul>
         <li>Indirect, incidental, special, consequential, or punitive damages</li>
@@ -195,7 +195,7 @@ export default function TermsOfService() {
 
       <h2>Indemnification</h2>
       <p>
-        You agree to indemnify and hold harmless VidTempla, its officers, directors, employees, and
+        You agree to indemnify and hold harmless Ray Amjad LTD, its officers, directors, employees, and
         agents from any claims, damages, losses, or expenses arising from:
       </p>
       <ul>
@@ -243,8 +243,8 @@ export default function TermsOfService() {
 
       <h2>Governing Law</h2>
       <p>
-        These Terms are governed by the laws of [Your Jurisdiction], without regard to conflict of
-        law principles. Any legal action must be brought in the courts located in [Your Jurisdiction].
+        These Terms are governed by the laws of the United Kingdom, without regard to conflict of
+        law principles. Any legal action must be brought in the courts located in the United Kingdom.
       </p>
 
       <h2>Changes to Terms</h2>

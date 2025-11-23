@@ -11,7 +11,7 @@ export default function PrivacyPolicy() {
       <LegalLayout title="Privacy Policy" lastUpdated="November 19, 2025">
       <h2>Introduction</h2>
       <p>
-        Welcome to VidTempla. We respect your privacy and are committed to protecting your personal data.
+        Welcome to VidTempla, operated by Ray Amjad LTD (Company Number 14506459). We respect your privacy and are committed to protecting your personal data.
         This privacy policy will inform you about how we handle your personal data when you use our service
         and tell you about your privacy rights.
       </p>
