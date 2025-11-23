@@ -88,6 +88,7 @@ export const billingRouter = createTRPCRouter({
           products: [planConfig.productId],
           successUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/settings?checkout=success`,
           customerEmail: ctx.user.email,
+          externalCustomerId: ctx.user.id,
           metadata: {
             userId: ctx.user.id,
             planTier: input.planTier,
