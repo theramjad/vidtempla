@@ -49,16 +49,12 @@ export const useAuthStore = create<AuthState>()(
 
         const supabase = createClient();
 
-        // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          set({
-            session,
-            user: session?.user ?? null,
-            isInitialized: true
-          });
-        });
+        // Don't call getSession() here to avoid race conditions with middleware
+        // The middleware handles token refresh, and onAuthStateChange will
+        // sync the session to the client when it's updated
 
-        // Listen for auth changes
+        // Listen for auth changes - this is the ONLY way to sync auth state
+        // It will be triggered by middleware updates and sign-in/out events
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (_event, session) => {
             set({
@@ -69,6 +65,9 @@ export const useAuthStore = create<AuthState>()(
           }
         );
 
+        // Mark as initialized immediately
+        set({ isInitialized: true });
+
         // Cleanup subscription on unmount
         return () => {
           subscription.unsubscribe();
@@ -78,7 +77,9 @@ export const useAuthStore = create<AuthState>()(
 
       signOut: async () => {
         const supabase = createClient();
-        await supabase.auth.signOut();
+        // Use scope: "local" to only sign out this session, not all sessions
+        // This prevents invalidating refresh tokens in other devices/contexts
+        await supabase.auth.signOut({ scope: "local" });
         set({ user: null, session: null });
       },
 
