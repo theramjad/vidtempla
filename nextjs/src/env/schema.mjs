@@ -83,6 +83,9 @@ export const clientSchema = z.object({
 
   // Polar
   NEXT_PUBLIC_POLAR_ORGANIZATION_ID: z.string(),
+
+  // PostHog
+  NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
 });
 
 /**
@@ -101,4 +104,7 @@ export const clientEnv = {
 
   // Polar
   NEXT_PUBLIC_POLAR_ORGANIZATION_ID: process.env.NEXT_PUBLIC_POLAR_ORGANIZATION_ID,
+
+  // PostHog
+  NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
 };
