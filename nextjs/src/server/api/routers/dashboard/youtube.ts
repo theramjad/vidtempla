@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { createTRPCRouter, adminProcedure } from '@/server/api/trpc';
+import { createTRPCRouter, protectedProcedure } from '@/server/api/trpc';
 import { TRPCError } from '@trpc/server';
 import { getOAuthUrl } from '@/lib/clients/youtube';
 import { decrypt, encrypt } from '@/utils/encryption';
@@ -24,7 +24,7 @@ export const youtubeRouter = createTRPCRouter({
   // ==================== Channel Management ====================
 
   channels: createTRPCRouter({
-    list: adminProcedure.query(async ({ ctx }): Promise<Database['public']['Tables']['youtube_channels']['Row'][]> => {
+    list: protectedProcedure.query(async ({ ctx }): Promise<Database['public']['Tables']['youtube_channels']['Row'][]> => {
       const { data, error } = await supabaseServer
         .from('youtube_channels')
         .select('*')
@@ -36,11 +36,11 @@ export const youtubeRouter = createTRPCRouter({
       return data || [];
     }),
 
-    initiateOAuth: adminProcedure.mutation(async () => {
+    initiateOAuth: protectedProcedure.mutation(async () => {
       return { url: getOAuthUrl() };
     }),
 
-    disconnect: adminProcedure
+    disconnect: protectedProcedure
       .input(z.object({ channelId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         const { error } = await supabaseServer
@@ -54,7 +54,7 @@ export const youtubeRouter = createTRPCRouter({
         return { success: true };
       }),
 
-    syncVideos: adminProcedure
+    syncVideos: protectedProcedure
       .input(z.object({ channelId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         // Trigger Inngest event to sync videos in background
@@ -73,7 +73,7 @@ export const youtubeRouter = createTRPCRouter({
   // ==================== Container Management ====================
 
   containers: createTRPCRouter({
-    list: adminProcedure.query(async ({ ctx }): Promise<Database['public']['Tables']['containers']['Row'][]> => {
+    list: protectedProcedure.query(async ({ ctx }): Promise<Database['public']['Tables']['containers']['Row'][]> => {
       const { data, error } = await supabaseServer
         .from('containers')
         .select(`
@@ -88,7 +88,7 @@ export const youtubeRouter = createTRPCRouter({
       return data;
     }),
 
-    create: adminProcedure
+    create: protectedProcedure
       .input(
         z.object({
           name: z.string().min(1),
@@ -113,7 +113,7 @@ export const youtubeRouter = createTRPCRouter({
         return data;
       }),
 
-    update: adminProcedure
+    update: protectedProcedure
       .input(
         z.object({
           id: z.string().uuid(),
@@ -164,7 +164,7 @@ export const youtubeRouter = createTRPCRouter({
         return data;
       }),
 
-    delete: adminProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         const { error } = await supabaseServer
@@ -178,7 +178,7 @@ export const youtubeRouter = createTRPCRouter({
         return { success: true };
       }),
 
-    getAffectedVideos: adminProcedure
+    getAffectedVideos: protectedProcedure
       .input(z.object({ containerId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         const { data: videos, error } = await supabaseServer
@@ -199,7 +199,7 @@ export const youtubeRouter = createTRPCRouter({
   // ==================== Template Management ====================
 
   templates: createTRPCRouter({
-    list: adminProcedure.query(async ({ ctx }): Promise<(Database['public']['Tables']['templates']['Row'] & { variables: string[] })[]> => {
+    list: protectedProcedure.query(async ({ ctx }): Promise<(Database['public']['Tables']['templates']['Row'] & { variables: string[] })[]> => {
       const { data, error } = await supabaseServer
         .from('templates')
         .select('*')
@@ -215,7 +215,7 @@ export const youtubeRouter = createTRPCRouter({
       }));
     }),
 
-    create: adminProcedure
+    create: protectedProcedure
       .input(
         z.object({
           name: z.string().min(1),
@@ -238,7 +238,7 @@ export const youtubeRouter = createTRPCRouter({
         return data;
       }),
 
-    update: adminProcedure
+    update: protectedProcedure
       .input(
         z.object({
           id: z.string().uuid(),
@@ -298,7 +298,7 @@ export const youtubeRouter = createTRPCRouter({
         return data;
       }),
 
-    delete: adminProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         const { error } = await supabaseServer
@@ -312,13 +312,13 @@ export const youtubeRouter = createTRPCRouter({
         return { success: true };
       }),
 
-    parseVariables: adminProcedure
+    parseVariables: protectedProcedure
       .input(z.object({ content: z.string() }))
       .query(({ input }) => {
         return { variables: parseVariables(input.content) };
       }),
 
-    getAffectedVideos: adminProcedure
+    getAffectedVideos: protectedProcedure
       .input(z.object({ templateId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         // First, find all containers that use this template
@@ -366,7 +366,7 @@ export const youtubeRouter = createTRPCRouter({
   // ==================== Video Management ====================
 
   videos: createTRPCRouter({
-    list: adminProcedure
+    list: protectedProcedure
       .input(
         z.object({
           channelId: z.union([z.string().uuid(), z.literal('')]).optional(),
@@ -405,7 +405,7 @@ export const youtubeRouter = createTRPCRouter({
         return data || [];
       }),
 
-    unassigned: adminProcedure.query(async ({ ctx }) => {
+    unassigned: protectedProcedure.query(async ({ ctx }) => {
       const { data, error } = await supabaseServer
         .from('youtube_videos')
         .select(`
@@ -421,7 +421,7 @@ export const youtubeRouter = createTRPCRouter({
       return data;
     }),
 
-    assignToContainer: adminProcedure
+    assignToContainer: protectedProcedure
       .input(
         z.object({
           videoId: z.string().uuid(),
@@ -531,7 +531,7 @@ export const youtubeRouter = createTRPCRouter({
         return { success: true };
       }),
 
-    getVariables: adminProcedure
+    getVariables: protectedProcedure
       .input(z.object({ videoId: z.string().uuid() }))
       .query(async ({ ctx, input }) => {
         const { data, error } = await supabaseServer
@@ -560,7 +560,7 @@ export const youtubeRouter = createTRPCRouter({
         };
       }),
 
-    updateVariables: adminProcedure
+    updateVariables: protectedProcedure
       .input(
         z.object({
           videoId: z.string().uuid(),
@@ -603,7 +603,7 @@ export const youtubeRouter = createTRPCRouter({
         return { success: true };
       }),
 
-    getHistory: adminProcedure
+    getHistory: protectedProcedure
       .input(z.object({ videoId: z.string().uuid() }))
       .query(async ({ ctx, input }) => {
         const { data, error } = await supabaseServer
@@ -617,7 +617,7 @@ export const youtubeRouter = createTRPCRouter({
         return data;
       }),
 
-    rollback: adminProcedure
+    rollback: protectedProcedure
       .input(
         z.object({
           videoId: z.string().uuid(),
@@ -715,7 +715,7 @@ export const youtubeRouter = createTRPCRouter({
         };
       }),
 
-    updateToYouTube: adminProcedure
+    updateToYouTube: protectedProcedure
       .input(
         z.object({
           videoIds: z.array(z.string().uuid()),

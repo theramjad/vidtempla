@@ -22,9 +22,6 @@ export const appConfig = {
   auth: {
     enableSignUp: true,
     enablePasswordReset: true,
-    adminEmails: [
-      "r@rayamjad.com", // Your email here
-    ] as readonly string[],
   },
 
   // Dashboard configuration

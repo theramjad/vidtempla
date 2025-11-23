@@ -9,7 +9,6 @@ import { User } from "@supabase/supabase-js";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { type CreateNextContextOptions } from "@trpc/server/adapters/next";
 import superjson from "superjson";
-import { appConfig } from "@/config/app";
 import createClient from "@/utils/supabase/api";
 
 interface AuthContext {
@@ -53,34 +52,6 @@ const isAuthed = t.middleware(({ next, ctx }) => {
   });
 });
 
-// Check if user is admin
-const isAdmin = t.middleware(({ next, ctx }) => {
-  if (!ctx.user) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "You are not signed in",
-    });
-  }
-
-  const user = ctx.user;
-  const isAdmin = appConfig.auth.adminEmails.includes(user.email || "");
-  if (!isAdmin) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message:
-        "Only administrators can perform this action, your email is: " +
-        user.email,
-    });
-  }
-
-  return next({
-    ctx: {
-      user: ctx.user,
-    },
-  });
-});
-
 export const createTRPCRouter = t.router;
 export const publicProcedure = t.procedure;
 export const protectedProcedure = t.procedure.use(isAuthed);
-export const adminProcedure = protectedProcedure.use(isAdmin);
