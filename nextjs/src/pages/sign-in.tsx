@@ -171,6 +171,7 @@ export default function Page() {
       });
 
       if (error) {
+        console.error("OTP verification error:", error);
         toast({
           variant: "destructive",
           title: "Verification failed",
@@ -184,6 +185,10 @@ export default function Page() {
           title: "Success",
           description: "You've been signed in!",
         });
+
+        // Wait a bit for the session to be properly established
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         // Redirect to the return URL or dashboard
         const returnTo = router.query.returnTo as string;
         if (returnTo) {
@@ -191,8 +196,19 @@ export default function Page() {
         } else {
           router.push("/dashboard/youtube");
         }
+      } else {
+        // No error but no session - unexpected state
+        console.error("No session returned from verifyOtp");
+        toast({
+          variant: "destructive",
+          title: "Verification failed",
+          description: "Unable to create session. Please try again.",
+        });
+        setOtpCode("");
+        verificationAttemptedRef.current = false;
       }
     } catch (err) {
+      console.error("OTP verification exception:", err);
       toast({
         variant: "destructive",
         title: "Error",
