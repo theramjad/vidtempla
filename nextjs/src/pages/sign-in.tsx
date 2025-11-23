@@ -48,6 +48,7 @@ export default function Page() {
 
   // Refs
   const shownErrorsRef = useRef(new Set<string>());
+  const verificationAttemptedRef = useRef(false);
 
   // If user is already signed in, show message and redirect
   useEffect(() => {
@@ -153,6 +154,10 @@ export default function Page() {
   const handleVerifyOtp = useCallback(async (code: string) => {
     if (code.length !== 6) return;
 
+    // Prevent duplicate submissions
+    if (verificationAttemptedRef.current) return;
+    verificationAttemptedRef.current = true;
+
     setIsVerifyingOtp(true);
 
     try {
@@ -172,6 +177,7 @@ export default function Page() {
           description: error.message,
         });
         setOtpCode(""); // Clear the OTP input on error
+        verificationAttemptedRef.current = false; // Allow retry on error
       } else if (session) {
         setJustSignedIn(true);
         toast({
@@ -193,6 +199,7 @@ export default function Page() {
         description: "An unexpected error occurred. Please try again.",
       });
       setOtpCode("");
+      verificationAttemptedRef.current = false; // Allow retry on error
     } finally {
       setIsVerifyingOtp(false);
     }
@@ -414,6 +421,7 @@ export default function Page() {
                   onClick={() => {
                     setMagicLinkSent(false);
                     setOtpCode("");
+                    verificationAttemptedRef.current = false;
                   }}
                   className="text-sm text-emerald-600 hover:text-emerald-500"
                 >
