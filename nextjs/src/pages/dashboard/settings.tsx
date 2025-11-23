@@ -162,7 +162,7 @@ export default function SettingsPage() {
                 <>
                   <div className="flex items-center justify-between py-2">
                     <span className="font-medium">Current Plan</span>
-                    <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium capitalize">
+                    <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium capitalize">
                       {currentPlan?.plan_tier || 'Free'}
                     </span>
                   </div>
@@ -171,7 +171,7 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between py-2">
                       <span className="font-medium">Status</span>
                       <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${
-                        currentPlan.status === 'active' ? 'bg-green-100 text-green-700' :
+                        currentPlan.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
                         currentPlan.status === 'canceled' ? 'bg-red-100 text-red-700' :
                         'bg-yellow-100 text-yellow-700'
                       }`}>
@@ -229,7 +229,7 @@ export default function SettingsPage() {
                 <Button
                   onClick={handleManageSubscription}
                   disabled={portalLoading}
-                  className="flex-1"
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-500"
                 >
                   {portalLoading ? (
                     <>
@@ -281,7 +281,7 @@ export default function SettingsPage() {
                           </p>
                         </div>
                         <span className={`px-2 py-1 rounded text-xs font-medium capitalize ${
-                          order.status === 'paid' ? 'bg-green-100 text-green-700' :
+                          order.status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
                           order.status === 'refunded' ? 'bg-red-100 text-red-700' :
                           'bg-yellow-100 text-yellow-700'
                         }`}>
