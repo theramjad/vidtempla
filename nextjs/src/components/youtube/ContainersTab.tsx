@@ -37,15 +37,13 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus, Edit2, Trash2, Wand2 } from 'lucide-react';
+import { Loader2, Plus, Edit2, Trash2 } from 'lucide-react';
 import EditContainerModal from './EditContainerModal';
-import AIAnalysisModal from './AIAnalysisModal';
 
 export default function ContainersTab() {
   const { toast } = useToast();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [aiModalOpen, setAiModalOpen] = useState(false);
   const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -131,14 +129,6 @@ export default function ContainersTab() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="gap-2 border-purple-200 text-purple-700 hover:bg-purple-50 hover:text-purple-800"
-            onClick={() => setAiModalOpen(true)}
-          >
-            <Wand2 className="h-4 w-4" />
-            AI Migration Assistant
-          </Button>
           <Button onClick={() => setCreateDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Create Container
@@ -337,15 +327,6 @@ export default function ContainersTab() {
             onSuccess={refetch}
           />
         )}
-
-        <AIAnalysisModal
-          open={aiModalOpen}
-          onOpenChange={setAiModalOpen}
-          onSuccess={() => {
-            refetch();
-            // Optional: refetch templates too if we could access the parent's refetch, but this is fine.
-          }}
-        />
       </CardContent>
     </Card>
   );

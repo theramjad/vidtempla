@@ -28,15 +28,17 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Unplug, RefreshCw, Plus, ArrowUpRight } from 'lucide-react';
+import { Loader2, Unplug, RefreshCw, Plus, ArrowUpRight, Wand2 } from 'lucide-react';
 import Image from 'next/image';
 import { DateTime } from 'luxon';
 import Link from 'next/link';
+import AIAnalysisModal from './AIAnalysisModal';
 
 export default function ChannelsTab() {
   const { toast } = useToast();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
 
   const { data: channels, isLoading, refetch } = api.dashboard.youtube.channels.list.useQuery();
   const { data: limitCheck } = api.dashboard.youtube.channels.checkLimit.useQuery();
@@ -121,11 +123,20 @@ export default function ChannelsTab() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>YouTube Channels</CardTitle>
-        <p className="text-sm text-muted-foreground mt-1">
-          Connect your YouTube channels to manage video descriptions
-        </p>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <CardTitle>YouTube Channels</CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            Connect your YouTube channels to manage video descriptions
+          </p>
+        </div>
+        <Button
+          onClick={() => setAiModalOpen(true)}
+          className="gap-2 bg-purple-600 text-white hover:bg-purple-700"
+        >
+          <Wand2 className="h-4 w-4" />
+          AI Migration Assistant
+        </Button>
       </CardHeader>
       <CardContent className="p-0">
         {isLoading ? (
@@ -289,6 +300,14 @@ export default function ChannelsTab() {
           </div>
         )}
       </CardContent>
+
+      <AIAnalysisModal
+        open={aiModalOpen}
+        onOpenChange={setAiModalOpen}
+        onSuccess={() => {
+          refetch();
+        }}
+      />
     </Card>
   );
 }
