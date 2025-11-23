@@ -1,59 +1,27 @@
-import { createClient } from "@/utils/supabase/component";
-import { Session, User } from "@supabase/supabase-js";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useAuthStore } from "@/stores/use-auth-store";
+import { useRouter } from "next/router";
+import { useEffect } from "react";
 
 export function useUser() {
-  // Hooks
-  const supabase = createClient();
   const router = useRouter();
+  const { user, session, isInitialized, initialize, signOut: storeSignOut } = useAuthStore();
 
-  // States
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-
+  // Initialize auth listener once on mount
   useEffect(() => {
-    const getUserAndSession = async () => {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        setUser(user);
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        setSession(session);
-      } catch (error) {
-        console.error("Error fetching user:", error);
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
+    const cleanup = initialize();
+    return cleanup;
+  }, [initialize]);
 
-    getUserAndSession();
-
-    // Listen for auth state changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [supabase]);
-
-  // Functions
+  // Enhanced signOut that also redirects
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    router.push("/");
+    await storeSignOut();
+    router.push("/sign-in");
   };
 
-  return { user, session, loading, signOut };
+  return {
+    user,
+    session,
+    loading: !isInitialized, // Only loading until initialized
+    signOut,
+  };
 }
