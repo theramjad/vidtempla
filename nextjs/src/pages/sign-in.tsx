@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle } from "lucide-react";
 import Link from "next/link";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 /* 
 Function to parse URL params. This is required because the auth flow from
@@ -212,6 +213,21 @@ export default function Page() {
           {/* Only show form if user is not signed in */}
           {!user && !userLoading && (
               <form className="mt-8 space-y-6" onSubmit={handleSignIn}>
+                {/* Google Sign-in Button */}
+                <div>
+                  <GoogleSignInButton className="w-full" />
+                </div>
+
+                {/* Divider */}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="bg-white px-2 text-gray-500">Or continue with</span>
+                  </div>
+                </div>
+
                 <div className="-space-y-px rounded-md shadow-sm">
                   <div>
                     <label htmlFor="email" className="sr-only">

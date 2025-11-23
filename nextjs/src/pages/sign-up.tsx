@@ -6,6 +6,7 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { appConfig } from "@/config/app";
 import Link from "next/link";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export default function Page() {
   const router = useRouter();
@@ -108,6 +109,21 @@ export default function Page() {
               </h2>
             </div>
             <form className="mt-8 space-y-6" onSubmit={handleSignUp}>
+              {/* Google Sign-in Button */}
+              <div>
+                <GoogleSignInButton className="w-full" />
+              </div>
+
+              {/* Divider */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="bg-white px-2 text-gray-500">Or continue with</span>
+                </div>
+              </div>
+
               <div className="-space-y-px rounded-md shadow-sm">
                 <div>
                   <label htmlFor="email" className="sr-only">
