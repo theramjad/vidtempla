@@ -220,7 +220,7 @@ export default function AIAnalysisModal({
                        proposal.videoAnalysis.find((v) => v.videoId === selectedPreviewVideoId)?.variableValues || {}
                      ).map(([key, value]) => (
                        <div key={key} className="grid grid-cols-[120px_1fr] gap-2 text-sm">
-                         <span className="font-mono text-muted-foreground">{{\`{{${key}}}\`}}:</span>
+                         <span className="font-mono text-muted-foreground">{`{{${key}}}`}:</span>
                          <span className="font-medium">{value || <span className="text-muted-foreground italic">(empty)</span>}</span>
                        </div>
                      ))}
