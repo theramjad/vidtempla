@@ -28,9 +28,10 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Unplug, RefreshCw, Plus } from 'lucide-react';
+import { Loader2, Unplug, RefreshCw, Plus, ArrowUpRight } from 'lucide-react';
 import Image from 'next/image';
 import { DateTime } from 'luxon';
+import Link from 'next/link';
 
 export default function ChannelsTab() {
   const { toast } = useToast();
@@ -38,6 +39,7 @@ export default function ChannelsTab() {
   const [syncingId, setSyncingId] = useState<string | null>(null);
 
   const { data: channels, isLoading, refetch } = api.dashboard.youtube.channels.list.useQuery();
+  const { data: limitCheck } = api.dashboard.youtube.channels.checkLimit.useQuery();
   const disconnectMutation = api.dashboard.youtube.channels.disconnect.useMutation();
   const syncMutation = api.dashboard.youtube.channels.syncVideos.useMutation();
 
@@ -65,6 +67,14 @@ export default function ChannelsTab() {
   };
 
   const handleConnect = () => {
+    if (limitCheck && !limitCheck.canAddChannel) {
+      toast({
+        variant: 'destructive',
+        title: 'Channel limit reached',
+        description: `You've reached your limit of ${limitCheck.limit} ${limitCheck.limit === 1 ? 'channel' : 'channels'} on the ${limitCheck.planTier} plan. Please upgrade to add more channels.`,
+      });
+      return;
+    }
     window.location.href = '/api/auth/youtube/initiate';
   };
 
@@ -248,6 +258,35 @@ export default function ChannelsTab() {
               ))}
             </TableBody>
           </Table>
+        )}
+
+        {/* Connect New Channel Button (shown when channels exist) */}
+        {!isLoading && channels && channels.length > 0 && (
+          <div className="p-6 border-t bg-muted/20">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium">
+                  Connected Channels: {limitCheck?.currentCount || channels.length} / {limitCheck?.limit || '∞'}
+                </p>
+                {limitCheck && !limitCheck.canAddChannel && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    You've reached your channel limit on the {limitCheck.planTier} plan.{' '}
+                    <Link href="/dashboard/pricing" className="text-primary hover:underline inline-flex items-center">
+                      Upgrade to add more
+                      <ArrowUpRight className="h-3 w-3 ml-1" />
+                    </Link>
+                  </p>
+                )}
+              </div>
+              <Button
+                onClick={handleConnect}
+                variant={limitCheck?.canAddChannel ? "default" : "outline"}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Connect New Channel
+              </Button>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>

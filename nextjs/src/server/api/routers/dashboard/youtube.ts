@@ -18,7 +18,7 @@ import {
 import { inngestClient } from '@/lib/clients/inngest';
 import { supabaseServer } from '@/lib/clients/supabase';
 import type { Database } from '@shared-types/database.types';
-import { checkVideoLimit } from '@/lib/plan-limits';
+import { checkVideoLimit, checkChannelLimit } from '@/lib/plan-limits';
 
 export const youtubeRouter = createTRPCRouter({
   // ==================== Channel Management ====================
@@ -34,6 +34,11 @@ export const youtubeRouter = createTRPCRouter({
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
 
       return data || [];
+    }),
+
+    checkLimit: protectedProcedure.query(async ({ ctx }) => {
+      const result = await checkChannelLimit(ctx.user.id, supabaseServer);
+      return result;
     }),
 
     initiateOAuth: protectedProcedure.mutation(async () => {
