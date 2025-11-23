@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import { createTRPCRouter, protectedProcedure } from '@/server/api/trpc';
+import { protectedProcedure } from '@/server/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { supabaseServer } from '@/lib/clients/supabase';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { env } from '@/env/server.mjs';
+import { router } from '@/server/trpc/init';
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
@@ -27,7 +28,7 @@ const ProposalSchema = z.object({
 
 export type AIProposal = z.infer<typeof ProposalSchema>;
 
-export const aiRouter = createTRPCRouter({
+export const aiRouter = router({
   analyzeChannel: protectedProcedure
     .input(
       z.object({
@@ -179,31 +180,31 @@ export const aiRouter = createTRPCRouter({
 
           // B. Insert Variables
           const variablesToInsert = [];
-          
+
           // We need to map the flat variableValues map back to specific templates
           // The proposal gives us variableValues: { "var1": "val1" }
           // We know which template defines "var1" by parsing the templates created above.
-          
+
           // Optimization: Pre-calculate which variable belongs to which template
           // (Simple approach: Iterate all templates, check if var exists in content)
-          
+
           for (const [varName, varValue] of Object.entries(videoAnalysis.variableValues)) {
             // Find which template has this variable
             // Note: This assumes variable names are unique across the container, which is good practice but not guaranteed.
             // If duplicates exist, we assign to the first match or all matches.
-            
+
             for (const tpl of proposal.templates) {
-               if (tpl.content.includes(`{{${varName}}}`)) {
-                 const tplId = templateIdMap.get(tpl.name);
-                 if (tplId) {
-                   variablesToInsert.push({
-                     video_id: videoAnalysis.videoId,
-                     template_id: tplId,
-                     variable_name: varName,
-                     variable_value: varValue || '',
-                   });
-                 }
-               }
+              if (tpl.content.includes(`{{${varName}}}`)) {
+                const tplId = templateIdMap.get(tpl.name);
+                if (tplId) {
+                  variablesToInsert.push({
+                    video_id: videoAnalysis.videoId,
+                    template_id: tplId,
+                    variable_name: varName,
+                    variable_value: varValue || '',
+                  });
+                }
+              }
             }
           }
 

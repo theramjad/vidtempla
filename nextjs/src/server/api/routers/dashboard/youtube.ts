@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { createTRPCRouter, protectedProcedure } from '@/server/api/trpc';
+import { protectedProcedure } from '@/server/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { getOAuthUrl } from '@/lib/clients/youtube';
 import { decrypt, encrypt } from '@/utils/encryption';
@@ -19,11 +19,12 @@ import { inngestClient } from '@/lib/clients/inngest';
 import { supabaseServer } from '@/lib/clients/supabase';
 import type { Database } from '@shared-types/database.types';
 import { checkVideoLimit, checkChannelLimit } from '@/lib/plan-limits';
+import { router } from '@/server/trpc/init';
 
-export const youtubeRouter = createTRPCRouter({
+export const youtubeRouter = router({
   // ==================== Channel Management ====================
 
-  channels: createTRPCRouter({
+  channels: router({
     list: protectedProcedure.query(async ({ ctx }): Promise<Database['public']['Tables']['youtube_channels']['Row'][]> => {
       const { data, error } = await supabaseServer
         .from('youtube_channels')
@@ -77,7 +78,7 @@ export const youtubeRouter = createTRPCRouter({
 
   // ==================== Container Management ====================
 
-  containers: createTRPCRouter({
+  containers: router({
     list: protectedProcedure.query(async ({ ctx }): Promise<Database['public']['Tables']['containers']['Row'][]> => {
       const { data, error } = await supabaseServer
         .from('containers')
@@ -203,7 +204,7 @@ export const youtubeRouter = createTRPCRouter({
 
   // ==================== Template Management ====================
 
-  templates: createTRPCRouter({
+  templates: router({
     list: protectedProcedure.query(async ({ ctx }): Promise<(Database['public']['Tables']['templates']['Row'] & { variables: string[] })[]> => {
       const { data, error } = await supabaseServer
         .from('templates')
@@ -370,7 +371,7 @@ export const youtubeRouter = createTRPCRouter({
 
   // ==================== Video Management ====================
 
-  videos: createTRPCRouter({
+  videos: router({
     list: protectedProcedure
       .input(
         z.object({

@@ -4,13 +4,14 @@
  */
 
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import { protectedProcedure } from "@/server/trpc/init";
 import { TRPCError } from "@trpc/server";
 import { polar } from "@/lib/polar-server";
 import { PLAN_CONFIG, type PlanTier } from "@/lib/polar";
 import { supabaseServer } from "@/lib/clients/supabase";
+import { router } from "@/server/trpc/init";
 
-export const billingRouter = createTRPCRouter({
+export const billingRouter = router({
   /**
    * Get the current user's subscription plan
    */
