@@ -27,91 +27,6 @@ export default function Page() {
   const shownErrorsRef = useRef(new Set<string>());
   const verificationAttemptedRef = useRef(false);
 
-  // If user is already signed in, show message and redirect
-  useEffect(() => {
-    if (user && !userLoading && !justSignedIn) {
-      const returnTo = router.query.returnTo as string;
-      if (returnTo) {
-        router.push(decodeURIComponent(returnTo));
-      } else {
-        toast({
-          title: "Already signed in",
-          description: "You're already signed in!",
-        });
-      }
-    }
-  }, [user, userLoading, justSignedIn]);
-
-  // Check if sign-up is enabled
-  if (!appConfig.auth.enableSignUp) {
-    return (
-      <>
-        <Head>
-          <title>Sign Up | VidTempla</title>
-        </Head>
-        <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-6 shadow-md">
-          <div className="flex flex-col items-center space-y-6">
-            <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-              Sign Up Disabled
-            </h2>
-            <p className="text-center text-gray-600">
-              Account creation is currently disabled. Please contact an administrator.
-            </p>
-            <button
-              onClick={() => router.push("/sign-in")}
-              className="group relative flex w-full justify-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
-            >
-              Go to Sign In
-            </button>
-          </div>
-        </div>
-      </div>
-      </>
-    );
-  }
-
-  /**
-   * Handle sign up with magic link
-   * @param e - Form event
-   */
-  async function handleSignUp(e: React.FormEvent) {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    try {
-      const { data, error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: true,
-          emailRedirectTo: process.env.NEXT_PUBLIC_APP_URL,
-        },
-      });
-
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Sign up failed",
-          description: error.message,
-        });
-      } else {
-        setMagicLinkSent(true);
-        toast({
-          title: "Code sent",
-          description: "Check your email for the login link and verification code!",
-        });
-      }
-    } catch (err) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
   /**
    * Handle OTP verification
    * @param code - The OTP code to verify
@@ -184,7 +99,22 @@ export default function Page() {
     } finally {
       setIsVerifyingOtp(false);
     }
-  }, [email, supabase, router.query.returnTo]);
+  }, [email, supabase, router.query.returnTo, toast]);
+
+  // If user is already signed in, show message and redirect
+  useEffect(() => {
+    if (user && !userLoading && !justSignedIn) {
+      const returnTo = router.query.returnTo as string;
+      if (returnTo) {
+        router.push(decodeURIComponent(returnTo));
+      } else {
+        toast({
+          title: "Already signed in",
+          description: "You're already signed in!",
+        });
+      }
+    }
+  }, [user, userLoading, justSignedIn, router, toast]);
 
   // Auto-verify when OTP code is complete
   useEffect(() => {
@@ -192,6 +122,76 @@ export default function Page() {
       handleVerifyOtp(otpCode);
     }
   }, [otpCode, isVerifyingOtp, handleVerifyOtp]);
+
+  // Check if sign-up is enabled
+  if (!appConfig.auth.enableSignUp) {
+    return (
+      <>
+        <Head>
+          <title>Sign Up | VidTempla</title>
+        </Head>
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-6 shadow-md">
+          <div className="flex flex-col items-center space-y-6">
+            <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+              Sign Up Disabled
+            </h2>
+            <p className="text-center text-gray-600">
+              Account creation is currently disabled. Please contact an administrator.
+            </p>
+            <button
+              onClick={() => router.push("/sign-in")}
+              className="group relative flex w-full justify-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+            >
+              Go to Sign In
+            </button>
+          </div>
+        </div>
+      </div>
+      </>
+    );
+  }
+
+  /**
+   * Handle sign up with magic link
+   * @param e - Form event
+   */
+  async function handleSignUp(e: React.FormEvent) {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: process.env.NEXT_PUBLIC_APP_URL,
+        },
+      });
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Sign up failed",
+          description: error.message,
+        });
+      } else {
+        setMagicLinkSent(true);
+        toast({
+          title: "Code sent",
+          description: "Check your email for the login link and verification code!",
+        });
+      }
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   // Helper component for OTP slot
   function Slot(props: SlotProps) {
