@@ -32,6 +32,9 @@ export const serverSchema = z.object({
   POLAR_WEBHOOK_SECRET: z.string(),
   POLAR_PRO_PRODUCT_ID: z.string(),
   POLAR_BUSINESS_PRODUCT_ID: z.string(),
+
+  // AI
+  GEMINI_API_KEY: z.string(),
 });
 
 /**
@@ -66,6 +69,9 @@ export const serverEnv = {
   POLAR_WEBHOOK_SECRET: process.env.POLAR_WEBHOOK_SECRET,
   POLAR_PRO_PRODUCT_ID: process.env.POLAR_PRO_PRODUCT_ID,
   POLAR_BUSINESS_PRODUCT_ID: process.env.POLAR_BUSINESS_PRODUCT_ID,
+
+  // AI
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
 };
 
 /**

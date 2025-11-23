@@ -21,7 +21,6 @@ export const appConfig = {
   // Authentication settings
   auth: {
     enableSignUp: true,
-    enablePasswordReset: true,
   },
 
   // Dashboard configuration

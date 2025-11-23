@@ -50,14 +50,6 @@ export default function YouTubePage() {
       </Head>
       <DashboardLayout>
         <div className="container mx-auto py-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            YouTube Description Manager
-          </h1>
-          <p className="text-muted-foreground">
-            Manage your YouTube channels, templates, and video descriptions
-          </p>
-        </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-4">

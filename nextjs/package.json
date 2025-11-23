@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.4",
+    "@google/generative-ai": "^0.24.1",
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^3.9.1",
@@ -52,6 +53,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.0.4",
     "inngest": "^3.28.0",
+    "input-otp": "^1.4.2",
     "lucide-react": "^0.453.0",
     "luxon": "^3.5.0",
     "micro": "^10.0.1",
