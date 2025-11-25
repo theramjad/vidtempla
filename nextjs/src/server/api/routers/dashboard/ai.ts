@@ -3,6 +3,7 @@ import { protectedProcedure } from '@/server/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { supabaseServer } from '@/lib/clients/supabase';
 import { openai } from '@/lib/clients/openai';
+import { zodResponseFormat } from 'openai/helpers/zod';
 import { env } from '@/env/server.mjs';
 import { router } from '@/server/trpc/init';
 
@@ -18,7 +19,12 @@ const ProposalSchema = z.object({
   videoAnalysis: z.array(
     z.object({
       videoId: z.string(),
-      variableValues: z.record(z.string()), // map of variableName -> value
+      variableValues: z.array(
+        z.object({
+          name: z.string(),
+          value: z.string(),
+        })
+      ),
     })
   ),
 });
@@ -67,8 +73,8 @@ export const aiRouter = router({
 
       const existingTemplatesText = existingTemplates?.length
         ? `EXISTING SYSTEM TEMPLATES:\n${existingTemplates
-            .map((t) => `--- TEMPLATE: ${t.name} ---\n${t.content}\n`)
-            .join('\n')}`
+          .map((t) => `--- TEMPLATE: ${t.name} ---\n${t.content}\n`)
+          .join('\n')}`
         : 'No existing templates found.';
 
       const prompt = `
@@ -200,27 +206,12 @@ export const aiRouter = router({
         </REASONING>
       </EXAMPLE_3>
 
-      OUTPUT FORMAT (JSON ONLY):
-      {
-        "containerName": "Proposed Container Name (e.g., Standard Podcast Layout)",
-        "separator": "\n\n",
-        "templates": [
-          { "name": "Template Name", "content": "Text with {{variables}}..." }
-        ],
-        "videoAnalysis": [
-          {
-            "videoId": "The UUID provided in the input",
-            "variableValues": {
-              "variable_name": "extracted value from this video's description"
-            }
-          }
-        ]
-      }
+      OUTPUT FORMAT:
+      You must return a valid JSON object matching the provided schema.
 
       CONSTRAINTS:
       - Do not Hallucinate values. If a variable value is missing in a description, use an empty string.
       - Ensure the "content" of templates combined equals the original structure as closely as possible.
-      - Return ONLY valid JSON.
 
       INPUT DATA:
       ${existingTemplatesText}
@@ -230,25 +221,27 @@ export const aiRouter = router({
       // 3. Call OpenAI
       try {
         const completion = await openai.chat.completions.create({
-          model: 'gpt-4-turbo',
+          model: 'gpt-4o-2024-08-06',
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful assistant that outputs JSON only.',
+              content: 'You are a helpful assistant that analyzes YouTube video descriptions.',
             },
             {
               role: 'user',
               content: prompt,
             },
           ],
-          response_format: { type: 'json_object' },
+          response_format: zodResponseFormat(ProposalSchema, 'ai_proposal'),
         });
 
-        const text = completion.choices[0]?.message?.content || '{}';
+        const text = completion.choices[0]?.message?.content;
+        
+        if (!text) {
+           throw new Error('No content returned from OpenAI');
+        }
 
-        // 4. Parse and Validate
-        const json = JSON.parse(text);
-        const proposal = ProposalSchema.parse(json);
+        const proposal = JSON.parse(text);
 
         return proposal;
       } catch (err) {
@@ -342,7 +335,7 @@ export const aiRouter = router({
           // Optimization: Pre-calculate which variable belongs to which template
           // (Simple approach: Iterate all templates, check if var exists in content)
 
-          for (const [varName, varValue] of Object.entries(videoAnalysis.variableValues)) {
+          for (const { name: varName, value: varValue } of videoAnalysis.variableValues) {
             // Find which template has this variable
             // Note: This assumes variable names are unique across the container, which is good practice but not guaranteed.
             // If duplicates exist, we assign to the first match or all matches.

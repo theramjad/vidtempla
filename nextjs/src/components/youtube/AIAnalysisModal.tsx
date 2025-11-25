@@ -218,9 +218,9 @@ export default function AIAnalysisModal({
 
                 {selectedPreviewVideoId && (
                    <div className="bg-muted/50 p-4 rounded-md space-y-2">
-                     {Object.entries(
-                       proposal.videoAnalysis.find((v) => v.videoId === selectedPreviewVideoId)?.variableValues || {}
-                     ).map(([key, value]) => (
+                     {(
+                       proposal.videoAnalysis.find((v) => v.videoId === selectedPreviewVideoId)?.variableValues || []
+                     ).map(({ name: key, value }) => (
                        <div key={key} className="grid grid-cols-[120px_1fr] gap-2 text-sm">
                          <span className="font-mono text-muted-foreground">{`{{${key}}}`}:</span>
                          <span className="font-medium">{value || <span className="text-muted-foreground italic">(empty)</span>}</span>
