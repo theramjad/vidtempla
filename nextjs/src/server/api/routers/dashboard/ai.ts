@@ -3,7 +3,7 @@ import { protectedProcedure } from '@/server/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { supabaseServer } from '@/lib/clients/supabase';
 import { openai } from '@/lib/clients/openai';
-import { zodResponseFormat } from 'openai/helpers/zod';
+import { zodResponseFormat, zodTextFormat } from 'openai/helpers/zod';
 import { env } from '@/env/server.mjs';
 import { router } from '@/server/trpc/init';
 
@@ -58,13 +58,13 @@ export const aiRouter = router({
         });
       }
 
-      // 1.5 Fetch existing templates
+      // 2. Fetch existing templates
       const { data: existingTemplates } = await supabaseServer
         .from('templates')
         .select('name, content')
         .eq('user_id', ctx.user.id);
 
-      // 2. Construct Prompt
+      // 3. Construct Prompt
       const videosText = videos
         .map(
           (v, i) =>
@@ -74,8 +74,8 @@ export const aiRouter = router({
 
       const existingTemplatesText = existingTemplates?.length
         ? `<EXISTING_TEMPLATES>\n${existingTemplates
-            .map((t) => `<TEMPLATE name="${t.name}">\n${t.content}\n</TEMPLATE>`)
-            .join('\n')}\n</EXISTING_TEMPLATES>`
+          .map((t) => `<TEMPLATE name="${t.name}">\n${t.content}\n</TEMPLATE>`)
+          .join('\n')}\n</EXISTING_TEMPLATES>`
         : '<EXISTING_TEMPLATES>None</EXISTING_TEMPLATES>';
 
       const systemPrompt = `
@@ -221,11 +221,11 @@ export const aiRouter = router({
       ${videosText}
       `;
 
-      // 3. Call OpenAI
+      // 4. Call OpenAI
       try {
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4o-2024-08-06',
-          messages: [
+        const resp = await openai.responses.parse({
+          model: 'gpt-4.1-mini',
+          input: [
             {
               role: 'system',
               content: systemPrompt,
@@ -235,16 +235,12 @@ export const aiRouter = router({
               content: userMessage,
             },
           ],
-          response_format: zodResponseFormat(ProposalSchema, 'ai_proposal'),
+          text: {
+            format: zodTextFormat(ProposalSchema, 'ai_proposal'),
+          },
         });
 
-        const text = completion.choices[0]?.message?.content;
-        
-        if (!text) {
-           throw new Error('No content returned from OpenAI');
-        }
-
-        const proposal = JSON.parse(text);
+        const proposal = resp.output_parsed;
 
         return proposal;
       } catch (err) {
@@ -277,56 +273,56 @@ export const aiRouter = router({
 
         // Logic based on AI's 'action'
         if (tpl.action === 'reuse') {
-            // AI says reuse -> Try to find by NAME first (as it should have used the existing name)
-            const { data: existingByName } = await supabaseServer
+          // AI says reuse -> Try to find by NAME first (as it should have used the existing name)
+          const { data: existingByName } = await supabaseServer
+            .from('templates')
+            .select('id')
+            .eq('user_id', ctx.user.id)
+            .eq('name', tpl.name)
+            .maybeSingle();
+
+          if (existingByName) {
+            tplId = existingByName.id;
+          } else {
+            // Fallback: maybe it hallucinated the name but content matches?
+            const { data: existingByContent } = await supabaseServer
               .from('templates')
               .select('id')
               .eq('user_id', ctx.user.id)
-              .eq('name', tpl.name)
+              .eq('content', tpl.content)
               .maybeSingle();
-            
-             if (existingByName) {
-                 tplId = existingByName.id;
-             } else {
-                 // Fallback: maybe it hallucinated the name but content matches?
-                  const { data: existingByContent } = await supabaseServer
-                    .from('templates')
-                    .select('id')
-                    .eq('user_id', ctx.user.id)
-                    .eq('content', tpl.content)
-                    .maybeSingle();
-                  
-                  if (existingByContent) tplId = existingByContent.id;
-             }
+
+            if (existingByContent) tplId = existingByContent.id;
+          }
         }
 
         // If action was 'create' OR if 'reuse' failed to find a match (safety fallback)
         if (!tplId) {
-            // Check for duplicate content even if AI said create (deduplication safety)
-             const { data: existingByContent } = await supabaseServer
-                .from('templates')
-                .select('id')
-                .eq('user_id', ctx.user.id)
-                .eq('content', tpl.content)
-                .maybeSingle();
+          // Check for duplicate content even if AI said create (deduplication safety)
+          const { data: existingByContent } = await supabaseServer
+            .from('templates')
+            .select('id')
+            .eq('user_id', ctx.user.id)
+            .eq('content', tpl.content)
+            .maybeSingle();
 
-            if (existingByContent) {
-                tplId = existingByContent.id;
-            } else {
-                // Actually create it
-                 const { data: newTpl, error: tplError } = await supabaseServer
-                .from('templates')
-                .insert({
-                  user_id: ctx.user.id,
-                  name: tpl.name,
-                  content: tpl.content,
-                })
-                .select('id')
-                .single();
+          if (existingByContent) {
+            tplId = existingByContent.id;
+          } else {
+            // Actually create it
+            const { data: newTpl, error: tplError } = await supabaseServer
+              .from('templates')
+              .insert({
+                user_id: ctx.user.id,
+                name: tpl.name,
+                content: tpl.content,
+              })
+              .select('id')
+              .single();
 
-                if (tplError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: tplError.message });
-                tplId = newTpl.id;
-            }
+            if (tplError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: tplError.message });
+            tplId = newTpl.id;
+          }
         }
 
         templateIdMap.set(tpl.name, tplId);
