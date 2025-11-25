@@ -42,6 +42,7 @@ export const aiRouter = router({
         .from('youtube_videos')
         .select('id, title, current_description, video_id')
         .eq('channel_id', input.channelId)
+        .is('container_id', null)
         .order('published_at', { ascending: false })
         .limit(input.limit);
 
@@ -53,6 +54,12 @@ export const aiRouter = router({
         });
       }
 
+      // 1.5 Fetch existing templates
+      const { data: existingTemplates } = await supabaseServer
+        .from('templates')
+        .select('name, content')
+        .eq('user_id', ctx.user.id);
+
       // 2. Construct Prompt
       const videosText = videos
         .map(
@@ -60,6 +67,12 @@ export const aiRouter = router({
             `--- VIDEO ${i + 1} (ID: ${v.id}) ---\nTITLE: ${v.title}\nDESCRIPTION:\n${v.current_description}\n`
         )
         .join('\n');
+
+      const existingTemplatesText = existingTemplates?.length
+        ? `EXISTING SYSTEM TEMPLATES:\n${existingTemplates
+            .map((t) => `--- TEMPLATE: ${t.name} ---\n${t.content}\n`)
+            .join('\n')}`
+        : 'No existing templates found.';
 
       const prompt = `
       You are an expert YouTube Automation Architect. Your goal is to analyze the descriptions of these YouTube videos and create a scalable "Container" and "Template" system.
@@ -71,11 +84,13 @@ export const aiRouter = router({
 
       TASK:
       1. Analyze the patterns in the provided video descriptions.
-      2. Identify static sections (intros, social links, disclaimers) -> Convert these to Templates.
-      3. Identify dynamic sections (episode summaries, guest names, specific links) -> Convert these to Variables inside Templates (e.g., "{{coupon_code}}", "{{episode_summary}}").
-      4. Extract the variable values for EACH provided video based on your proposed structure.
+      2. Check the "EXISTING SYSTEM TEMPLATES" provided below. If a section of the description matches an existing template (structure and variables), YOU MUST REUSE IT.
+      3. Identify static sections (intros, social links, disclaimers) -> Convert these to Templates.
+      4. Identify dynamic sections (episode summaries, guest names, specific links) -> Convert these to Variables inside Templates (e.g., "{{coupon_code}}", "{{episode_summary}}").
+      5. Extract the variable values for EACH provided video based on your proposed structure.
 
       GUIDELINES FOR TEMPLATE CREATION:
+      - **REUSE EXISTING TEMPLATES**: If an existing template matches the content, use its exact Name and Content in your proposal.
       - **PREFER GRANULAR, MODULAR TEMPLATES**. Break the description down into smaller, logical components.
       - Create separate templates for distinct sections (e.g., "Episode Content", "Timestamps", "Social Links", "Sponsors", "Gear", "Disclaimer").
       - Avoid creating massive "Footer" templates. Instead, split static sections into their own templates so they can be reordered or updated independently.
@@ -211,6 +226,7 @@ export const aiRouter = router({
       - Return ONLY valid JSON.
 
       INPUT DATA:
+      ${existingTemplatesText}
       ${videosText}
       `;
 
@@ -252,19 +268,35 @@ export const aiRouter = router({
       const templateIdsInOrder: string[] = [];
 
       for (const tpl of proposal.templates) {
-        const { data: newTpl, error: tplError } = await supabaseServer
+        // Check if template exists to avoid duplicates
+        const { data: existingTpl } = await supabaseServer
           .from('templates')
-          .insert({
-            user_id: ctx.user.id,
-            name: tpl.name,
-            content: tpl.content,
-          })
           .select('id')
-          .single();
+          .eq('user_id', ctx.user.id)
+          .eq('content', tpl.content)
+          .maybeSingle();
 
-        if (tplError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: tplError.message });
-        templateIdMap.set(tpl.name, newTpl.id);
-        templateIdsInOrder.push(newTpl.id);
+        let tplId: string;
+
+        if (existingTpl) {
+          tplId = existingTpl.id;
+        } else {
+          const { data: newTpl, error: tplError } = await supabaseServer
+            .from('templates')
+            .insert({
+              user_id: ctx.user.id,
+              name: tpl.name,
+              content: tpl.content,
+            })
+            .select('id')
+            .single();
+
+          if (tplError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: tplError.message });
+          tplId = newTpl.id;
+        }
+
+        templateIdMap.set(tpl.name, tplId);
+        templateIdsInOrder.push(tplId);
       }
 
       // 2. Create Container
