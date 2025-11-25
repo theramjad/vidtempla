@@ -34,7 +34,6 @@ export const serverSchema = z.object({
   POLAR_BUSINESS_PRODUCT_ID: z.string(),
 
   // AI
-  GEMINI_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string(),
 });
 
@@ -72,7 +71,6 @@ export const serverEnv = {
   POLAR_BUSINESS_PRODUCT_ID: process.env.POLAR_BUSINESS_PRODUCT_ID,
 
   // AI
-  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
 };
 
