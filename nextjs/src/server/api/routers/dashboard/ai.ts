@@ -14,6 +14,7 @@ const ProposalSchema = z.object({
     z.object({
       name: z.string(),
       content: z.string(),
+      action: z.enum(['create', 'reuse']).describe("Set to 'reuse' if this matches an EXISTING SYSTEM TEMPLATE, otherwise 'create'"),
     })
   ),
   videoAnalysis: z.array(
@@ -72,12 +73,12 @@ export const aiRouter = router({
         .join('\n');
 
       const existingTemplatesText = existingTemplates?.length
-        ? `EXISTING SYSTEM TEMPLATES:\n${existingTemplates
-          .map((t) => `--- TEMPLATE: ${t.name} ---\n${t.content}\n`)
-          .join('\n')}`
-        : 'No existing templates found.';
+        ? `<EXISTING_TEMPLATES>\n${existingTemplates
+            .map((t) => `<TEMPLATE name="${t.name}">\n${t.content}\n</TEMPLATE>`)
+            .join('\n')}\n</EXISTING_TEMPLATES>`
+        : '<EXISTING_TEMPLATES>None</EXISTING_TEMPLATES>';
 
-      const prompt = `
+      const systemPrompt = `
       You are an expert YouTube Automation Architect. Your goal is to analyze the descriptions of these YouTube videos and create a scalable "Container" and "Template" system.
 
       SYSTEM DEFINITIONS:
@@ -87,13 +88,13 @@ export const aiRouter = router({
 
       TASK:
       1. Analyze the patterns in the provided video descriptions.
-      2. Check the "EXISTING SYSTEM TEMPLATES" provided below. If a section of the description matches an existing template (structure and variables), YOU MUST REUSE IT.
-      3. Identify static sections (intros, social links, disclaimers) -> Convert these to Templates.
+      2. Check the <EXISTING_TEMPLATES> provided in the user input. If a section of the description matches an existing template (structure and variables), YOU MUST REUSE IT and set action="reuse".
+      3. Identify static sections (intros, social links, disclaimers) -> Convert these to Templates (action="create").
       4. Identify dynamic sections (episode summaries, guest names, specific links) -> Convert these to Variables inside Templates (e.g., "{{coupon_code}}", "{{episode_summary}}").
       5. Extract the variable values for EACH provided video based on your proposed structure.
 
       GUIDELINES FOR TEMPLATE CREATION:
-      - **REUSE EXISTING TEMPLATES**: If an existing template matches the content, use its exact Name and Content in your proposal.
+      - **REUSE EXISTING TEMPLATES**: If an existing template matches the content, use its exact Name and Content in your proposal and set action="reuse".
       - **PREFER GRANULAR, MODULAR TEMPLATES**. Break the description down into smaller, logical components.
       - Create separate templates for distinct sections (e.g., "Episode Content", "Timestamps", "Social Links", "Sponsors", "Gear", "Disclaimer").
       - Avoid creating massive "Footer" templates. Instead, split static sections into their own templates so they can be reordered or updated independently.
@@ -212,7 +213,9 @@ export const aiRouter = router({
       CONSTRAINTS:
       - Do not Hallucinate values. If a variable value is missing in a description, use an empty string.
       - Ensure the "content" of templates combined equals the original structure as closely as possible.
+      `;
 
+      const userMessage = `
       INPUT DATA:
       ${existingTemplatesText}
       ${videosText}
@@ -225,11 +228,11 @@ export const aiRouter = router({
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful assistant that analyzes YouTube video descriptions.',
+              content: systemPrompt,
             },
             {
               role: 'user',
-              content: prompt,
+              content: userMessage,
             },
           ],
           response_format: zodResponseFormat(ProposalSchema, 'ai_proposal'),
@@ -270,31 +273,60 @@ export const aiRouter = router({
       const templateIdsInOrder: string[] = [];
 
       for (const tpl of proposal.templates) {
-        // Check if template exists to avoid duplicates
-        const { data: existingTpl } = await supabaseServer
-          .from('templates')
-          .select('id')
-          .eq('user_id', ctx.user.id)
-          .eq('content', tpl.content)
-          .maybeSingle();
+        let tplId: string | null = null;
 
-        let tplId: string;
+        // Logic based on AI's 'action'
+        if (tpl.action === 'reuse') {
+            // AI says reuse -> Try to find by NAME first (as it should have used the existing name)
+            const { data: existingByName } = await supabaseServer
+              .from('templates')
+              .select('id')
+              .eq('user_id', ctx.user.id)
+              .eq('name', tpl.name)
+              .maybeSingle();
+            
+             if (existingByName) {
+                 tplId = existingByName.id;
+             } else {
+                 // Fallback: maybe it hallucinated the name but content matches?
+                  const { data: existingByContent } = await supabaseServer
+                    .from('templates')
+                    .select('id')
+                    .eq('user_id', ctx.user.id)
+                    .eq('content', tpl.content)
+                    .maybeSingle();
+                  
+                  if (existingByContent) tplId = existingByContent.id;
+             }
+        }
 
-        if (existingTpl) {
-          tplId = existingTpl.id;
-        } else {
-          const { data: newTpl, error: tplError } = await supabaseServer
-            .from('templates')
-            .insert({
-              user_id: ctx.user.id,
-              name: tpl.name,
-              content: tpl.content,
-            })
-            .select('id')
-            .single();
+        // If action was 'create' OR if 'reuse' failed to find a match (safety fallback)
+        if (!tplId) {
+            // Check for duplicate content even if AI said create (deduplication safety)
+             const { data: existingByContent } = await supabaseServer
+                .from('templates')
+                .select('id')
+                .eq('user_id', ctx.user.id)
+                .eq('content', tpl.content)
+                .maybeSingle();
 
-          if (tplError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: tplError.message });
-          tplId = newTpl.id;
+            if (existingByContent) {
+                tplId = existingByContent.id;
+            } else {
+                // Actually create it
+                 const { data: newTpl, error: tplError } = await supabaseServer
+                .from('templates')
+                .insert({
+                  user_id: ctx.user.id,
+                  name: tpl.name,
+                  content: tpl.content,
+                })
+                .select('id')
+                .single();
+
+                if (tplError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: tplError.message });
+                tplId = newTpl.id;
+            }
         }
 
         templateIdMap.set(tpl.name, tplId);

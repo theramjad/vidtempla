@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/accordion';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Wand2, CheckCircle2, ArrowRight, Info } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { AIProposal } from '@/server/api/routers/dashboard/ai';
 
@@ -183,7 +184,16 @@ export default function AIAnalysisModal({
                 <Accordion type="single" collapsible className="w-full">
                   {proposal.templates.map((tpl, idx) => (
                     <AccordionItem key={idx} value={`tpl-${idx}`}>
-                      <AccordionTrigger>{tpl.name}</AccordionTrigger>
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center gap-3">
+                            <span className="font-medium">{tpl.name}</span>
+                            {tpl.action === 'reuse' ? (
+                                <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200">Reused</Badge>
+                            ) : (
+                                <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 hover:bg-green-200 border-green-200">New</Badge>
+                            )}
+                        </div>
+                      </AccordionTrigger>
                       <AccordionContent>
                         <pre className="text-xs bg-muted p-2 rounded overflow-x-auto whitespace-pre-wrap">
                           {tpl.content}
