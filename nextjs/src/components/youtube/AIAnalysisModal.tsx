@@ -117,7 +117,7 @@ export default function AIAnalysisModal({
     switch (step) {
       case 'select':
         return (
-          <div className="space-y-4 py-4">
+          <div className="space-y-6 py-4">
             <div className="bg-secondary/50 p-4 rounded-lg border border-secondary flex items-start gap-3">
               <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
               <div className="text-sm text-muted-foreground">
@@ -125,10 +125,10 @@ export default function AIAnalysisModal({
                 Gemini AI will analyze your last 20 videos to identify common patterns. It will propose a reusable Container and Templates, and automatically extract variables (like guest names or topics) from your existing descriptions.
               </div>
             </div>
-            <div>
-              <Label>Select Channel to Analyze</Label>
+            <div className="space-y-3">
+              <Label className="text-base font-medium">Select Channel to Analyze</Label>
               <Select value={selectedChannelId} onValueChange={setSelectedChannelId}>
-                <SelectTrigger>
+                <SelectTrigger className="h-11">
                   <SelectValue placeholder="Select a channel..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -153,6 +153,8 @@ export default function AIAnalysisModal({
             <div className="text-center space-y-1">
               <h3 className="font-medium text-lg">Analyzing Descriptions...</h3>
               <p className="text-sm text-muted-foreground">Finding patterns in your last 20 videos</p>
+              <p className="text-sm text-muted-foreground">This may take 1-2 minutes.</p>
+              <p className="text-xs text-amber-600 font-medium pt-2">Please do not close this page</p>
             </div>
           </div>
         );
@@ -266,8 +268,7 @@ export default function AIAnalysisModal({
     <Dialog open={open} onOpenChange={step === 'applying' ? undefined : onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Wand2 className="w-5 h-5 text-purple-500" />
+          <DialogTitle>
             AI Migration Assistant
           </DialogTitle>
           {step === 'select' && (
