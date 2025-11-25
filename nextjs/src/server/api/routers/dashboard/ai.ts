@@ -2,12 +2,9 @@ import { z } from 'zod';
 import { protectedProcedure } from '@/server/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { supabaseServer } from '@/lib/clients/supabase';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { openai } from '@/lib/clients/openai';
 import { env } from '@/env/server.mjs';
 import { router } from '@/server/trpc/init';
-
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
 
 const ProposalSchema = z.object({
   containerName: z.string(),
@@ -230,12 +227,24 @@ export const aiRouter = router({
       ${videosText}
       `;
 
-      // 3. Call Gemini
+      // 3. Call OpenAI
       try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', generationConfig: { responseMimeType: "application/json" } });
-        const result = await model.generateContent(prompt);
-        const response = result.response;
-        const text = response.text();
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4-turbo',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful assistant that outputs JSON only.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          response_format: { type: 'json_object' },
+        });
+
+        const text = completion.choices[0]?.message?.content || '{}';
 
         // 4. Parse and Validate
         const json = JSON.parse(text);
