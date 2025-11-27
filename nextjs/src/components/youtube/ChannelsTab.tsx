@@ -33,7 +33,6 @@ import Image from 'next/image';
 import { DateTime } from 'luxon';
 import Link from 'next/link';
 import AIAnalysisModal from './AIAnalysisModal';
-import { env } from '@/env/client.mjs';
 
 export default function ChannelsTab() {
   const { toast } = useToast();
@@ -131,7 +130,7 @@ export default function ChannelsTab() {
             Connect your YouTube channels to manage video descriptions
           </p>
         </div>
-        {env.NEXT_PUBLIC_ENABLE_AI_MIGRATION === 'true' && (
+        {process.env.NODE_ENV === 'development' && (
           <Button
             onClick={() => setAiModalOpen(true)}
             className="gap-2 bg-purple-600 text-white hover:bg-purple-700"

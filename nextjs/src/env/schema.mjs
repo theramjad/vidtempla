@@ -94,9 +94,6 @@ export const clientSchema = z.object({
 
   // PostHog
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
-
-  // Feature Flags
-  NEXT_PUBLIC_ENABLE_AI_MIGRATION: z.enum(["true", "false"]).default(process.env.NODE_ENV === "development" ? "true" : "false"),
 });
 
 /**
@@ -118,7 +115,4 @@ export const clientEnv = {
 
   // PostHog
   NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
-
-  // Feature Flags
-  NEXT_PUBLIC_ENABLE_AI_MIGRATION: process.env.NEXT_PUBLIC_ENABLE_AI_MIGRATION,
 };
