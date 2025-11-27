@@ -4,6 +4,7 @@
  */
 
 import { inngestClient } from '@/lib/clients/inngest';
+import { NonRetriableError } from 'inngest';
 import { createClient } from '@supabase/supabase-js';
 import { decrypt, encrypt } from '@/utils/encryption';
 import { refreshAccessToken, updateVideoDescription } from '@/lib/clients/youtube';
@@ -55,8 +56,29 @@ async function getValidAccessToken(
 
       return newTokens.access_token;
     } catch (error) {
-      // Add context about which channel failed
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // Check if this is a token/auth error - mark as invalid immediately
+      const isTokenError =
+        errorMessage.includes('invalid_grant') ||
+        errorMessage.includes('Token has been expired or revoked') ||
+        errorMessage.includes('status 400');
+
+      if (isTokenError) {
+        // Mark channel as needing re-authentication immediately
+        await supabase
+          .from('youtube_channels')
+          .update({ token_status: 'invalid' })
+          .eq('id', channel.id);
+
+        // Throw non-retryable error
+        throw new NonRetriableError(
+          `Token invalid for channel ${channel.channel_id || 'unknown'} (${channel.title || 'Unknown'}). ` +
+          `Please re-authenticate. Error: ${errorMessage}`
+        );
+      }
+
+      // For other errors, throw normally (will retry)
       throw new Error(
         `Failed to refresh access token for channel ${channel.channel_id || 'unknown'} (DB ID: ${channel.id}). ` +
         `Channel: ${channel.title || 'Unknown'}. ` +
