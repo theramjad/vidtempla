@@ -21,6 +21,18 @@ export const syncChannelVideos = inngestClient.createFunction(
   {
     id: 'youtube-sync-channel-videos',
     name: 'Sync YouTube Channel Videos',
+    onFailure: async ({ event, error }) => {
+      const { channelId } = event.data.event.data;
+
+      console.error('Sync failed for channel:', channelId, 'Error:', error);
+
+      // Reset sync status back to idle on failure
+      const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
+      await supabase
+        .from('youtube_channels')
+        .update({ sync_status: 'idle' })
+        .eq('id', channelId);
+    },
   },
   { event: 'youtube/channel.sync' },
   async ({ event, step }) => {
@@ -67,21 +79,32 @@ export const syncChannelVideos = inngestClient.createFunction(
       // Check if token is expired or about to expire
       if (expiresAt && expiresAt.getTime() - now.getTime() < bufferTime) {
         const refreshToken = decrypt(channel.refresh_token_encrypted);
-        const newTokens = await refreshAccessToken(refreshToken);
 
-        // Update tokens in database
-        const newExpiresAt = new Date();
-        newExpiresAt.setSeconds(newExpiresAt.getSeconds() + newTokens.expires_in);
+        try {
+          const newTokens = await refreshAccessToken(refreshToken);
 
-        await supabase
-          .from('youtube_channels')
-          .update({
-            access_token_encrypted: encrypt(newTokens.access_token),
-            token_expires_at: newExpiresAt.toISOString(),
-          })
-          .eq('id', channelId);
+          // Update tokens in database
+          const newExpiresAt = new Date();
+          newExpiresAt.setSeconds(newExpiresAt.getSeconds() + newTokens.expires_in);
 
-        return newTokens.access_token;
+          await supabase
+            .from('youtube_channels')
+            .update({
+              access_token_encrypted: encrypt(newTokens.access_token),
+              token_expires_at: newExpiresAt.toISOString(),
+            })
+            .eq('id', channelId);
+
+          return newTokens.access_token;
+        } catch (error) {
+          // Add context about which channel failed
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          throw new Error(
+            `Failed to refresh access token for channel ${channel.channel_id} (DB ID: ${channelId}). ` +
+            `Channel: ${channel.title || 'Unknown'}. ` +
+            `Error: ${errorMessage}`
+          );
+        }
       }
 
       return currentAccessToken;

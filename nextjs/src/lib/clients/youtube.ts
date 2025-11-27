@@ -163,17 +163,38 @@ export async function refreshAccessToken(
     grant_type: 'refresh_token',
   });
 
-  const response = await axios.post<OAuthTokenResponse>(
-    YOUTUBE_TOKEN_URL,
-    params.toString(),
-    {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    }
-  );
+  try {
+    const response = await axios.post<OAuthTokenResponse>(
+      YOUTUBE_TOKEN_URL,
+      params.toString(),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
+    );
 
-  return response.data;
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const errorData = error.response?.data;
+      const errorMessage = errorData?.error_description || errorData?.error || 'Unknown error';
+
+      console.error('Token refresh error:', {
+        status,
+        error: errorData,
+        message: error.message,
+      });
+
+      throw new Error(
+        `Failed to refresh access token (status ${status}): ${errorMessage}. ` +
+        `This usually means the refresh token is invalid or revoked. ` +
+        `Error details: ${JSON.stringify(errorData)}`
+      );
+    }
+    throw error;
+  }
 }
 
 /**

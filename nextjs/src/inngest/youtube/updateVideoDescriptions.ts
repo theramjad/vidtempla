@@ -17,6 +17,8 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 async function getValidAccessToken(
   channel: {
     id: string;
+    channel_id?: string;
+    title?: string | null;
     access_token_encrypted: string | null;
     refresh_token_encrypted: string | null;
     token_expires_at: string | null;
@@ -36,20 +38,31 @@ async function getValidAccessToken(
 
   if (expiresAt && expiresAt.getTime() - now.getTime() < bufferTime) {
     const refreshToken = decrypt(channel.refresh_token_encrypted);
-    const newTokens = await refreshAccessToken(refreshToken);
 
-    const newExpiresAt = new Date();
-    newExpiresAt.setSeconds(newExpiresAt.getSeconds() + newTokens.expires_in);
+    try {
+      const newTokens = await refreshAccessToken(refreshToken);
 
-    await supabase
-      .from('youtube_channels')
-      .update({
-        access_token_encrypted: encrypt(newTokens.access_token),
-        token_expires_at: newExpiresAt.toISOString(),
-      })
-      .eq('id', channel.id);
+      const newExpiresAt = new Date();
+      newExpiresAt.setSeconds(newExpiresAt.getSeconds() + newTokens.expires_in);
 
-    return newTokens.access_token;
+      await supabase
+        .from('youtube_channels')
+        .update({
+          access_token_encrypted: encrypt(newTokens.access_token),
+          token_expires_at: newExpiresAt.toISOString(),
+        })
+        .eq('id', channel.id);
+
+      return newTokens.access_token;
+    } catch (error) {
+      // Add context about which channel failed
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(
+        `Failed to refresh access token for channel ${channel.channel_id || 'unknown'} (DB ID: ${channel.id}). ` +
+        `Channel: ${channel.title || 'Unknown'}. ` +
+        `Error: ${errorMessage}`
+      );
+    }
   }
 
   return accessToken;

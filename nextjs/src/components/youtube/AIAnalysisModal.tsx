@@ -66,7 +66,7 @@ export default function AIAnalysisModal({
         limit: 20,
       });
       setProposal(result);
-      if (result.videoAnalysis.length > 0) {
+      if (result && result.videoAnalysis.length > 0) {
         setSelectedPreviewVideoId(result.videoAnalysis[0]!.videoId);
       }
       setStep('review');
