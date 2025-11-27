@@ -130,13 +130,15 @@ export default function ChannelsTab() {
             Connect your YouTube channels to manage video descriptions
           </p>
         </div>
-        <Button
-          onClick={() => setAiModalOpen(true)}
-          className="gap-2 bg-purple-600 text-white hover:bg-purple-700"
-        >
-          <Wand2 className="h-4 w-4" />
-          AI Migration Assistant
-        </Button>
+        {process.env.NODE_ENV === 'development' && (
+          <Button
+            onClick={() => setAiModalOpen(true)}
+            className="gap-2 bg-purple-600 text-white hover:bg-purple-700"
+          >
+            <Wand2 className="h-4 w-4" />
+            AI Migration Assistant
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="p-0">
         {isLoading ? (
