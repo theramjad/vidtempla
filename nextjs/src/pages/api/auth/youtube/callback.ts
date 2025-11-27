@@ -74,13 +74,14 @@ export default async function handler(
       .single();
 
     if (existingChannel) {
-      // Update existing channel
+      // Update existing channel (re-authentication)
       await supabase
         .from('youtube_channels')
         .update({
           access_token_encrypted: encryptedAccessToken,
           refresh_token_encrypted: encryptedRefreshToken,
           token_expires_at: expiresAt.toISOString(),
+          token_status: 'valid', // Reset token status on re-authentication
           title: channelInfo.snippet.title,
           thumbnail_url: channelInfo.snippet.thumbnails.high.url,
           subscriber_count: parseInt(channelInfo.statistics.subscriberCount),

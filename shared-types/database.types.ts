@@ -306,6 +306,7 @@ export type Database = {
           thumbnail_url: string | null
           title: string | null
           token_expires_at: string | null
+          token_status: string | null
           updated_at: string
           user_id: string
         }
@@ -321,6 +322,7 @@ export type Database = {
           thumbnail_url?: string | null
           title?: string | null
           token_expires_at?: string | null
+          token_status?: string | null
           updated_at?: string
           user_id: string
         }
@@ -336,6 +338,7 @@ export type Database = {
           thumbnail_url?: string | null
           title?: string | null
           token_expires_at?: string | null
+          token_status?: string | null
           updated_at?: string
           user_id?: string
         }

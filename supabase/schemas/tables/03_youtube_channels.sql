@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS youtube_channels (
     refresh_token_encrypted text,
     token_expires_at timestamptz,
     sync_status text DEFAULT 'idle' CHECK (sync_status IN ('idle', 'syncing', 'error')),
+    token_status text DEFAULT 'valid' CHECK (token_status IN ('valid', 'invalid')),
     last_synced_at timestamptz,
     created_at timestamptz DEFAULT now() NOT NULL,
     updated_at timestamptz DEFAULT now() NOT NULL

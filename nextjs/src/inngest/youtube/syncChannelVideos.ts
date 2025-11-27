@@ -23,14 +23,24 @@ export const syncChannelVideos = inngestClient.createFunction(
     name: 'Sync YouTube Channel Videos',
     onFailure: async ({ event, error }) => {
       const { channelId } = event.data.event.data;
+      const errorMessage = error?.message || String(error);
 
       console.error('Sync failed for channel:', channelId, 'Error:', error);
 
-      // Reset sync status back to idle on failure
+      // Check if this is a token/auth error
+      const isTokenError =
+        errorMessage.includes('invalid_grant') ||
+        errorMessage.includes('Token has been expired or revoked') ||
+        errorMessage.includes('Failed to refresh access token');
+
+      // Reset sync status and mark token as invalid if it's a token error
       const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
       await supabase
         .from('youtube_channels')
-        .update({ sync_status: 'idle' })
+        .update({
+          sync_status: 'idle',
+          ...(isTokenError && { token_status: 'invalid' }),
+        })
         .eq('id', channelId);
     },
   },

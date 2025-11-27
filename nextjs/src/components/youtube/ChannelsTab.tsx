@@ -16,19 +16,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Unplug, RefreshCw, Plus, ArrowUpRight, Wand2 } from 'lucide-react';
+import { Loader2, Unplug, RefreshCw, Plus, ArrowUpRight, Wand2, AlertTriangle, Link2 } from 'lucide-react';
+import DisconnectConfirmDialog from './DisconnectConfirmDialog';
 import Image from 'next/image';
 import { DateTime } from 'luxon';
 import Link from 'next/link';
@@ -39,6 +29,11 @@ export default function ChannelsTab() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
+  const [channelToDisconnect, setChannelToDisconnect] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   const { data: channels, isLoading, refetch } = api.dashboard.youtube.channels.list.useQuery();
   const { data: limitCheck } = api.dashboard.youtube.channels.checkLimit.useQuery();
@@ -80,14 +75,23 @@ export default function ChannelsTab() {
     window.location.href = '/api/auth/youtube/initiate';
   };
 
-  const handleDisconnect = async (channelId: string) => {
-    setDeletingId(channelId);
+  const openDisconnectDialog = (channel: { id: string; title: string | null }) => {
+    setChannelToDisconnect({ id: channel.id, title: channel.title || 'Unknown Channel' });
+    setDisconnectDialogOpen(true);
+  };
+
+  const handleDisconnect = async () => {
+    if (!channelToDisconnect) return;
+
+    setDeletingId(channelToDisconnect.id);
     try {
-      await disconnectMutation.mutateAsync({ channelId });
+      await disconnectMutation.mutateAsync({ channelId: channelToDisconnect.id });
       toast({
         title: 'Channel disconnected',
         description: 'The channel has been removed successfully.',
       });
+      setDisconnectDialogOpen(false);
+      setChannelToDisconnect(null);
       refetch();
     } catch (error) {
       toast({
@@ -98,6 +102,11 @@ export default function ChannelsTab() {
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const handleReconnect = () => {
+    // Redirect to OAuth flow - will update existing channel tokens
+    window.location.href = '/api/auth/youtube/initiate';
   };
 
   const handleSync = async (channelId: string) => {
@@ -166,17 +175,30 @@ export default function ChannelsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {channels?.map((channel: Database['public']['Tables']['youtube_channels']['Row']) => (
-                <TableRow key={channel.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      {channel.thumbnail_url && channel.channel_id && (
-                        <a
-                          href={`https://youtube.com/channel/${channel.channel_id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block transition-opacity hover:opacity-80"
-                        >
+              {channels?.map((channel: Database['public']['Tables']['youtube_channels']['Row']) => {
+                const isTokenInvalid = channel.token_status === 'invalid';
+
+                return (
+                  <TableRow key={channel.id} className={isTokenInvalid ? 'bg-destructive/5' : undefined}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        {channel.thumbnail_url && channel.channel_id && (
+                          <a
+                            href={`https://youtube.com/channel/${channel.channel_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block transition-opacity hover:opacity-80"
+                          >
+                            <Image
+                              src={channel.thumbnail_url}
+                              alt={channel.title || 'Channel'}
+                              width={40}
+                              height={40}
+                              className="rounded-full"
+                            />
+                          </a>
+                        )}
+                        {channel.thumbnail_url && !channel.channel_id && (
                           <Image
                             src={channel.thumbnail_url}
                             alt={channel.title || 'Channel'}
@@ -184,91 +206,87 @@ export default function ChannelsTab() {
                             height={40}
                             className="rounded-full"
                           />
-                        </a>
-                      )}
-                      {channel.thumbnail_url && !channel.channel_id && (
-                        <Image
-                          src={channel.thumbnail_url}
-                          alt={channel.title || 'Channel'}
-                          width={40}
-                          height={40}
-                          className="rounded-full"
-                        />
-                      )}
-                      {channel.channel_id ? (
-                        <a
-                          href={`https://youtube.com/channel/${channel.channel_id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-medium hover:underline"
-                        >
-                          {channel.title}
-                        </a>
-                      ) : (
-                        <span className="font-medium">{channel.title}</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {channel.subscriber_count?.toLocaleString() || '—'}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm">
-                      {formatTimestamp(channel.last_synced_at)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSync(channel.id)}
-                        disabled={syncingId === channel.id || channel.sync_status === 'syncing'}
-                      >
-                        {syncingId === channel.id || channel.sync_status === 'syncing' ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-4 w-4" />
                         )}
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-2">
+                            {channel.channel_id ? (
+                              <a
+                                href={`https://youtube.com/channel/${channel.channel_id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium hover:underline"
+                              >
+                                {channel.title}
+                              </a>
+                            ) : (
+                              <span className="font-medium">{channel.title}</span>
+                            )}
+                            {isTokenInvalid && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
+                                <AlertTriangle className="h-3 w-3" />
+                                Reconnect Required
+                              </span>
+                            )}
+                          </div>
+                          {isTokenInvalid && (
+                            <span className="text-xs text-muted-foreground">
+                              Authorization expired. Click Reconnect to restore access.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {channel.subscriber_count?.toLocaleString() || '—'}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm">
+                        {formatTimestamp(channel.last_synced_at)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {isTokenInvalid ? (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={handleReconnect}
+                            className="gap-1"
+                          >
+                            <Link2 className="h-4 w-4" />
+                            Reconnect
+                          </Button>
+                        ) : (
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={deletingId === channel.id}
+                            onClick={() => handleSync(channel.id)}
+                            disabled={syncingId === channel.id || channel.sync_status === 'syncing'}
                           >
-                            {deletingId === channel.id ? (
+                            {syncingId === channel.id || channel.sync_status === 'syncing' ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <Unplug className="h-4 w-4" />
+                              <RefreshCw className="h-4 w-4" />
                             )}
                           </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>
-                              Disconnect Channel?
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will remove the channel and all associated videos,
-                              variables, and history. This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDisconnect(channel.id)}
-                            >
-                              Disconnect
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openDisconnectDialog(channel)}
+                          disabled={deletingId === channel.id}
+                        >
+                          {deletingId === channel.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Unplug className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
@@ -309,6 +327,14 @@ export default function ChannelsTab() {
         onSuccess={() => {
           refetch();
         }}
+      />
+
+      <DisconnectConfirmDialog
+        open={disconnectDialogOpen}
+        onOpenChange={setDisconnectDialogOpen}
+        channelTitle={channelToDisconnect?.title || ''}
+        onConfirm={handleDisconnect}
+        isDeleting={deletingId !== null}
       />
     </Card>
   );
