@@ -12,6 +12,8 @@ import { api } from '@/utils/api';
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { toast } from 'sonner';
+import PlanChangeConfirmDialog from '@/components/billing/PlanChangeConfirmDialog';
+import { type PlanTier, isUpgrade as checkIsUpgrade, PLAN_CONFIG } from '@/lib/polar';
 
 const pricingTiers = [
   {
@@ -71,13 +73,27 @@ const pricingTiers = [
 
 export default function PricingPage() {
   const router = useRouter();
+  const utils = api.useUtils();
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [planChangeDialog, setPlanChangeDialog] = useState<{
+    open: boolean;
+    targetPlan: PlanTier | null;
+  }>({ open: false, targetPlan: null });
 
   // Fetch current subscription
   const { data: currentPlan, isLoading: planLoading } =
     api.dashboard.billing.getCurrentPlan.useQuery();
 
-  // Create checkout session mutation
+  // Fetch upgrade preview when dialog is open
+  const { data: upgradePreview, isLoading: previewLoading } =
+    api.dashboard.billing.getUpgradePreview.useQuery(
+      { targetPlanTier: planChangeDialog.targetPlan as 'pro' | 'business' },
+      {
+        enabled: planChangeDialog.open && planChangeDialog.targetPlan !== null && planChangeDialog.targetPlan !== 'free',
+      }
+    );
+
+  // Create checkout session mutation (for free users or resubscribing)
   const createCheckout = api.dashboard.billing.createCheckoutSession.useMutation({
     onSuccess: (data) => {
       // Redirect to Polar checkout
@@ -91,12 +107,52 @@ export default function PricingPage() {
     },
   });
 
-  const handleUpgrade = async (planTier: 'pro' | 'business') => {
+  // Update subscription mutation (for existing subscribers)
+  const updateSubscription = api.dashboard.billing.updateSubscription.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
+      setPlanChangeDialog({ open: false, targetPlan: null });
+      // Invalidate queries to refresh data
+      utils.dashboard.billing.getCurrentPlan.invalidate();
+      utils.dashboard.billing.getUsageStats.invalidate();
+    },
+    onError: (error) => {
+      toast.error('Failed to update subscription', {
+        description: error.message,
+      });
+    },
+  });
+
+  // Handle checkout for new subscriptions (free users or canceled users)
+  const handleCheckout = async (planTier: 'pro' | 'business') => {
     setCheckoutLoading(planTier);
     createCheckout.mutate({ planTier });
   };
 
-  const currentPlanTier = currentPlan?.plan_tier?.toLowerCase() || 'free';
+  // Handle plan change for existing subscribers
+  const handlePlanChange = (targetTier: PlanTier) => {
+    // If user doesn't have a Polar subscription, use checkout flow
+    if (!currentPlan?.polar_subscription_id || currentPlan?.status === 'canceled') {
+      if (targetTier !== 'free') {
+        handleCheckout(targetTier as 'pro' | 'business');
+      }
+      return;
+    }
+
+    // Open confirmation dialog for in-app plan change
+    setPlanChangeDialog({ open: true, targetPlan: targetTier });
+  };
+
+  // Confirm plan change
+  const handleConfirmPlanChange = () => {
+    if (planChangeDialog.targetPlan) {
+      updateSubscription.mutate({ targetPlanTier: planChangeDialog.targetPlan });
+    }
+  };
+
+  const currentPlanTier = (currentPlan?.plan_tier?.toLowerCase() || 'free') as PlanTier;
+  const hasActiveSubscription = currentPlan?.polar_subscription_id && currentPlan?.status === 'active';
+  const isCanceled = currentPlan?.status === 'canceled' || currentPlan?.cancel_at_period_end;
 
   return (
     <>
@@ -120,19 +176,42 @@ export default function PricingPage() {
 
         <div className="grid md:grid-cols-3 gap-6 mt-8">
           {pricingTiers.map((tier) => {
-            const tierName = tier.name.toLowerCase();
+            const tierName = tier.name.toLowerCase() as PlanTier;
             const isCurrentPlan = tierName === currentPlanTier;
             const isLoading = checkoutLoading === tierName;
+            const isUpgrading = checkIsUpgrade(currentPlanTier, tierName);
 
-            // Determine button text and state
+            // Determine button text and state based on current plan and subscription status
             let buttonText = tier.buttonText;
             let buttonDisabled = false;
+            let buttonVariant: 'default' | 'outline' | 'destructive' = tier.buttonVariant;
 
             if (isCurrentPlan) {
               buttonText = 'Current Plan';
               buttonDisabled = true;
+              buttonVariant = 'outline';
             } else if (tierName === 'free') {
-              buttonDisabled = true;
+              // Can only downgrade to free if on a paid plan with active subscription
+              if (hasActiveSubscription && currentPlanTier !== 'free') {
+                buttonText = 'Downgrade to Free';
+                buttonVariant = 'outline';
+              } else {
+                buttonDisabled = true;
+                buttonText = 'Free Plan';
+              }
+            } else if (isCanceled) {
+              // Canceled users need to resubscribe
+              buttonText = `Subscribe to ${tier.name}`;
+            } else if (!hasActiveSubscription) {
+              // Free users upgrading
+              buttonText = `Upgrade to ${tier.name}`;
+            } else if (isUpgrading) {
+              // Active subscribers upgrading
+              buttonText = `Upgrade to ${tier.name}`;
+            } else {
+              // Active subscribers downgrading
+              buttonText = `Downgrade to ${tier.name}`;
+              buttonVariant = 'outline';
             }
 
             return (
@@ -198,14 +277,10 @@ export default function PricingPage() {
                 <CardFooter>
                   <Button
                     className="w-full"
-                    variant={isCurrentPlan ? 'outline' : tier.buttonVariant}
+                    variant={buttonVariant}
                     size="lg"
                     disabled={buttonDisabled || isLoading || planLoading}
-                    onClick={() => {
-                      if (tierName === 'pro' || tierName === 'business') {
-                        handleUpgrade(tierName as 'pro' | 'business');
-                      }
-                    }}
+                    onClick={() => handlePlanChange(tierName)}
                   >
                     {isLoading ? (
                       <>
@@ -240,6 +315,34 @@ export default function PricingPage() {
           </Card>
         </div>
       </div>
+
+      {/* Plan Change Confirmation Dialog */}
+      {planChangeDialog.targetPlan && (
+        <PlanChangeConfirmDialog
+          open={planChangeDialog.open}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPlanChangeDialog({ open: false, targetPlan: null });
+            }
+          }}
+          currentPlan={{
+            tier: currentPlanTier,
+            name: PLAN_CONFIG[currentPlanTier].name,
+          }}
+          targetPlan={{
+            tier: planChangeDialog.targetPlan,
+            name: PLAN_CONFIG[planChangeDialog.targetPlan].name,
+          }}
+          isUpgrade={upgradePreview?.isUpgrade ?? checkIsUpgrade(currentPlanTier, planChangeDialog.targetPlan)}
+          proratedAmountFormatted={upgradePreview?.proratedAmountFormatted ?? '$0.00'}
+          newMonthlyPriceFormatted={upgradePreview?.newMonthlyPriceFormatted ?? PLAN_CONFIG[planChangeDialog.targetPlan].priceMonthly === 0 ? '$0.00' : `$${(PLAN_CONFIG[planChangeDialog.targetPlan].priceMonthly / 100).toFixed(2)}`}
+          currentPeriodEnd={currentPlan?.current_period_end ?? null}
+          featuresGaining={upgradePreview?.featuresGaining ?? []}
+          featuresLosing={upgradePreview?.featuresLosing ?? []}
+          onConfirm={handleConfirmPlanChange}
+          isLoading={updateSubscription.isPending || previewLoading}
+        />
+      )}
     </DashboardLayout>
     </>
   );
