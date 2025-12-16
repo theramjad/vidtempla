@@ -161,14 +161,14 @@ export default function PricingPage() {
       </Head>
       <DashboardLayout>
         <div className="container mx-auto py-6 space-y-6">
-        <div className="text-center">
+        <div className="text-center mb-12">
           <h1 className="text-3xl font-bold tracking-tight">Pricing Plans</h1>
           <p className="text-muted-foreground mt-2">
             Choose the plan that best fits your needs
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6 mt-8">
+        <div className="grid md:grid-cols-3 gap-6">
           {pricingTiers.map((tier) => {
             const tierName = tier.name.toLowerCase() as PlanTier;
             const isCurrentPlan = tierName === currentPlanTier;
