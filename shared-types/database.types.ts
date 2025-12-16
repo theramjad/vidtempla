@@ -99,53 +99,6 @@ export type Database = {
           },
         ]
       }
-      orders: {
-        Row: {
-          amount: number
-          created_at: string
-          currency: string
-          id: string
-          metadata: Json | null
-          status: string
-          stripe_customer_id: string | null
-          stripe_invoice_id: string
-          subscription_id: string | null
-          user_id: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          currency?: string
-          id?: string
-          metadata?: Json | null
-          status: string
-          stripe_customer_id?: string | null
-          stripe_invoice_id: string
-          subscription_id?: string | null
-          user_id: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          currency?: string
-          id?: string
-          metadata?: Json | null
-          status?: string
-          stripe_customer_id?: string | null
-          stripe_invoice_id?: string
-          subscription_id?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "orders_subscription_id_fkey"
-            columns: ["subscription_id"]
-            isOneToOne: false
-            referencedRelation: "subscriptions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       subscriptions: {
         Row: {
           cancel_at_period_end: boolean | null

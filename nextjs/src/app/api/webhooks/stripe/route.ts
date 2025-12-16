@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         break;
 
       case "invoice.paid":
-        await handleInvoicePaid(event.data.object as StripeInvoiceWithSubscription);
+        console.log(`Invoice paid: ${(event.data.object as StripeInvoiceWithSubscription).id}`);
         break;
 
       case "invoice.payment_failed":
@@ -208,40 +208,6 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log(`Subscription ${subscription.id} deleted and reverted to free`);
 }
 
-/**
- * Handle invoice.paid event
- */
-async function handleInvoicePaid(invoice: StripeInvoiceWithSubscription) {
-  console.log(`Processing invoice.paid: ${invoice.id}`);
-
-  const customerId = invoice.customer as string;
-  const subscriptionId = invoice.subscription as string;
-
-  // Find user by stripe_customer_id
-  const { data: subscription } = await supabaseServer
-    .from("subscriptions")
-    .select("user_id, id")
-    .eq("stripe_customer_id", customerId)
-    .single();
-
-  if (!subscription) {
-    console.warn(`No subscription found for customer: ${customerId}`);
-    return;
-  }
-
-  // Create or update order record
-  await supabaseServer.from("orders").upsert({
-    user_id: subscription.user_id,
-    stripe_invoice_id: invoice.id,
-    stripe_customer_id: customerId,
-    amount: invoice.amount_paid,
-    currency: invoice.currency.toUpperCase(),
-    status: "paid",
-    subscription_id: subscription.id,
-  });
-
-  console.log(`Invoice ${invoice.id} marked as paid for user ${subscription.user_id}`);
-}
 
 /**
  * Handle invoice.payment_failed event

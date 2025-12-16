@@ -251,26 +251,6 @@ export const billingRouter = router({
     };
   }),
 
-  /**
-   * Get payment history (invoices)
-   */
-  getOrders: protectedProcedure.query(async ({ ctx }) => {
-    const { data: orders, error } = await supabaseServer
-      .from("orders")
-      .select("*")
-      .eq("user_id", ctx.user.id)
-      .order("created_at", { ascending: false })
-      .limit(10);
-
-    if (error) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: error.message,
-      });
-    }
-
-    return orders;
-  }),
 
   /**
    * Get upgrade preview with prorated amount calculation

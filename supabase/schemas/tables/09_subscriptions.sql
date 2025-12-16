@@ -52,44 +52,6 @@ CREATE TRIGGER update_subscriptions_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION public.update_subscriptions_updated_at();
 
--- Orders table for payment history
-CREATE TABLE IF NOT EXISTS public.orders (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    polar_order_id TEXT UNIQUE NOT NULL,
-    polar_customer_id TEXT,
-    amount INTEGER NOT NULL, -- Amount in cents
-    currency TEXT NOT NULL DEFAULT 'USD',
-    status TEXT NOT NULL CHECK (status IN ('pending', 'paid', 'refunded', 'failed')),
-    subscription_id UUID REFERENCES public.subscriptions(id) ON DELETE SET NULL,
-    metadata JSONB DEFAULT '{}'::jsonb,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- Create index on user_id for fast lookups
-CREATE INDEX IF NOT EXISTS idx_orders_user_id ON public.orders(user_id);
-
--- Create index on polar_order_id for webhook lookups
-CREATE INDEX IF NOT EXISTS idx_orders_polar_order_id ON public.orders(polar_order_id);
-
--- Create index on subscription_id
-CREATE INDEX IF NOT EXISTS idx_orders_subscription_id ON public.orders(subscription_id);
-
--- Enable RLS
-ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
-
--- Policy: Users can view their own orders
-CREATE POLICY "Users can view their own orders"
-    ON public.orders
-    FOR SELECT
-    USING (auth.uid() = user_id);
-
--- Policy: Service role can manage all orders
-CREATE POLICY "Service role can manage all orders"
-    ON public.orders
-    FOR ALL
-    USING (auth.role() = 'service_role');
-
 -- Webhook events table for idempotency
 CREATE TABLE IF NOT EXISTS public.webhook_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

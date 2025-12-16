@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/utils/supabase/component';
-import { Loader2, ExternalLink, CreditCard } from 'lucide-react';
+import { Loader2, ExternalLink } from 'lucide-react';
 import { api } from '@/utils/api';
 import { toast } from 'sonner';
 import { useRouter } from 'next/router';
@@ -31,9 +31,6 @@ export default function SettingsPage() {
   const { data: usageStats, isLoading: usageLoading } =
     api.dashboard.billing.getUsageStats.useQuery();
 
-  // Fetch recent orders
-  const { data: orders, isLoading: ordersLoading } =
-    api.dashboard.billing.getOrders.useQuery();
 
   // Get customer portal URL
   const getPortalUrl = api.dashboard.billing.getCustomerPortalUrl.useQuery(
@@ -92,12 +89,6 @@ export default function SettingsPage() {
     });
   };
 
-  const formatCurrency = (cents: number, currency: string = 'USD') => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(cents / 100);
-  };
 
   return (
     <>
@@ -247,53 +238,6 @@ export default function SettingsPage() {
             </CardFooter>
           </Card>
 
-          {/* Payment History */}
-          {orders && orders.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Payment History
-                </CardTitle>
-                <CardDescription>
-                  Your recent transactions and invoices
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {ordersLoading ? (
-                  <div className="flex items-center gap-2 p-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm text-muted-foreground">Loading orders...</span>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {orders.map((order) => (
-                      <div
-                        key={order.id}
-                        className="flex items-center justify-between py-3 border-b last:border-0"
-                      >
-                        <div>
-                          <p className="text-sm font-medium">
-                            {formatCurrency(order.amount, order.currency)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDate(order.created_at)}
-                          </p>
-                        </div>
-                        <span className={`px-2 py-1 rounded text-xs font-medium capitalize ${
-                          order.status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
-                          order.status === 'refunded' ? 'bg-red-100 text-red-700' :
-                          'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {order.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
     </DashboardLayout>
