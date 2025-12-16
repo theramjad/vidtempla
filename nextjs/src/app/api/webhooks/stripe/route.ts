@@ -175,17 +175,33 @@ async function handleSubscriptionUpdate(subscription: StripeSubscriptionWithPeri
     return;
   }
 
+  // Build update object with required fields
+  const updateData: {
+    stripe_subscription_id: string;
+    plan_tier: PlanTier;
+    status: SubscriptionStatus;
+    cancel_at_period_end: boolean;
+    current_period_start?: string;
+    current_period_end?: string;
+  } = {
+    stripe_subscription_id: subscription.id,
+    plan_tier: planTier,
+    status: status,
+    cancel_at_period_end: subscription.cancel_at_period_end,
+  };
+
+  // Only add period dates if they exist and are valid
+  if (subscription.current_period_start && typeof subscription.current_period_start === 'number') {
+    updateData.current_period_start = new Date(subscription.current_period_start * 1000).toISOString();
+  }
+  if (subscription.current_period_end && typeof subscription.current_period_end === 'number') {
+    updateData.current_period_end = new Date(subscription.current_period_end * 1000).toISOString();
+  }
+
   // Update subscription
   await supabaseServer
     .from("subscriptions")
-    .update({
-      stripe_subscription_id: subscription.id,
-      plan_tier: planTier,
-      status: status,
-      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-      cancel_at_period_end: subscription.cancel_at_period_end,
-    })
+    .update(updateData)
     .eq("id", existingSubscription.id);
 
   console.log(`Updated subscription ${existingSubscription.id} to ${planTier} (${status})`);
