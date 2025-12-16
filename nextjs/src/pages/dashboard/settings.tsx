@@ -225,7 +225,7 @@ export default function SettingsPage() {
                   View All Plans
                 </Button>
               </Link>
-              {currentPlan?.plan_tier !== 'free' && currentPlan?.polar_customer_id && (
+              {currentPlan?.plan_tier !== 'free' && currentPlan?.stripe_customer_id && (
                 <Button
                   onClick={handleManageSubscription}
                   disabled={portalLoading}

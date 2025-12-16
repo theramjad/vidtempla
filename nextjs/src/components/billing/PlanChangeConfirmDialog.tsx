@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, ArrowUp, ArrowDown, Check, X, Loader2 } from 'lucide-react';
-import type { PlanTier } from '@/lib/polar';
+import type { PlanTier } from '@/lib/stripe';
 
 interface PlanChangeConfirmDialogProps {
   open: boolean;

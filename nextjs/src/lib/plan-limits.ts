@@ -4,7 +4,7 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { PLAN_CONFIG, type PlanTier } from "./polar";
+import { PLAN_CONFIG, type PlanTier } from "./stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@shared-types/database.types";
 

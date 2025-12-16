@@ -106,9 +106,9 @@ export type Database = {
           currency: string
           id: string
           metadata: Json | null
-          polar_customer_id: string | null
-          polar_order_id: string
           status: string
+          stripe_customer_id: string | null
+          stripe_invoice_id: string
           subscription_id: string | null
           user_id: string
         }
@@ -118,9 +118,9 @@ export type Database = {
           currency?: string
           id?: string
           metadata?: Json | null
-          polar_customer_id?: string | null
-          polar_order_id: string
           status: string
+          stripe_customer_id?: string | null
+          stripe_invoice_id: string
           subscription_id?: string | null
           user_id: string
         }
@@ -130,9 +130,9 @@ export type Database = {
           currency?: string
           id?: string
           metadata?: Json | null
-          polar_customer_id?: string | null
-          polar_order_id?: string
           status?: string
+          stripe_customer_id?: string | null
+          stripe_invoice_id?: string
           subscription_id?: string | null
           user_id?: string
         }
@@ -154,9 +154,10 @@ export type Database = {
           current_period_start: string | null
           id: string
           plan_tier: string
-          polar_customer_id: string | null
-          polar_subscription_id: string | null
           status: string
+          stripe_checkout_session_id: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           updated_at: string
           user_id: string
         }
@@ -167,9 +168,10 @@ export type Database = {
           current_period_start?: string | null
           id?: string
           plan_tier?: string
-          polar_customer_id?: string | null
-          polar_subscription_id?: string | null
           status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -180,9 +182,10 @@ export type Database = {
           current_period_start?: string | null
           id?: string
           plan_tier?: string
-          polar_customer_id?: string | null
-          polar_subscription_id?: string | null
           status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
           user_id?: string
         }

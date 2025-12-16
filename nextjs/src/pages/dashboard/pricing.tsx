@@ -13,7 +13,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { toast } from 'sonner';
 import PlanChangeConfirmDialog from '@/components/billing/PlanChangeConfirmDialog';
-import { type PlanTier, isUpgrade as checkIsUpgrade, PLAN_CONFIG } from '@/lib/polar';
+import { type PlanTier, isUpgrade as checkIsUpgrade, PLAN_CONFIG } from '@/lib/stripe';
 
 const pricingTiers = [
   {
@@ -96,7 +96,7 @@ export default function PricingPage() {
   // Create checkout session mutation (for free users or resubscribing)
   const createCheckout = api.dashboard.billing.createCheckoutSession.useMutation({
     onSuccess: (data) => {
-      // Redirect to Polar checkout
+      // Redirect to Stripe checkout
       window.location.href = data.checkoutUrl;
     },
     onError: (error) => {
@@ -131,8 +131,8 @@ export default function PricingPage() {
 
   // Handle plan change for existing subscribers
   const handlePlanChange = (targetTier: PlanTier) => {
-    // If user doesn't have a Polar subscription, use checkout flow
-    if (!currentPlan?.polar_subscription_id || currentPlan?.status === 'canceled') {
+    // If user doesn't have a Stripe subscription, use checkout flow
+    if (!currentPlan?.stripe_subscription_id || currentPlan?.status === 'canceled') {
       if (targetTier !== 'free') {
         handleCheckout(targetTier as 'pro' | 'business');
       }
@@ -151,7 +151,7 @@ export default function PricingPage() {
   };
 
   const currentPlanTier = (currentPlan?.plan_tier?.toLowerCase() || 'free') as PlanTier;
-  const hasActiveSubscription = currentPlan?.polar_subscription_id && currentPlan?.status === 'active';
+  const hasActiveSubscription = currentPlan?.stripe_subscription_id && currentPlan?.status === 'active';
   const isCanceled = currentPlan?.status === 'canceled' || currentPlan?.cancel_at_period_end;
 
   return (

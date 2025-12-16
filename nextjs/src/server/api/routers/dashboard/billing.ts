@@ -6,7 +6,7 @@
 import { z } from "zod";
 import { protectedProcedure } from "@/server/trpc/init";
 import { TRPCError } from "@trpc/server";
-import { polar } from "@/lib/polar-server";
+import { stripe } from "@/lib/stripe-server";
 import {
   PLAN_CONFIG,
   type PlanTier,
@@ -14,7 +14,7 @@ import {
   isUpgrade,
   getFeatureDifference,
   formatCents,
-} from "@/lib/polar";
+} from "@/lib/stripe";
 import { supabaseServer } from "@/lib/clients/supabase";
 import { router } from "@/server/trpc/init";
 
@@ -77,45 +77,48 @@ export const billingRouter = router({
       try {
         // Get plan configuration
         const planConfig = PLAN_CONFIG[input.planTier];
-        if (!planConfig.productId) {
+        if (!planConfig.priceId) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Invalid plan tier or product ID not configured",
+            message: "Invalid plan tier or price ID not configured",
           });
         }
 
-        // Get or create subscription record to store polar_customer_id
+        // Get or create subscription record
         const { data: subscription } = await supabaseServer
           .from("subscriptions")
           .select("*")
           .eq("user_id", ctx.user.id)
           .single();
 
-        // Create checkout session with Polar
-        const checkoutSession = await polar.checkouts.create({
-          products: [planConfig.productId],
-          successUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/settings?checkout=success`,
-          customerEmail: ctx.user.email,
-          externalCustomerId: ctx.user.id,
+        // Create Stripe Checkout session
+        const session = await stripe.checkout.sessions.create({
+          mode: "subscription",
+          payment_method_types: ["card"],
+          line_items: [
+            {
+              price: planConfig.priceId,
+              quantity: 1,
+            },
+          ],
+          success_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/settings?checkout=success`,
+          cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/pricing`,
+          customer_email: ctx.user.email,
           metadata: {
             userId: ctx.user.id,
             planTier: input.planTier,
           },
+          subscription_data: {
+            metadata: {
+              userId: ctx.user.id,
+              planTier: input.planTier,
+            },
+          },
         });
 
-        // If we have a customer ID from the checkout, update our subscription record
-        if (checkoutSession.customerId && subscription) {
-          await supabaseServer
-            .from("subscriptions")
-            .update({
-              polar_customer_id: checkoutSession.customerId,
-            })
-            .eq("id", subscription.id);
-        }
-
         return {
-          checkoutUrl: checkoutSession.url,
-          checkoutId: checkoutSession.id,
+          checkoutUrl: session.url!,
+          checkoutId: session.id,
         };
       } catch (error) {
         console.error("Checkout session creation error:", error);
@@ -136,24 +139,25 @@ export const billingRouter = router({
     try {
       const { data: subscription } = await supabaseServer
         .from("subscriptions")
-        .select("polar_customer_id")
+        .select("stripe_customer_id")
         .eq("user_id", ctx.user.id)
         .single();
 
-      if (!subscription?.polar_customer_id) {
+      if (!subscription?.stripe_customer_id) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "No active subscription found",
         });
       }
 
-      // Generate customer portal session
-      const portalSession = await polar.customerSessions.create({
-        customerId: subscription.polar_customer_id,
+      // Create Stripe Customer Portal session
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: subscription.stripe_customer_id,
+        return_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/settings`,
       });
 
       return {
-        portalUrl: portalSession.customerPortalUrl,
+        portalUrl: portalSession.url,
       };
     } catch (error) {
       console.error("Customer portal URL error:", error);
@@ -224,7 +228,7 @@ export const billingRouter = router({
   }),
 
   /**
-   * Get payment history (orders)
+   * Get payment history (invoices)
    */
   getOrders: protectedProcedure.query(async ({ ctx }) => {
     const { data: orders, error } = await supabaseServer
@@ -336,8 +340,8 @@ export const billingRouter = router({
         });
       }
 
-      // Check if subscription has a Polar subscription ID
-      if (!subscription.polar_subscription_id) {
+      // Check if subscription has a Stripe subscription ID
+      if (!subscription.stripe_subscription_id) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message: "No active paid subscription found. Please subscribe first.",
@@ -368,11 +372,8 @@ export const billingRouter = router({
       try {
         // Handle downgrade to free (cancel subscription)
         if (targetTier === "free") {
-          await polar.subscriptions.update({
-            id: subscription.polar_subscription_id,
-            subscriptionUpdate: {
-              cancelAtPeriodEnd: true,
-            },
+          await stripe.subscriptions.update(subscription.stripe_subscription_id, {
+            cancel_at_period_end: true,
           });
 
           // Update local subscription to reflect pending cancellation
@@ -391,28 +392,41 @@ export const billingRouter = router({
           };
         }
 
-        // Get target product ID
+        // Get target price ID
         const targetConfig = PLAN_CONFIG[targetTier];
-        if (!targetConfig.productId) {
+        if (!targetConfig.priceId) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: "Target plan product ID not configured",
+            message: "Target plan price ID not configured",
           });
         }
 
-        // Update subscription with Polar
-        await polar.subscriptions.update({
-          id: subscription.polar_subscription_id,
-          subscriptionUpdate: {
-            productId: targetConfig.productId,
-            // Use "invoice" for upgrades (charge immediately)
-            // Use "prorate" for downgrades (credit on next invoice)
-            prorationBehavior: isUpgrading ? "invoice" : "prorate",
-          },
+        // Get current subscription from Stripe
+        const stripeSubscription = await stripe.subscriptions.retrieve(
+          subscription.stripe_subscription_id
+        );
+
+        // Update subscription with Stripe
+        await stripe.subscriptions.update(subscription.stripe_subscription_id, {
+          items: [
+            {
+              id: stripeSubscription.items.data[0].id,
+              price: targetConfig.priceId,
+            },
+          ],
+          // Proration behavior:
+          // - For upgrades: charge immediately (create_prorations + always_invoice)
+          // - For downgrades: apply credit at next invoice (create_prorations)
+          proration_behavior: "create_prorations",
+          billing_cycle_anchor: isUpgrading ? "now" : "unchanged",
+          ...(isUpgrading && {
+            // For upgrades, invoice immediately
+            payment_behavior: "default_incomplete",
+          }),
         });
 
         // Note: The actual plan tier update will happen via webhook
-        // when Polar sends subscription.updated event
+        // when Stripe sends subscription.updated event
 
         if (isUpgrading) {
           return {
@@ -432,11 +446,11 @@ export const billingRouter = router({
       } catch (error) {
         console.error("Subscription update error:", error);
 
-        // Handle specific Polar errors
+        // Handle specific Stripe errors
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
 
-        if (errorMessage.includes("subscription_locked")) {
+        if (errorMessage.includes("locked")) {
           throw new TRPCError({
             code: "CONFLICT",
             message:

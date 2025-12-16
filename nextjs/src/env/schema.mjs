@@ -27,11 +27,11 @@ export const serverSchema = z.object({
   INNGEST_EVENT_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
 
-  // Polar
-  POLAR_ACCESS_TOKEN: z.string(),
-  POLAR_WEBHOOK_SECRET: z.string(),
-  POLAR_PRO_PRODUCT_ID: z.string(),
-  POLAR_BUSINESS_PRODUCT_ID: z.string(),
+  // Stripe
+  STRIPE_SECRET_KEY: z.string(),
+  STRIPE_WEBHOOK_SECRET: z.string(),
+  STRIPE_PRO_PRICE_ID: z.string(),
+  STRIPE_BUSINESS_PRICE_ID: z.string(),
 
   // AI
   OPENAI_API_KEY: z.string(),
@@ -64,11 +64,11 @@ export const serverEnv = {
   INNGEST_EVENT_KEY: process.env.INNGEST_EVENT_KEY,
   INNGEST_SIGNING_KEY: process.env.INNGEST_SIGNING_KEY,
 
-  // Polar
-  POLAR_ACCESS_TOKEN: process.env.POLAR_ACCESS_TOKEN,
-  POLAR_WEBHOOK_SECRET: process.env.POLAR_WEBHOOK_SECRET,
-  POLAR_PRO_PRODUCT_ID: process.env.POLAR_PRO_PRODUCT_ID,
-  POLAR_BUSINESS_PRODUCT_ID: process.env.POLAR_BUSINESS_PRODUCT_ID,
+  // Stripe
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+  STRIPE_PRO_PRICE_ID: process.env.STRIPE_PRO_PRICE_ID,
+  STRIPE_BUSINESS_PRICE_ID: process.env.STRIPE_BUSINESS_PRICE_ID,
 
   // AI
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
@@ -87,8 +87,8 @@ export const clientSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string(),
 
-  // Polar
-  NEXT_PUBLIC_POLAR_ORGANIZATION_ID: z.string(),
+  // Stripe
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string(),
 
   // PostHog
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
@@ -108,8 +108,8 @@ export const clientEnv = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
 
-  // Polar
-  NEXT_PUBLIC_POLAR_ORGANIZATION_ID: process.env.NEXT_PUBLIC_POLAR_ORGANIZATION_ID,
+  // Stripe
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
 
   // PostHog
   NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
