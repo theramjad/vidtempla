@@ -406,11 +406,19 @@ export const billingRouter = router({
           subscription.stripe_subscription_id
         );
 
+        const firstItem = stripeSubscription.items.data[0];
+        if (!firstItem) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Subscription has no items",
+          });
+        }
+
         // Update subscription with Stripe
         await stripe.subscriptions.update(subscription.stripe_subscription_id, {
           items: [
             {
-              id: stripeSubscription.items.data[0].id,
+              id: firstItem.id,
               price: targetConfig.priceId,
             },
           ],

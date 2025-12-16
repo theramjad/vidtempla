@@ -6,6 +6,19 @@ import { mapPriceIdToPlanTier } from "@/lib/stripe";
 import Stripe from "stripe";
 
 /**
+ * Extended Stripe types with properties that exist in the API but may not be in type definitions
+ */
+interface StripeSubscriptionWithPeriods extends Stripe.Subscription {
+  current_period_start: number;
+  current_period_end: number;
+  cancel_at_period_end: boolean;
+}
+
+interface StripeInvoiceWithSubscription extends Stripe.Invoice {
+  subscription: string | Stripe.Subscription | null;
+}
+
+/**
  * Stripe webhook handler
  * Handles subscription lifecycle events from Stripe
  */
@@ -56,7 +69,7 @@ export async function POST(request: NextRequest) {
 
       case "customer.subscription.created":
       case "customer.subscription.updated":
-        await handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
+        await handleSubscriptionUpdate(event.data.object as StripeSubscriptionWithPeriods);
         break;
 
       case "customer.subscription.deleted":
@@ -64,11 +77,11 @@ export async function POST(request: NextRequest) {
         break;
 
       case "invoice.paid":
-        await handleInvoicePaid(event.data.object as Stripe.Invoice);
+        await handleInvoicePaid(event.data.object as StripeInvoiceWithSubscription);
         break;
 
       case "invoice.payment_failed":
-        await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
+        await handleInvoicePaymentFailed(event.data.object as StripeInvoiceWithSubscription);
         break;
 
       default:
@@ -128,14 +141,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // Fetch and process the subscription details
   if (subscriptionId) {
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    await handleSubscriptionUpdate(subscription);
+    await handleSubscriptionUpdate(subscription as unknown as StripeSubscriptionWithPeriods);
   }
 }
 
 /**
  * Handle subscription created/updated events
  */
-async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
+async function handleSubscriptionUpdate(subscription: StripeSubscriptionWithPeriods) {
   console.log(`Processing subscription update: ${subscription.id}`);
 
   const customerId = subscription.customer as string;
@@ -198,7 +211,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 /**
  * Handle invoice.paid event
  */
-async function handleInvoicePaid(invoice: Stripe.Invoice) {
+async function handleInvoicePaid(invoice: StripeInvoiceWithSubscription) {
   console.log(`Processing invoice.paid: ${invoice.id}`);
 
   const customerId = invoice.customer as string;
@@ -233,7 +246,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 /**
  * Handle invoice.payment_failed event
  */
-async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
+async function handleInvoicePaymentFailed(invoice: StripeInvoiceWithSubscription) {
   console.log(`Processing invoice.payment_failed: ${invoice.id}`);
 
   const subscriptionId = invoice.subscription as string;
