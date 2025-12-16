@@ -166,12 +166,6 @@ export default function PricingPage() {
           <p className="text-muted-foreground mt-2">
             Choose the plan that best fits your needs
           </p>
-          {!planLoading && currentPlan && (
-            <p className="text-sm text-muted-foreground mt-1">
-              Current plan:{' '}
-              <span className="font-medium capitalize">{currentPlanTier}</span>
-            </p>
-          )}
         </div>
 
         <div className="grid md:grid-cols-3 gap-6 mt-8">
@@ -297,23 +291,6 @@ export default function PricingPage() {
           })}
         </div>
 
-        <div className="mt-12 text-center">
-          <Card className="max-w-2xl mx-auto">
-            <CardHeader>
-              <CardTitle>Need a Custom Plan?</CardTitle>
-              <CardDescription>
-                Contact us for enterprise solutions and custom pricing
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                For organizations with specific needs, we offer custom plans with tailored features,
-                dedicated support, and flexible pricing.
-              </p>
-              <Button variant="outline">Contact Sales</Button>
-            </CardContent>
-          </Card>
-        </div>
       </div>
 
       {/* Plan Change Confirmation Dialog */}
