@@ -85,11 +85,34 @@ export const billingRouter = router({
         }
 
         // Get or create subscription record
-        const { data: subscription } = await supabaseServer
+        let { data: subscription } = await supabaseServer
           .from("subscriptions")
           .select("*")
           .eq("user_id", ctx.user.id)
           .single();
+
+        // Create subscription record if it doesn't exist
+        if (!subscription) {
+          const { data: newSubscription, error: insertError } = await supabaseServer
+            .from("subscriptions")
+            .insert({
+              user_id: ctx.user.id,
+              plan_tier: "free",
+              status: "active",
+            })
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error("Error creating subscription record:", insertError);
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Failed to create subscription record",
+            });
+          }
+
+          subscription = newSubscription;
+        }
 
         // Create Stripe Checkout session
         const session = await stripe.checkout.sessions.create({
