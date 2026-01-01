@@ -90,7 +90,7 @@ export const useAuthStore = create<AuthState>()(
       // Only persist user data, not initialization state
       partialize: (state) => ({
         user: state.user,
-        session: state.session,
+        // Don't persist session - let Supabase be the source of truth for tokens
       }),
     }
   )

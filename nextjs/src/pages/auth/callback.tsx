@@ -51,7 +51,7 @@ export default function AuthCallback() {
           });
           // Check if there's a returnTo query parameter
           const returnTo = router.query.returnTo as string;
-          if (returnTo) {
+          if (returnTo && returnTo.startsWith('/')) {
             router.push(decodeURIComponent(returnTo));
           } else {
             router.push("/dashboard/youtube");

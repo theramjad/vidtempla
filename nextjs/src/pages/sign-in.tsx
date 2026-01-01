@@ -54,7 +54,7 @@ export default function Page() {
   useEffect(() => {
     if (user && !userLoading && !justSignedIn) {
       const returnTo = router.query.returnTo as string;
-      if (returnTo) {
+      if (returnTo && returnTo.startsWith('/')) {
         router.push(decodeURIComponent(returnTo));
       } else {
         toast({
@@ -191,7 +191,7 @@ export default function Page() {
 
         // Redirect to the return URL or dashboard
         const returnTo = router.query.returnTo as string;
-        if (returnTo) {
+        if (returnTo && returnTo.startsWith('/')) {
           router.push(decodeURIComponent(returnTo));
         } else {
           router.push("/dashboard/youtube");
