@@ -14,7 +14,11 @@
       "Bash(npm run build:*)",
       "Bash(npm view:*)",
       "WebSearch",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "WebFetch(domain:developers.google.com)",
+      "mcp__exa__web_search_exa",
+      "WebFetch(domain:www.better-auth.com)",
+      "WebFetch(domain:planetscale.com)"
     ],
     "deny": [],
     "ask": []
