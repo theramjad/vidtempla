@@ -1,14 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { getSessionCookie } from "better-auth/cookies";
 
 export async function middleware(request: NextRequest) {
   // Check authentication for dashboard routes
   if (request.nextUrl.pathname.startsWith("/dashboard")) {
-    // Better Auth uses __Secure- prefix on HTTPS (production)
-    const sessionToken =
-      request.cookies.get("better-auth.session_token") ||
-      request.cookies.get("__Secure-better-auth.session_token");
+    const sessionCookie = getSessionCookie(request);
 
-    if (!sessionToken) {
+    if (!sessionCookie) {
       const url = request.nextUrl.clone();
       url.pathname = "/sign-in";
       url.searchParams.set("returnTo", request.nextUrl.pathname);
