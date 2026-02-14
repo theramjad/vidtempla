@@ -8,8 +8,11 @@
  * Requires DATABASE_URL in .env.local for the target PlanetScale database.
  */
 
-import "dotenv/config";
+import { config } from "dotenv";
 import postgres from "postgres";
+
+// Load .env.local (Next.js convention)
+config({ path: ".env.local" });
 
 // ---------------------------------------------------------------------------
 // CLI args
@@ -331,22 +334,19 @@ async function migrateSubscriptions() {
     return;
   }
 
-  // Source has polar_* columns, target has stripe_* columns.
-  // Map polar → stripe equivalents; checkout_session_id has no source equivalent.
   const rows = await source.unsafe(`
-    SELECT id, user_id,
-           polar_subscription_id AS stripe_subscription_id,
-           polar_customer_id AS stripe_customer_id,
-           plan_tier, status,
+    SELECT id, user_id, stripe_subscription_id, stripe_customer_id,
+           stripe_checkout_session_id, plan_tier, status,
            current_period_start, current_period_end,
            cancel_at_period_end, created_at, updated_at
     FROM public.subscriptions
   `);
 
-  log(`Migrating ${rows.length} subscriptions (polar→stripe column mapping)…`);
+  log(`Migrating ${rows.length} subscriptions…`);
   await batchInsert(target, "subscriptions", [
     "id", "user_id", "stripe_subscription_id", "stripe_customer_id",
-    "plan_tier", "status", "current_period_start", "current_period_end",
+    "stripe_checkout_session_id", "plan_tier", "status",
+    "current_period_start", "current_period_end",
     "cancel_at_period_end", "created_at", "updated_at",
   ], rows as Record<string, unknown>[]);
 }
