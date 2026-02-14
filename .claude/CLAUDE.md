@@ -1,7 +1,7 @@
-# Admin Dashboard Template - Claude Code Rules
+# VidTempla - Claude Code Rules
 
 ## Project Overview
-This is an admin dashboard template built with Next.js 15, TypeScript, Supabase, and tRPC. It provides a complete foundation for building admin interfaces. The user will be building upon this template.
+VidTempla is a YouTube description management tool built with Next.js 15, TypeScript, PlanetScale Postgres, Drizzle ORM, Better Auth, and tRPC.
 
 ## Git Commit
 Git commit anytime you make a big change, and for big changes, also split up into smaller logical commits as well. You should do this automatically without asking me for permission every single time. Your commits should be detailed in a way that you understand, in case you need to look back at the Git commit history.
@@ -10,14 +10,15 @@ Git commit anytime you make a big change, and for big changes, also split up int
 - **Frontend**: Next.js 15, React 18, TypeScript
 - **Styling**: Tailwind CSS, Radix UI components
 - **Backend**: tRPC for type-safe APIs, Next.js API routes
-- **Database**: Supabase (PostgreSQL) with Row Level Security
-- **Authentication**: Supabase Auth with email-based admin controls
+- **Database**: PlanetScale Postgres with Drizzle ORM
+- **Authentication**: Better Auth (magic link + Google OAuth)
 - **Background Jobs**: Inngest for scheduled tasks
-- **Type Safety**: Full TypeScript with end-to-end type safety
+- **Payments**: Stripe
+- **Type Safety**: Full TypeScript with end-to-end type safety via Drizzle + tRPC
 
 ## Project Structure
 ```
-youtube-description-updater/
+vidtempla/
 ├── nextjs/                    # Main Next.js application
 │   ├── src/
 │   │   ├── components/        # React components
@@ -25,92 +26,53 @@ youtube-description-updater/
 │   │   │   ├── layout/       # Layout components
 │   │   │   └── [feature]/    # Feature-specific components
 │   │   ├── config/           # App configuration
-│   │   │   └── app.ts        # Main app config (includes admin emails)
+│   │   │   └── app.ts        # Main app config
+│   │   ├── db/               # Drizzle ORM
+│   │   │   ├── schema.ts     # Table definitions
+│   │   │   ├── relations.ts  # Drizzle relations
+│   │   │   └── index.ts      # DB client
+│   │   ├── lib/
+│   │   │   ├── auth.ts       # Better Auth server config
+│   │   │   └── auth-client.ts # Better Auth client
 │   │   ├── pages/            # Next.js pages
 │   │   │   ├── dashboard/    # Dashboard pages
 │   │   │   └── api/          # API routes
 │   │   ├── server/           # tRPC server and routers
 │   │   │   └── api/          # tRPC API definitions
-│   │   └── utils/            # Utility functions
+│   │   └── hooks/            # React hooks (useUser, etc.)
+│   ├── drizzle/              # Drizzle migrations
+│   ├── scripts/              # One-off scripts (data migration, etc.)
 │   ├── .env.example          # Environment variables template
 │   └── package.json
-├── shared-types/             # Shared TypeScript types
-│   └── database.types.ts     # Generated Supabase types
-└── supabase/                # Supabase configuration
-    ├── migrations/          # Database migration files
-    └── config.toml         # Supabase configuration
+└── tasks/                    # Migration plans and docs
 ```
 
 Always run npm run dev within the Next.js project.
 
-## Core Development Principles
+## Database Workflow (Drizzle ORM)
 
-## Database Migration Workflow
+### Schema Changes
+1. Edit `nextjs/src/db/schema.ts` to modify table definitions
+2. Generate migration: `npx drizzle-kit generate`
+3. Apply locally: `npx drizzle-kit push` (or `npx drizzle-kit migrate`)
+4. For custom SQL (triggers, functions): create manual SQL file in `nextjs/drizzle/`
 
-### 1. Making Schema Changes
-- Edit files in `supabase/schemas/` to define your database structure
-- Use numeric prefixes for dependency order: `01_users.sql`, `02_posts.sql`, etc.
-- Tables with foreign keys must come after their referenced tables
+### Remote Server
+NEVER apply migrations to the remote server. Prompt the user to do this manually.
 
-### 2. Generate Migration
-```bash
-supabase db diff -f <migration_name>
-```
-This compares your schema files with the current database and creates a migration.
-
-### 2a. Manual Migrations
-When you need to write migrations manually (e.g., dropping constraints, altering tables):
-1. Get the current timestamp:
-   ```bash
-   date +"%Y%m%d%H%M%S"
-   ```
-2. Create a new file in `apps/supabase/migrations/` named `<timestamp>_<meaningful_name>.sql`
-3. Write your SQL migration
-4. Apply with `cd apps/supabase && supabase migration up`
-
-### 2b. Functions: write migrations manually
-- For `FUNCTION` objects, always write migrations by hand rather than relying on `db diff`.
-- Reason: the Supabase CLI does not reliably detect function body changes and can produce unstable diffs; also we often need explicit `DROP FUNCTION IF EXISTS ...` before `CREATE OR REPLACE FUNCTION` to update signatures safely.
-- Steps:
-  1. Update the function source under `apps/supabase/schemas/functions/*.sql`.
-  2. Get the current timestamp for the migration filename:
-     ```bash
-     date +"%Y%m%d%H%M%S"
-     ```
-  3. Create a new file in `apps/supabase/migrations/` named `<timestamp>_<meaningful_name>.sql`.
-  4. In that file, include:
-     - `DROP FUNCTION IF EXISTS schema.fn_name;`
-     - A full `CREATE OR REPLACE FUNCTION ...` definition.
-  5. Commit both the schema file change and the new migration file together.
-  6. Apply locally with `supabase migration up` in the supabase folder.
-
-### 3. Apply the migration locally
-
-Run the following command in the supabase folder
-```bash
-supabase migration up
-```
-Applies pending migrations to your local Supabase database. **Note: Must be run from the `apps/supabase` directory.**
-
-### 4. Remote server
-
-NEVER apply migrations to the remote server. You will be severely punished if you do Prompt the user to do this manually. 
-
-### 5. Generate Types Using
-
-```base
-npx supabase gen types typescript --local > shared-types/database.types.ts
-```
+### Key Tables
+- **Better Auth**: `user`, `session`, `account`, `verification`
+- **App**: `youtube_channels`, `youtube_videos`, `containers`, `templates`, `video_variables`, `description_history`, `subscriptions`, `webhook_events`
 
 ### Authentication & Security
-- Admin access controlled by email addresses in `nextjs/src/config/app.ts`
-- Always verify admin permissions in tRPC procedures
-- Use Supabase RLS policies for additional security
+- Better Auth handles auth via `nextjs/src/lib/auth.ts` (server) and `nextjs/src/lib/auth-client.ts` (client)
+- User isolation enforced in tRPC procedures via WHERE clauses (no RLS)
+- Middleware checks `better-auth.session_token` cookie for protected routes
 - Never expose sensitive data in client-side code
 
 ### Type Safety
 - Use TypeScript for all code
-- Import database types from `shared-types/database.types.ts`
+- Schema types come from Drizzle (`nextjs/src/db/schema.ts`)
 - Use tRPC for end-to-end type safety
 - Avoid `any` type - use proper TypeScript types
 
@@ -126,14 +88,12 @@ npx supabase gen types typescript --local > shared-types/database.types.ts
 ### Adding New Dashboard Features
 1. Add navigation items to `src/config/app.ts`
 2. Create page components in `src/pages/dashboard/`
-3. Implement tRPC procedures with admin permission checks
+3. Implement tRPC procedures with auth checks
 4. Add UI components with proper error handling
-5. Test with both admin and non-admin users
 
 ### Environment Setup
 - Use `.env.example` as template for environment variables
 - Never commit `.env.local` to version control
-- Update admin emails in `nextjs/src/config/app.ts`
 - Ensure all required environment variables are set
 
 ## File Naming Conventions
@@ -143,23 +103,14 @@ npx supabase gen types typescript --local > shared-types/database.types.ts
 - Types: PascalCase (e.g., `types/Database.ts`)
 
 ## Key Configuration Files
-- `nextjs/src/config/app.ts` - Main app configuration including admin emails
+- `nextjs/src/db/schema.ts` - Drizzle schema (source of truth for DB types)
+- `nextjs/src/lib/auth.ts` - Better Auth server configuration
+- `nextjs/src/config/app.ts` - Main app configuration
 - `nextjs/.env.example` - Environment variables template
-- `supabase/config.toml` - Supabase configuration
+- `nextjs/drizzle.config.ts` - Drizzle Kit configuration
 - `tailwind.config.ts` - Tailwind CSS configuration
 
 ## Security Considerations
-- Admin access is email-based - update `adminEmails` array in config
-- Use Supabase RLS policies for database security
+- User isolation via tRPC WHERE clauses (no database-level RLS)
 - Validate all user inputs and API requests
 - Keep environment variables secure and documented
-
-## When Working on This Project
-1. Always start by understanding the current database schema
-2. Use migrations for any database changes
-3. Regenerate types after schema changes
-4. Follow the existing code patterns and conventions
-5. Test admin permissions thoroughly
-6. Update documentation when adding new features
-
-Remember: This is a production-ready template focused on security, type safety, and maintainability.
