@@ -1,23 +1,20 @@
 import { db, type Database } from "@/db";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
-import { createClient } from "@/utils/supabase/server";
+import { auth, type Session } from "@/lib/auth";
 
 export type Context = {
   db: Database;
-  supabase: SupabaseClient;
-  user: User | null;
+  user: Session["user"] | null;
 };
 
-export async function createContext(): Promise<Context> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function createContext({
+  req,
+}: {
+  req: Request;
+}): Promise<Context> {
+  const session = await auth.api.getSession({ headers: req.headers });
 
   return {
     db,
-    supabase,
-    user,
+    user: session?.user ?? null,
   };
 }
