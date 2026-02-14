@@ -20,8 +20,19 @@ export const serverSchema = z.object({
   // RapidAPI (optional)
   RAPID_API_KEY: z.string().optional(),
 
-  // Supabase
-  SUPABASE_SERVICE_ROLE_KEY: z.string(),
+  // Database
+  DATABASE_URL: z.string(),
+
+  // Better Auth
+  BETTER_AUTH_SECRET: z.string(),
+  BETTER_AUTH_URL: z.string().url().optional(),
+
+  // Resend
+  RESEND_API_KEY: z.string(),
+
+  // Google OAuth (for Better Auth)
+  GOOGLE_CLIENT_ID: z.string(),
+  GOOGLE_CLIENT_SECRET: z.string(),
 
   // Inngest (only required in production)
   INNGEST_EVENT_KEY: z.string().optional(),
@@ -57,8 +68,19 @@ export const serverEnv = {
   // RapidAPI
   RAPID_API_KEY: process.env.RAPID_API_KEY,
 
-  // Supabase
-  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  // Database
+  DATABASE_URL: process.env.DATABASE_URL,
+
+  // Better Auth
+  BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
+  BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
+
+  // Resend
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
+
+  // Google OAuth (for Better Auth)
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
 
   // Inngest
   INNGEST_EVENT_KEY: process.env.INNGEST_EVENT_KEY,
@@ -83,10 +105,6 @@ export const clientSchema = z.object({
   // App URL
   NEXT_PUBLIC_APP_URL: z.string().url(),
 
-  // Supabase
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string(),
-
   // Stripe
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string(),
 
@@ -103,10 +121,6 @@ export const clientSchema = z.object({
 export const clientEnv = {
   // App URL
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-
-  // Supabase
-  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
 
   // Stripe
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,

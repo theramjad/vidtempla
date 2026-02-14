@@ -66,7 +66,7 @@ export default function SettingsPage() {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | Date) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
@@ -139,7 +139,7 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between py-2">
                     <span className="font-medium">Current Plan</span>
                     <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium capitalize">
-                      {currentPlan?.plan_tier || 'Free'}
+                      {currentPlan?.planTier || 'Free'}
                     </span>
                   </div>
 
@@ -156,16 +156,16 @@ export default function SettingsPage() {
                     </div>
                   )}
 
-                  {currentPlan?.current_period_start && currentPlan?.current_period_end && (
+                  {currentPlan?.currentPeriodStart && currentPlan?.currentPeriodEnd && (
                     <div className="flex items-center justify-between py-2">
                       <span className="font-medium">Billing Period</span>
                       <span className="text-sm text-muted-foreground">
-                        {formatDate(currentPlan.current_period_start)} - {formatDate(currentPlan.current_period_end)}
+                        {formatDate(currentPlan.currentPeriodStart)} - {formatDate(currentPlan.currentPeriodEnd)}
                       </span>
                     </div>
                   )}
 
-                  {currentPlan?.cancel_at_period_end && (
+                  {currentPlan?.cancelAtPeriodEnd && (
                     <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                       <p className="text-sm text-yellow-800">
                         Your subscription will be canceled at the end of the current billing period.
@@ -201,7 +201,7 @@ export default function SettingsPage() {
                   View All Plans
                 </Button>
               </Link>
-              {currentPlan?.plan_tier !== 'free' && currentPlan?.stripe_customer_id && (
+              {currentPlan?.planTier !== 'free' && currentPlan?.stripeCustomerId && (
                 <Button
                   onClick={handleManageSubscription}
                   disabled={portalLoading}

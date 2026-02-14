@@ -61,9 +61,9 @@ export default function EditContainerModal({
   useEffect(() => {
     if (container) {
       setName(container.name);
-      setTemplateIds(container.template_order || []);
+      setTemplateIds(container.templateOrder || []);
       setSeparator(container.separator || '\n\n');
-      setOriginalTemplateIds(container.template_order || []);
+      setOriginalTemplateIds(container.templateOrder || []);
       setOriginalSeparator(container.separator || '\n\n');
     }
   }, [container]);

@@ -33,9 +33,6 @@ export const auth = betterAuth({
       },
     }),
   ],
-  advanced: {
-    generateId: false, // use database-level UUID generation
-  },
 });
 
 export type Session = typeof auth.$Infer.Session;

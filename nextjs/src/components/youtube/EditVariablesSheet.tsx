@@ -70,11 +70,11 @@ export default function EditVariablesSheet({
     if (variablesData?.variables) {
       const initialData: typeof formData = {};
       variablesData.variables.forEach((variable: VideoVariable) => {
-        const key = `${variable.template_id}-${variable.variable_name}`;
+        const key = `${variable.templateId}-${variable.variableName}`;
         initialData[key] = {
-          templateId: variable.template_id,
-          name: variable.variable_name,
-          value: variable.variable_value || '',
+          templateId: variable.templateId,
+          name: variable.variableName,
+          value: variable.variableValue || '',
           templateName: variable.template?.name || 'Unknown Template',
         };
       });
@@ -132,7 +132,7 @@ export default function EditVariablesSheet({
     }
 
     const container = variablesData.video.container;
-    if (!container.template_order || container.template_order.length === 0) {
+    if (!container.templateOrder || container.templateOrder.length === 0) {
       return '';
     }
 
@@ -147,7 +147,7 @@ export default function EditVariablesSheet({
       }
     });
 
-    const sortedTemplates = container.template_order
+    const sortedTemplates = container.templateOrder
       .map((id: string) => templateMap.get(id))
       .filter((t): t is { id: string; content: string } => t !== undefined);
 
@@ -166,7 +166,7 @@ export default function EditVariablesSheet({
       sortedTemplates,
       variablesMap,
       container.separator || '\n\n',
-      variablesData.video.video_id
+      variablesData.video.videoId
     );
   }, [variablesData, formData]);
 

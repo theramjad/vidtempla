@@ -12,23 +12,60 @@ import { decrypt, encrypt } from '@/utils/encryption';
 import { refreshAccessToken, updateVideoDescription } from '@/lib/clients/youtube';
 import { buildDescription } from '@/utils/templateParser';
 
+// Plain serializable types for data flowing through Inngest steps
+// (Inngest JSON-serializes step results, so we avoid Drizzle relation types)
+interface SerializedChannel {
+  id: string;
+  channelId: string | null;
+  title: string | null;
+  accessTokenEncrypted: string | null;
+  refreshTokenEncrypted: string | null;
+  tokenExpiresAt: string | null; // Date becomes string after JSON serialization
+  tokenStatus: string;
+  [key: string]: unknown;
+}
+
+interface SerializedContainer {
+  id: string;
+  templateOrder: string[] | null;
+  separator: string;
+  [key: string]: unknown;
+}
+
+interface SerializedVideoVariable {
+  variableName: string;
+  variableValue: string | null;
+}
+
+interface SerializedVideo {
+  id: string;
+  videoId: string;
+  channelId: string;
+  currentDescription: string | null;
+  container: SerializedContainer | null;
+  videoVariables: SerializedVideoVariable[];
+  youtubeChannel: SerializedChannel;
+}
+
+interface DescriptionToUpdate {
+  videoId: string;
+  videoIdYouTube: string;
+  channelId: string;
+  newDescription: string;
+  channel: SerializedChannel;
+}
+
 // Helper to get valid access token
 async function getValidAccessToken(
-  channel: {
-    id: string;
-    channelId: string | null;
-    title?: string | null;
-    accessTokenEncrypted: string | null;
-    refreshTokenEncrypted: string | null;
-    tokenExpiresAt: Date | null;
-  }
+  channel: SerializedChannel
 ): Promise<string> {
   if (!channel.accessTokenEncrypted || !channel.refreshTokenEncrypted) {
     throw new Error('Channel tokens not found');
   }
 
   const accessToken = decrypt(channel.accessTokenEncrypted);
-  const expiresAt = channel.tokenExpiresAt;
+  // tokenExpiresAt is a string after JSON serialization through Inngest steps
+  const expiresAt = channel.tokenExpiresAt ? new Date(channel.tokenExpiresAt) : null;
   const now = new Date();
   const bufferTime = 5 * 60 * 1000; // 5 minutes
 
@@ -110,14 +147,14 @@ export const updateVideoDescriptions = inngestClient.createFunction(
         },
       });
 
-      return videos || [];
-    });
+      return (videos || []) as unknown as SerializedVideo[];
+    }) as SerializedVideo[];
 
     // Step 2: Build descriptions for each video
     const descriptionsToUpdate = await step.run(
       'build-descriptions',
       async () => {
-        const results = [];
+        const results: DescriptionToUpdate[] = [];
 
         for (const video of videosToUpdate) {
           // Skip videos without containers
@@ -145,7 +182,7 @@ export const updateVideoDescriptions = inngestClient.createFunction(
           // Build variables map
           const variablesMap: Record<string, string> = {};
           if (video.videoVariables) {
-            video.videoVariables.forEach((v: { variableName: string; variableValue: string | null }) => {
+            video.videoVariables.forEach((v) => {
               variablesMap[v.variableName] = v.variableValue || '';
             });
           }
@@ -172,7 +209,7 @@ export const updateVideoDescriptions = inngestClient.createFunction(
 
         return results;
       }
-    );
+    ) as DescriptionToUpdate[];
 
     // Step 3: Update YouTube in batches (respect API rate limits)
     const BATCH_SIZE = 10;

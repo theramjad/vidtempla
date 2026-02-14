@@ -132,7 +132,7 @@ export default function PricingPage() {
   // Handle plan change for existing subscribers
   const handlePlanChange = (targetTier: PlanTier) => {
     // If user doesn't have a Stripe subscription, use checkout flow
-    if (!currentPlan?.stripe_subscription_id || currentPlan?.status === 'canceled') {
+    if (!currentPlan?.stripeSubscriptionId || currentPlan?.status === 'canceled') {
       if (targetTier !== 'free') {
         handleCheckout(targetTier as 'pro' | 'business');
       }
@@ -150,9 +150,9 @@ export default function PricingPage() {
     }
   };
 
-  const currentPlanTier = (currentPlan?.plan_tier?.toLowerCase() || 'free') as PlanTier;
-  const hasActiveSubscription = currentPlan?.stripe_subscription_id && currentPlan?.status === 'active';
-  const isCanceled = currentPlan?.status === 'canceled' || currentPlan?.cancel_at_period_end;
+  const currentPlanTier = (currentPlan?.planTier?.toLowerCase() || 'free') as PlanTier;
+  const hasActiveSubscription = currentPlan?.stripeSubscriptionId && currentPlan?.status === 'active';
+  const isCanceled = currentPlan?.status === 'canceled' || currentPlan?.cancelAtPeriodEnd;
 
   return (
     <>
@@ -313,7 +313,7 @@ export default function PricingPage() {
           isUpgrade={upgradePreview?.isUpgrade ?? checkIsUpgrade(currentPlanTier, planChangeDialog.targetPlan)}
           proratedAmountFormatted={upgradePreview?.proratedAmountFormatted ?? '$0.00'}
           newMonthlyPriceFormatted={upgradePreview?.newMonthlyPriceFormatted ?? PLAN_CONFIG[planChangeDialog.targetPlan].priceMonthly === 0 ? '$0.00' : `$${(PLAN_CONFIG[planChangeDialog.targetPlan].priceMonthly / 100).toFixed(2)}`}
-          currentPeriodEnd={currentPlan?.current_period_end ?? null}
+          currentPeriodEnd={currentPlan?.currentPeriodEnd?.toISOString() ?? null}
           featuresGaining={upgradePreview?.featuresGaining ?? []}
           featuresLosing={upgradePreview?.featuresLosing ?? []}
           onConfirm={handleConfirmPlanChange}

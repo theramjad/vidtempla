@@ -135,7 +135,7 @@ export default function HistoryDrawer({
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h4 className="font-medium">Version {version.version_number}</h4>
+                        <h4 className="font-medium">Version {version.versionNumber}</h4>
                         {isCurrent && (
                           <span className="px-2 py-0.5 bg-primary text-primary-foreground text-xs rounded">
                             Current
@@ -143,7 +143,7 @@ export default function HistoryDrawer({
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {new Date(version.created_at).toLocaleString()}
+                        {new Date(version.createdAt).toLocaleString()}
                       </p>
                     </div>
 
@@ -170,11 +170,11 @@ export default function HistoryDrawer({
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Rollback to Version {version.version_number}?</AlertDialogTitle>
+                              <AlertDialogTitle>Rollback to Version {version.versionNumber}?</AlertDialogTitle>
                               <AlertDialogDescription className="space-y-3">
                                 <p>
                                   This will restore the description from{' '}
-                                  {new Date(version.created_at).toLocaleString()}.
+                                  {new Date(version.createdAt).toLocaleString()}.
                                 </p>
 
                                 {currentVideo?.container && (
@@ -206,7 +206,7 @@ export default function HistoryDrawer({
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() =>
-                                  handleRollback(version.id, version.version_number)
+                                  handleRollback(version.id, version.versionNumber)
                                 }
                                 disabled={rollbackMutation.isPending}
                               >

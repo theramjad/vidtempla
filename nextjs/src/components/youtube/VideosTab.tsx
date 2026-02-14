@@ -190,13 +190,13 @@ export default function VideosTab() {
                   <TableRow key={video.id}>
                     <TableCell>
                       <a
-                        href={`https://youtube.com/watch?v=${video.video_id}`}
+                        href={`https://youtube.com/watch?v=${video.videoId}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="block transition-opacity hover:opacity-80"
                       >
                         <img
-                          src={`https://img.youtube.com/vi/${video.video_id}/default.jpg`}
+                          src={`https://img.youtube.com/vi/${video.videoId}/default.jpg`}
                           alt={video.title || 'Video thumbnail'}
                           className="w-24 h-auto rounded"
                         />
@@ -204,7 +204,7 @@ export default function VideosTab() {
                     </TableCell>
                     <TableCell>
                       <a
-                        href={`https://youtube.com/watch?v=${video.video_id}`}
+                        href={`https://youtube.com/watch?v=${video.videoId}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 hover:underline"
@@ -214,9 +214,9 @@ export default function VideosTab() {
                       </a>
                     </TableCell>
                     <TableCell>
-                      {video.channel?.channel_id ? (
+                      {video.channel?.channelId ? (
                         <a
-                          href={`https://youtube.com/channel/${video.channel.channel_id}`}
+                          href={`https://youtube.com/channel/${video.channel.channelId}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="hover:underline"
@@ -237,13 +237,13 @@ export default function VideosTab() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {video.published_at
-                        ? new Date(video.published_at).toLocaleDateString()
+                      {video.publishedAt
+                        ? new Date(video.publishedAt).toLocaleDateString()
                         : '—'}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        {!video.container_id ? (
+                        {!video.containerId ? (
                           <Button
                             size="sm"
                             variant="outline"

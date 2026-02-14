@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { api } from '@/utils/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { Database } from '@shared-types/database.types';
+
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -164,7 +164,7 @@ export default function ContainersTab() {
                 <TableRow key={container.id}>
                   <TableCell className="font-medium">{container.name}</TableCell>
                   <TableCell>
-                    {container.template_order?.length || 0} template(s)
+                    {container.templateOrder?.length || 0} template(s)
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">

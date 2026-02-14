@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { api } from '@/utils/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { Database } from '@shared-types/database.types';
+
 import {
   Table,
   TableBody,
@@ -43,7 +43,7 @@ export default function ChannelsTab() {
   // Auto-refresh when any channel is syncing
   useEffect(() => {
     const hasSyncingChannels = channels?.some(
-      (channel) => channel.sync_status === 'syncing'
+      (channel) => channel.syncStatus === 'syncing'
     );
 
     if (hasSyncingChannels) {
@@ -56,10 +56,10 @@ export default function ChannelsTab() {
     }
   }, [channels, refetch]);
 
-  const formatTimestamp = (timestamp: string | null) => {
+  const formatTimestamp = (timestamp: string | Date | null) => {
     if (!timestamp) return 'Never';
 
-    const dt = DateTime.fromISO(timestamp);
+    const dt = timestamp instanceof Date ? DateTime.fromJSDate(timestamp) : DateTime.fromISO(timestamp);
     return dt.toLocaleString(DateTime.DATETIME_MED);
   };
 
@@ -175,22 +175,22 @@ export default function ChannelsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {channels?.map((channel: Database['public']['Tables']['youtube_channels']['Row']) => {
-                const isTokenInvalid = channel.token_status === 'invalid';
+              {channels?.map((channel) => {
+                const isTokenInvalid = channel.tokenStatus === 'invalid';
 
                 return (
                   <TableRow key={channel.id} className={isTokenInvalid ? 'bg-destructive/5' : undefined}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        {channel.thumbnail_url && channel.channel_id && (
+                        {channel.thumbnailUrl && channel.channelId && (
                           <a
-                            href={`https://youtube.com/channel/${channel.channel_id}`}
+                            href={`https://youtube.com/channel/${channel.channelId}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="block transition-opacity hover:opacity-80"
                           >
                             <Image
-                              src={channel.thumbnail_url}
+                              src={channel.thumbnailUrl}
                               alt={channel.title || 'Channel'}
                               width={40}
                               height={40}
@@ -198,9 +198,9 @@ export default function ChannelsTab() {
                             />
                           </a>
                         )}
-                        {channel.thumbnail_url && !channel.channel_id && (
+                        {channel.thumbnailUrl && !channel.channelId && (
                           <Image
-                            src={channel.thumbnail_url}
+                            src={channel.thumbnailUrl}
                             alt={channel.title || 'Channel'}
                             width={40}
                             height={40}
@@ -209,9 +209,9 @@ export default function ChannelsTab() {
                         )}
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
-                            {channel.channel_id ? (
+                            {channel.channelId ? (
                               <a
-                                href={`https://youtube.com/channel/${channel.channel_id}`}
+                                href={`https://youtube.com/channel/${channel.channelId}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="font-medium hover:underline"
@@ -237,11 +237,11 @@ export default function ChannelsTab() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {channel.subscriber_count?.toLocaleString() || '—'}
+                      {channel.subscriberCount?.toLocaleString() || '—'}
                     </TableCell>
                     <TableCell>
                       <span className="text-sm">
-                        {formatTimestamp(channel.last_synced_at)}
+                        {formatTimestamp(channel.lastSyncedAt)}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
@@ -261,9 +261,9 @@ export default function ChannelsTab() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleSync(channel.id)}
-                            disabled={syncingId === channel.id || channel.sync_status === 'syncing'}
+                            disabled={syncingId === channel.id || channel.syncStatus === 'syncing'}
                           >
-                            {syncingId === channel.id || channel.sync_status === 'syncing' ? (
+                            {syncingId === channel.id || channel.syncStatus === 'syncing' ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                               <RefreshCw className="h-4 w-4" />

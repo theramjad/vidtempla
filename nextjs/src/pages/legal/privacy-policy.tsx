@@ -79,7 +79,7 @@ export default function PrivacyPolicy() {
         <li>All data is encrypted in transit using SSL/TLS</li>
         <li>Database access is restricted and encrypted at rest</li>
         <li>OAuth tokens are securely encrypted and never exposed</li>
-        <li>We use Supabase for secure database hosting with row-level security</li>
+        <li>We use secure database hosting with application-level access controls</li>
         <li>Regular security audits and updates</li>
       </ul>
 
