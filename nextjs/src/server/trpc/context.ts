@@ -1,8 +1,9 @@
+import { db, type Database } from "@/db";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { User } from "@supabase/supabase-js";
 
 export type Context = {
+  db: Database;
   supabase: SupabaseClient;
   user: User | null;
 };
@@ -15,6 +16,7 @@ export async function createContext(): Promise<Context> {
   } = await supabase.auth.getUser();
 
   return {
+    db,
     supabase,
     user,
   };

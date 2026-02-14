@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "@/lib/stripe-server";
-import { supabaseServer } from "@/lib/clients/supabase";
+import { db } from "@/db";
+import { webhookEvents, subscriptions } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import type { PlanTier, SubscriptionStatus } from "@/lib/stripe";
 import { mapPriceIdToPlanTier } from "@/lib/stripe";
 import Stripe from "stripe";
@@ -54,11 +56,18 @@ export async function POST(request: NextRequest) {
 
   try {
     // Store webhook event for audit trail and idempotency
-    await supabaseServer.from("webhook_events").upsert({
-      event_id: event.id,
-      event_type: event.type,
+    await db.insert(webhookEvents).values({
+      eventId: event.id,
+      eventType: event.type,
       payload: event.data.object as never,
       processed: false,
+    }).onConflictDoUpdate({
+      target: webhookEvents.eventId,
+      set: {
+        eventType: event.type,
+        payload: event.data.object as never,
+        processed: false,
+      },
     });
 
     // Handle the event
@@ -89,23 +98,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Mark event as processed
-    await supabaseServer
-      .from("webhook_events")
-      .update({ processed: true, processed_at: new Date().toISOString() })
-      .eq("event_id", event.id);
+    await db.update(webhookEvents)
+      .set({ processed: true, processedAt: new Date() })
+      .where(eq(webhookEvents.eventId, event.id));
 
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("Error processing webhook:", error);
 
     // Log error in webhook_events table
-    await supabaseServer
-      .from("webhook_events")
-      .update({
+    await db.update(webhookEvents)
+      .set({
         processed: false,
-        error_message: error instanceof Error ? error.message : "Unknown error",
+        errorMessage: error instanceof Error ? error.message : "Unknown error",
       })
-      .eq("event_id", event.id);
+      .where(eq(webhookEvents.eventId, event.id));
 
     // Return 200 to prevent Stripe from retrying
     return NextResponse.json({ error: "Internal error" }, { status: 200 });
@@ -128,13 +135,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   // Update subscription record with Stripe customer ID and checkout session
-  await supabaseServer
-    .from("subscriptions")
-    .update({
-      stripe_customer_id: customerId,
-      stripe_checkout_session_id: session.id,
+  await db.update(subscriptions)
+    .set({
+      stripeCustomerId: customerId,
+      stripeCheckoutSessionId: session.id,
     })
-    .eq("user_id", userId);
+    .where(eq(subscriptions.userId, userId));
 
   console.log(`Updated subscription for user ${userId} with customer ${customerId}`);
 
@@ -164,11 +170,10 @@ async function handleSubscriptionUpdate(subscription: StripeSubscriptionWithPeri
   const status = mapSubscriptionStatus(subscription.status);
 
   // Find subscription by stripe_customer_id
-  const { data: existingSubscription } = await supabaseServer
-    .from("subscriptions")
-    .select("id, user_id")
-    .eq("stripe_customer_id", customerId)
-    .single();
+  const [existingSubscription] = await db.select({
+    id: subscriptions.id,
+    userId: subscriptions.userId,
+  }).from(subscriptions).where(eq(subscriptions.stripeCustomerId, customerId));
 
   if (!existingSubscription) {
     console.warn(`No subscription found for customer: ${customerId}`);
@@ -177,32 +182,31 @@ async function handleSubscriptionUpdate(subscription: StripeSubscriptionWithPeri
 
   // Build update object with required fields
   const updateData: {
-    stripe_subscription_id: string;
-    plan_tier: PlanTier;
+    stripeSubscriptionId: string;
+    planTier: PlanTier;
     status: SubscriptionStatus;
-    cancel_at_period_end: boolean;
-    current_period_start?: string;
-    current_period_end?: string;
+    cancelAtPeriodEnd: boolean;
+    currentPeriodStart?: Date;
+    currentPeriodEnd?: Date;
   } = {
-    stripe_subscription_id: subscription.id,
-    plan_tier: planTier,
+    stripeSubscriptionId: subscription.id,
+    planTier: planTier,
     status: status,
-    cancel_at_period_end: subscription.cancel_at_period_end,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
   };
 
   // Only add period dates if they exist and are valid
   if (subscription.current_period_start && typeof subscription.current_period_start === 'number') {
-    updateData.current_period_start = new Date(subscription.current_period_start * 1000).toISOString();
+    updateData.currentPeriodStart = new Date(subscription.current_period_start * 1000);
   }
   if (subscription.current_period_end && typeof subscription.current_period_end === 'number') {
-    updateData.current_period_end = new Date(subscription.current_period_end * 1000).toISOString();
+    updateData.currentPeriodEnd = new Date(subscription.current_period_end * 1000);
   }
 
   // Update subscription
-  await supabaseServer
-    .from("subscriptions")
-    .update(updateData)
-    .eq("id", existingSubscription.id);
+  await db.update(subscriptions)
+    .set(updateData)
+    .where(eq(subscriptions.id, existingSubscription.id));
 
   console.log(`Updated subscription ${existingSubscription.id} to ${planTier} (${status})`);
 }
@@ -213,13 +217,12 @@ async function handleSubscriptionUpdate(subscription: StripeSubscriptionWithPeri
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log(`Processing subscription.deleted: ${subscription.id}`);
 
-  await supabaseServer
-    .from("subscriptions")
-    .update({
+  await db.update(subscriptions)
+    .set({
       status: "canceled",
-      plan_tier: "free", // Revert to free plan
+      planTier: "free", // Revert to free plan
     })
-    .eq("stripe_subscription_id", subscription.id);
+    .where(eq(subscriptions.stripeSubscriptionId, subscription.id));
 
   console.log(`Subscription ${subscription.id} deleted and reverted to free`);
 }
@@ -235,10 +238,9 @@ async function handleInvoicePaymentFailed(invoice: StripeInvoiceWithSubscription
 
   if (subscriptionId) {
     // Update subscription status to past_due
-    await supabaseServer
-      .from("subscriptions")
-      .update({ status: "past_due" })
-      .eq("stripe_subscription_id", subscriptionId);
+    await db.update(subscriptions)
+      .set({ status: "past_due" })
+      .where(eq(subscriptions.stripeSubscriptionId, subscriptionId));
 
     console.log(`Subscription ${subscriptionId} marked as past_due`);
   }

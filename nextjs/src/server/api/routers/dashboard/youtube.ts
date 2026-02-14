@@ -16,8 +16,9 @@ import {
   findMissingVariables,
 } from '@/utils/templateParser';
 import { inngestClient } from '@/lib/clients/inngest';
-import { supabaseServer } from '@/lib/clients/supabase';
-import type { Database } from '@shared-types/database.types';
+import { db } from '@/db';
+import { youtubeChannels, containers, templates, youtubeVideos, videoVariables, descriptionHistory } from '@/db/schema';
+import { eq, and, desc, asc, sql, count, isNull, ilike, inArray, getTableColumns } from 'drizzle-orm';
 import { checkVideoLimit, checkChannelLimit } from '@/lib/plan-limits';
 import { router } from '@/server/trpc/init';
 
@@ -25,20 +26,18 @@ export const youtubeRouter = router({
   // ==================== Channel Management ====================
 
   channels: router({
-    list: protectedProcedure.query(async ({ ctx }): Promise<Database['public']['Tables']['youtube_channels']['Row'][]> => {
-      const { data, error } = await supabaseServer
-        .from('youtube_channels')
-        .select('*')
-        .eq('user_id', ctx.user.id)
-        .order('created_at', { ascending: false });
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const data = await db
+        .select()
+        .from(youtubeChannels)
+        .where(eq(youtubeChannels.userId, ctx.user.id))
+        .orderBy(desc(youtubeChannels.createdAt));
 
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-
-      return data || [];
+      return data;
     }),
 
     checkLimit: protectedProcedure.query(async ({ ctx }) => {
-      const result = await checkChannelLimit(ctx.user.id, supabaseServer);
+      const result = await checkChannelLimit(ctx.user.id, db);
       return result;
     }),
 
@@ -49,13 +48,9 @@ export const youtubeRouter = router({
     disconnect: protectedProcedure
       .input(z.object({ channelId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
-        const { error } = await supabaseServer
-          .from('youtube_channels')
-          .delete()
-          .eq('id', input.channelId)
-          .eq('user_id', ctx.user.id);
-
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+        await db
+          .delete(youtubeChannels)
+          .where(and(eq(youtubeChannels.id, input.channelId), eq(youtubeChannels.userId, ctx.user.id)));
 
         return { success: true };
       }),
@@ -79,17 +74,17 @@ export const youtubeRouter = router({
   // ==================== Container Management ====================
 
   containers: router({
-    list: protectedProcedure.query(async ({ ctx }): Promise<Database['public']['Tables']['containers']['Row'][]> => {
-      const { data, error } = await supabaseServer
-        .from('containers')
-        .select(`
-          *,
-          videos:youtube_videos(count)
-        `)
-        .eq('user_id', ctx.user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const data = await db
+        .select({
+          ...getTableColumns(containers),
+          videoCount: count(youtubeVideos.id),
+        })
+        .from(containers)
+        .leftJoin(youtubeVideos, eq(youtubeVideos.containerId, containers.id))
+        .where(eq(containers.userId, ctx.user.id))
+        .groupBy(containers.id)
+        .orderBy(desc(containers.createdAt));
 
       return data;
     }),
@@ -103,18 +98,15 @@ export const youtubeRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const { data, error } = await supabaseServer
-          .from('containers')
-          .insert({
-            user_id: ctx.user.id,
+        const [data] = await db
+          .insert(containers)
+          .values({
+            userId: ctx.user.id,
             name: input.name,
-            template_order: input.templateIds,
+            templateOrder: input.templateIds,
             separator: input.separator ?? '\n\n',
           })
-          .select()
-          .single();
-
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+          .returning();
 
         return data;
       }),
@@ -131,30 +123,26 @@ export const youtubeRouter = router({
       .mutation(async ({ ctx, input }) => {
         const updateData: {
           name?: string;
-          template_order?: string[];
+          templateOrder?: string[];
           separator?: string;
         } = {};
         if (input.name) updateData.name = input.name;
-        if (input.templateIds) updateData.template_order = input.templateIds;
+        if (input.templateIds) updateData.templateOrder = input.templateIds;
         if (input.separator !== undefined) updateData.separator = input.separator;
 
-        const { data, error } = await supabaseServer
-          .from('containers')
-          .update(updateData)
-          .eq('id', input.id)
-          .eq('user_id', ctx.user.id)
-          .select()
-          .single();
-
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+        const [data] = await db
+          .update(containers)
+          .set(updateData)
+          .where(and(eq(containers.id, input.id), eq(containers.userId, ctx.user.id)))
+          .returning();
 
         // Trigger Inngest event to update all videos in this container
         // Only trigger if template_order or separator changed (affects description)
         if (input.templateIds !== undefined || input.separator !== undefined) {
-          const { data: videos } = await supabaseServer
-            .from('youtube_videos')
-            .select('id')
-            .eq('container_id', input.id);
+          const videos = await db
+            .select({ id: youtubeVideos.id })
+            .from(youtubeVideos)
+            .where(eq(youtubeVideos.containerId, input.id));
 
           if (videos && videos.length > 0) {
             await inngestClient.send({
@@ -173,13 +161,9 @@ export const youtubeRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
-        const { error } = await supabaseServer
-          .from('containers')
-          .delete()
-          .eq('id', input.id)
-          .eq('user_id', ctx.user.id);
-
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+        await db
+          .delete(containers)
+          .where(and(eq(containers.id, input.id), eq(containers.userId, ctx.user.id)));
 
         return { success: true };
       }),
@@ -187,13 +171,15 @@ export const youtubeRouter = router({
     getAffectedVideos: protectedProcedure
       .input(z.object({ containerId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
-        const { data: videos, error } = await supabaseServer
-          .from('youtube_videos')
-          .select('id, title, video_id')
-          .eq('container_id', input.containerId)
-          .order('title', { ascending: true });
-
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+        const videos = await db
+          .select({
+            id: youtubeVideos.id,
+            title: youtubeVideos.title,
+            videoId: youtubeVideos.videoId,
+          })
+          .from(youtubeVideos)
+          .where(eq(youtubeVideos.containerId, input.containerId))
+          .orderBy(asc(youtubeVideos.title));
 
         return {
           videos: videos || [],
@@ -205,17 +191,15 @@ export const youtubeRouter = router({
   // ==================== Template Management ====================
 
   templates: router({
-    list: protectedProcedure.query(async ({ ctx }): Promise<(Database['public']['Tables']['templates']['Row'] & { variables: string[] })[]> => {
-      const { data, error } = await supabaseServer
-        .from('templates')
-        .select('*')
-        .eq('user_id', ctx.user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const data = await db
+        .select()
+        .from(templates)
+        .where(eq(templates.userId, ctx.user.id))
+        .orderBy(desc(templates.createdAt));
 
       // Add variable count to each template
-      return (data || []).map((template) => ({
+      return data.map((template) => ({
         ...template,
         variables: parseVariables(template.content),
       }));
@@ -229,17 +213,14 @@ export const youtubeRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const { data, error } = await supabaseServer
-          .from('templates')
-          .insert({
-            user_id: ctx.user.id,
+        const [data] = await db
+          .insert(templates)
+          .values({
+            userId: ctx.user.id,
             name: input.name,
             content: input.content,
           })
-          .select()
-          .single();
-
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+          .returning();
 
         return data;
       }),
@@ -260,34 +241,34 @@ export const youtubeRouter = router({
         if (input.name) updateData.name = input.name;
         if (input.content !== undefined) updateData.content = input.content;
 
-        const { data, error } = await supabaseServer
-          .from('templates')
-          .update(updateData)
-          .eq('id', input.id)
-          .eq('user_id', ctx.user.id)
-          .select()
-          .single();
-
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+        const [data] = await db
+          .update(templates)
+          .set(updateData)
+          .where(and(eq(templates.id, input.id), eq(templates.userId, ctx.user.id)))
+          .returning();
 
         // Trigger Inngest event to update all videos using this template
         // Only trigger if content changed (affects description)
         if (input.content !== undefined) {
           // Find all containers that use this template
-          const { data: containers } = await supabaseServer
-            .from('containers')
-            .select('id')
-            .eq('user_id', ctx.user.id)
-            .contains('template_order', [input.id]);
+          const containersData = await db
+            .select({ id: containers.id })
+            .from(containers)
+            .where(
+              and(
+                eq(containers.userId, ctx.user.id),
+                sql`${containers.templateOrder}::jsonb @> ${JSON.stringify([input.id])}::jsonb`
+              )
+            );
 
-          if (containers && containers.length > 0) {
-            const containerIds = containers.map((c) => c.id);
+          if (containersData && containersData.length > 0) {
+            const containerIds = containersData.map((c) => c.id);
 
             // Get all videos from these containers
-            const { data: videos } = await supabaseServer
-              .from('youtube_videos')
-              .select('id')
-              .in('container_id', containerIds);
+            const videos = await db
+              .select({ id: youtubeVideos.id })
+              .from(youtubeVideos)
+              .where(inArray(youtubeVideos.containerId, containerIds));
 
             if (videos && videos.length > 0) {
               await inngestClient.send({
@@ -307,13 +288,9 @@ export const youtubeRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
-        const { error } = await supabaseServer
-          .from('templates')
-          .delete()
-          .eq('id', input.id)
-          .eq('user_id', ctx.user.id);
-
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+        await db
+          .delete(templates)
+          .where(and(eq(templates.id, input.id), eq(templates.userId, ctx.user.id)));
 
         return { success: true };
       }),
@@ -328,15 +305,21 @@ export const youtubeRouter = router({
       .input(z.object({ templateId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         // First, find all containers that use this template
-        const { data: containers, error: containerError } = await supabaseServer
-          .from('containers')
-          .select('id, name, template_order')
-          .eq('user_id', ctx.user.id)
-          .contains('template_order', [input.templateId]);
+        const containersData = await db
+          .select({
+            id: containers.id,
+            name: containers.name,
+            templateOrder: containers.templateOrder,
+          })
+          .from(containers)
+          .where(
+            and(
+              eq(containers.userId, ctx.user.id),
+              sql`${containers.templateOrder}::jsonb @> ${JSON.stringify([input.templateId])}::jsonb`
+            )
+          );
 
-        if (containerError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: containerError.message });
-
-        if (!containers || containers.length === 0) {
+        if (!containersData || containersData.length === 0) {
           return {
             videos: [],
             count: 0,
@@ -345,20 +328,23 @@ export const youtubeRouter = router({
         }
 
         // Get all videos from these containers
-        const containerIds = containers.map((c) => c.id);
-        const { data: videos, error: videoError } = await supabaseServer
-          .from('youtube_videos')
-          .select('id, title, video_id, container_id')
-          .in('container_id', containerIds)
-          .order('title', { ascending: true });
-
-        if (videoError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: videoError.message });
+        const containerIds = containersData.map((c) => c.id);
+        const videos = await db
+          .select({
+            id: youtubeVideos.id,
+            title: youtubeVideos.title,
+            videoId: youtubeVideos.videoId,
+            containerId: youtubeVideos.containerId,
+          })
+          .from(youtubeVideos)
+          .where(inArray(youtubeVideos.containerId, containerIds))
+          .orderBy(asc(youtubeVideos.title));
 
         // Build container info with video counts
-        const containerInfo = containers.map((container) => ({
+        const containerInfo = containersData.map((container) => ({
           id: container.id,
           name: container.name,
-          videoCount: videos?.filter((v) => v.container_id === container.id).length || 0,
+          videoCount: videos?.filter((v) => v.containerId === container.id).length || 0,
         }));
 
         return {
@@ -381,48 +367,58 @@ export const youtubeRouter = router({
         })
       )
       .query(async ({ ctx, input }) => {
-        let query = supabaseServer
-          .from('youtube_videos')
-          .select(`
-            *,
-            channel:youtube_channels!inner(id, title, user_id, channel_id),
-            container:containers(id, name)
-          `)
-          .eq('channel.user_id', ctx.user.id);
+        const filters = [eq(youtubeChannels.userId, ctx.user.id)];
 
         if (input.channelId && input.channelId !== '') {
-          query = query.eq('channel_id', input.channelId);
+          filters.push(eq(youtubeVideos.channelId, input.channelId));
         }
 
         if (input.containerId && input.containerId !== '') {
-          query = query.eq('container_id', input.containerId);
+          filters.push(eq(youtubeVideos.containerId, input.containerId));
         }
 
         if (input.search) {
-          query = query.ilike('title', `%${input.search}%`);
+          filters.push(ilike(youtubeVideos.title, `%${input.search}%`));
         }
 
-        const { data, error } = await query.order('published_at', {
-          ascending: false,
-        });
+        const results = await db
+          .select({
+            ...getTableColumns(youtubeVideos),
+            channel: {
+              id: youtubeChannels.id,
+              title: youtubeChannels.title,
+              userId: youtubeChannels.userId,
+              channelId: youtubeChannels.channelId,
+            },
+            container: {
+              id: containers.id,
+              name: containers.name,
+            },
+          })
+          .from(youtubeVideos)
+          .innerJoin(youtubeChannels, eq(youtubeVideos.channelId, youtubeChannels.id))
+          .leftJoin(containers, eq(youtubeVideos.containerId, containers.id))
+          .where(and(...filters))
+          .orderBy(desc(youtubeVideos.publishedAt));
 
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-
-        return data || [];
+        return results;
       }),
 
     unassigned: protectedProcedure.query(async ({ ctx }) => {
-      const { data, error } = await supabaseServer
-        .from('youtube_videos')
-        .select(`
-          *,
-          channel:youtube_channels!inner(id, title, user_id, channel_id)
-        `)
-        .eq('channel.user_id', ctx.user.id)
-        .is('container_id', null)
-        .order('published_at', { ascending: false });
-
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      const data = await db
+        .select({
+          ...getTableColumns(youtubeVideos),
+          channel: {
+            id: youtubeChannels.id,
+            title: youtubeChannels.title,
+            userId: youtubeChannels.userId,
+            channelId: youtubeChannels.channelId,
+          },
+        })
+        .from(youtubeVideos)
+        .innerJoin(youtubeChannels, eq(youtubeVideos.channelId, youtubeChannels.id))
+        .where(and(eq(youtubeChannels.userId, ctx.user.id), isNull(youtubeVideos.containerId)))
+        .orderBy(desc(youtubeVideos.publishedAt));
 
       return data;
     }),
@@ -436,13 +432,12 @@ export const youtubeRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         // First verify the video isn't already assigned
-        const { data: video } = await supabaseServer
-          .from('youtube_videos')
-          .select('container_id')
-          .eq('id', input.videoId)
-          .single();
+        const [video] = await db
+          .select({ containerId: youtubeVideos.containerId })
+          .from(youtubeVideos)
+          .where(eq(youtubeVideos.id, input.videoId));
 
-        if (video?.container_id) {
+        if (video?.containerId) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'Video is already assigned to a container',
@@ -451,21 +446,25 @@ export const youtubeRouter = router({
 
         // Check if user has reached their assigned video limit
         // We count videos that are already assigned to containers
-        const { data: channels } = await supabaseServer
-          .from('youtube_channels')
-          .select('id')
-          .eq('user_id', ctx.user.id);
+        const channels = await db
+          .select({ id: youtubeChannels.id })
+          .from(youtubeChannels)
+          .where(eq(youtubeChannels.userId, ctx.user.id));
 
         const channelIds = channels?.map((c) => c.id) || [];
 
         if (channelIds.length > 0) {
-          const { count: assignedCount } = await supabaseServer
-            .from('youtube_videos')
-            .select('id', { count: 'exact', head: true })
-            .in('channel_id', channelIds)
-            .not('container_id', 'is', null);
+          const [{ assignedCount }] = await db
+            .select({ assignedCount: count() })
+            .from(youtubeVideos)
+            .where(
+              and(
+                inArray(youtubeVideos.channelId, channelIds),
+                sql`${youtubeVideos.containerId} IS NOT NULL`
+              )
+            );
 
-          const limitCheck = await checkVideoLimit(ctx.user.id, supabaseServer);
+          const limitCheck = await checkVideoLimit(ctx.user.id, db);
 
           // If adding this video would exceed the limit, reject
           if ((assignedCount || 0) >= limitCheck.limit) {
@@ -477,12 +476,10 @@ export const youtubeRouter = router({
         }
 
         // Get the container's templates
-        const { data: container } = await supabaseServer
-          .from('containers')
-          .select('template_order')
-          .eq('id', input.containerId)
-          .eq('user_id', ctx.user.id)
-          .single();
+        const [container] = await db
+          .select({ templateOrder: containers.templateOrder })
+          .from(containers)
+          .where(and(eq(containers.id, input.containerId), eq(containers.userId, ctx.user.id)));
 
         if (!container) {
           throw new TRPCError({
@@ -492,44 +489,43 @@ export const youtubeRouter = router({
         }
 
         // Assign video to container
-        const { error: updateError } = await supabaseServer
-          .from('youtube_videos')
-          .update({ container_id: input.containerId })
-          .eq('id', input.videoId);
-
-        if (updateError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updateError.message });
+        await db
+          .update(youtubeVideos)
+          .set({ containerId: input.containerId })
+          .where(eq(youtubeVideos.id, input.videoId));
 
         // Initialize variables for all templates in the container
-        if (container.template_order && container.template_order.length > 0) {
-          const { data: templates } = await supabaseServer
-            .from('templates')
-            .select('id, content')
-            .in('id', container.template_order);
+        if (container.templateOrder && container.templateOrder.length > 0) {
+          const templatesData = await db
+            .select({
+              id: templates.id,
+              content: templates.content,
+            })
+            .from(templates)
+            .where(inArray(templates.id, container.templateOrder));
 
-          if (templates) {
+          if (templatesData) {
             const variablesToCreate: Array<{
-              video_id: string;
-              template_id: string;
-              variable_name: string;
-              variable_value: string;
+              videoId: string;
+              templateId: string;
+              variableName: string;
+              variableValue: string;
             }> = [];
 
-            templates.forEach((template) => {
+            templatesData.forEach((template) => {
               const variables = parseUserVariables(template.content);
               variables.forEach((varName) => {
                 variablesToCreate.push({
-                  video_id: input.videoId,
-                  template_id: template.id,
-                  variable_name: varName,
-                  variable_value: '',
+                  videoId: input.videoId,
+                  templateId: template.id,
+                  variableName: varName,
+                  variableValue: '',
                 });
               });
             });
 
             if (variablesToCreate.length > 0) {
-              await supabaseServer
-                .from('video_variables')
-                .insert(variablesToCreate);
+              await db.insert(videoVariables).values(variablesToCreate);
             }
           }
         }
@@ -540,29 +536,36 @@ export const youtubeRouter = router({
     getVariables: protectedProcedure
       .input(z.object({ videoId: z.string().uuid() }))
       .query(async ({ ctx, input }) => {
-        const { data, error } = await supabaseServer
-          .from('video_variables')
-          .select(`
-            *,
-            template:templates(id, name, content)
-          `)
-          .eq('video_id', input.videoId);
-
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+        const data = await db
+          .select({
+            ...getTableColumns(videoVariables),
+            template: {
+              id: templates.id,
+              name: templates.name,
+              content: templates.content,
+            },
+          })
+          .from(videoVariables)
+          .leftJoin(templates, eq(videoVariables.templateId, templates.id))
+          .where(eq(videoVariables.videoId, input.videoId));
 
         // Get video and container info for preview
-        const { data: video } = await supabaseServer
-          .from('youtube_videos')
-          .select(`
-            video_id,
-            container:containers(id, template_order, separator)
-          `)
-          .eq('id', input.videoId)
-          .single();
+        const [videoData] = await db
+          .select({
+            videoId: youtubeVideos.videoId,
+            container: {
+              id: containers.id,
+              templateOrder: containers.templateOrder,
+              separator: containers.separator,
+            },
+          })
+          .from(youtubeVideos)
+          .leftJoin(containers, eq(youtubeVideos.containerId, containers.id))
+          .where(eq(youtubeVideos.id, input.videoId));
 
         return {
           variables: data,
-          video: video || null,
+          video: videoData || null,
         };
       }),
 
@@ -582,19 +585,20 @@ export const youtubeRouter = router({
       .mutation(async ({ ctx, input }) => {
         // Upsert all variables
         for (const variable of input.variables) {
-          await supabaseServer
-            .from('video_variables')
-            .upsert(
-              {
-                video_id: input.videoId,
-                template_id: variable.templateId,
-                variable_name: variable.name,
-                variable_value: variable.value,
+          await db
+            .insert(videoVariables)
+            .values({
+              videoId: input.videoId,
+              templateId: variable.templateId,
+              variableName: variable.name,
+              variableValue: variable.value,
+            })
+            .onConflictDoUpdate({
+              target: [videoVariables.videoId, videoVariables.templateId, videoVariables.variableName],
+              set: {
+                variableValue: variable.value,
               },
-              {
-                onConflict: 'video_id,template_id,variable_name',
-              }
-            );
+            });
         }
 
         // Trigger Inngest event to update this video's description
@@ -612,13 +616,11 @@ export const youtubeRouter = router({
     getHistory: protectedProcedure
       .input(z.object({ videoId: z.string().uuid() }))
       .query(async ({ ctx, input }) => {
-        const { data, error } = await supabaseServer
-          .from('description_history')
-          .select('*')
-          .eq('video_id', input.videoId)
-          .order('version_number', { ascending: false });
-
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+        const data = await db
+          .select()
+          .from(descriptionHistory)
+          .where(eq(descriptionHistory.videoId, input.videoId))
+          .orderBy(desc(descriptionHistory.versionNumber));
 
         return data;
       }),
@@ -632,12 +634,15 @@ export const youtubeRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         // Get the historical description
-        const { data: history } = await supabaseServer
-          .from('description_history')
-          .select('description')
-          .eq('id', input.historyId)
-          .eq('video_id', input.videoId)
-          .single();
+        const [history] = await db
+          .select({ description: descriptionHistory.description })
+          .from(descriptionHistory)
+          .where(
+            and(
+              eq(descriptionHistory.id, input.historyId),
+              eq(descriptionHistory.videoId, input.videoId)
+            )
+          );
 
         if (!history) {
           throw new TRPCError({
@@ -647,62 +652,39 @@ export const youtubeRouter = router({
         }
 
         // Get current video state (for return metadata)
-        const { data: video } = await supabaseServer
-          .from('youtube_videos')
-          .select('container_id')
-          .eq('id', input.videoId)
-          .single();
+        const [video] = await db
+          .select({ containerId: youtubeVideos.containerId })
+          .from(youtubeVideos)
+          .where(eq(youtubeVideos.id, input.videoId));
 
-        const { data: variables } = await supabaseServer
-          .from('video_variables')
-          .select('id')
-          .eq('video_id', input.videoId);
+        const variables = await db
+          .select({ id: videoVariables.id })
+          .from(videoVariables)
+          .where(eq(videoVariables.videoId, input.videoId));
 
-        const hadContainer = !!video?.container_id;
+        const hadContainer = !!video?.containerId;
         const variableCount = variables?.length || 0;
 
         // DELINK: Set container_id to NULL if video is currently in a container
         if (hadContainer) {
-          const { error: delinkError } = await supabaseServer
-            .from('youtube_videos')
-            .update({ container_id: null })
-            .eq('id', input.videoId);
-
-          if (delinkError) {
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: 'Failed to delink video from container',
-            });
-          }
+          await db
+            .update(youtubeVideos)
+            .set({ containerId: null })
+            .where(eq(youtubeVideos.id, input.videoId));
         }
 
         // CLEAR VARIABLES: Delete all video_variables for this video
         if (variableCount > 0) {
-          const { error: deleteVarsError } = await supabaseServer
-            .from('video_variables')
-            .delete()
-            .eq('video_id', input.videoId);
-
-          if (deleteVarsError) {
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: 'Failed to clear video variables',
-            });
-          }
+          await db
+            .delete(videoVariables)
+            .where(eq(videoVariables.videoId, input.videoId));
         }
 
         // Update video's current description
-        const { error: updateError } = await supabaseServer
-          .from('youtube_videos')
-          .update({ current_description: history.description })
-          .eq('id', input.videoId);
-
-        if (updateError) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to update video description',
-          });
-        }
+        await db
+          .update(youtubeVideos)
+          .set({ currentDescription: history.description })
+          .where(eq(youtubeVideos.id, input.videoId));
 
         // Trigger Inngest event to update on YouTube
         // The Inngest job will create the history entry after successful update
