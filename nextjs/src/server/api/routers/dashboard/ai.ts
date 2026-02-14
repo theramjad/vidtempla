@@ -344,7 +344,7 @@ export const aiRouter = router({
               })
               .returning({ id: templates.id });
 
-            tplId = newTpl.id;
+            tplId = newTpl!.id;
           }
         }
 
@@ -370,7 +370,7 @@ export const aiRouter = router({
           // A. Assign Container
           await db
             .update(youtubeVideos)
-            .set({ containerId: container.id })
+            .set({ containerId: container!.id })
             .where(eq(youtubeVideos.id, videoAnalysis.videoId));
 
           // B. Insert Variables
@@ -409,6 +409,6 @@ export const aiRouter = router({
         }
       }
 
-      return { success: true, containerId: container.id };
+      return { success: true, containerId: container!.id };
     }),
 });

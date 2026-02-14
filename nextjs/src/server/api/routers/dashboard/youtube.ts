@@ -454,7 +454,7 @@ export const youtubeRouter = router({
         const channelIds = channels?.map((c) => c.id) || [];
 
         if (channelIds.length > 0) {
-          const [{ assignedCount }] = await db
+          const countResult = await db
             .select({ assignedCount: count() })
             .from(youtubeVideos)
             .where(
@@ -463,6 +463,7 @@ export const youtubeRouter = router({
                 sql`${youtubeVideos.containerId} IS NOT NULL`
               )
             );
+          const assignedCount = countResult[0]?.assignedCount ?? 0;
 
           const limitCheck = await checkVideoLimit(ctx.user.id, db);
 
