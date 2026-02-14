@@ -220,7 +220,7 @@ Key query conversions:
 
 ---
 
-## Phase 3: Data Migration Script
+## Phase 3: Data Migration Script ✅ DONE
 
 **Create**: `nextjs/scripts/migrate-data.ts`
 
@@ -242,7 +242,7 @@ Key query conversions:
 
 ---
 
-## Phase 4: Cleanup (partially done — items marked below)
+## Phase 4: Cleanup ✅ DONE
 
 ### 4.1 Delete Supabase files
 - `supabase/` (entire directory)
