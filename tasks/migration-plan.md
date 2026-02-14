@@ -23,22 +23,22 @@ The app (VidTempla) is a YouTube description management tool built on Next.js 15
 
 ---
 
-## Phase 0: Setup & Dependencies
+## Phase 0: Setup & Dependencies ✅ DONE
 
-### 0.1 Install packages
+### 0.1 Install packages ✅
 ```
 npm install drizzle-orm postgres better-auth resend
 npm install -D drizzle-kit @better-auth/cli
 ```
 
-### 0.2 Create Drizzle config
+### 0.2 Create Drizzle config ✅
 **Create**: `nextjs/drizzle.config.ts`
 - Schema path: `./src/db/schema.ts`
 - Output: `./drizzle/`
 - Dialect: `postgresql`
 - Connection: `DATABASE_URL` env var
 
-### 0.3 Define Drizzle schema
+### 0.3 Define Drizzle schema ✅
 **Create**: `nextjs/src/db/schema.ts`
 
 Define all 8 app tables + Better Auth's 4 tables:
@@ -58,38 +58,37 @@ Define all 8 app tables + Better Auth's 4 tables:
 | `subscriptions` | id (uuid), user_id FK→user, stripe_* fields, plan_tier enum, status enum | |
 | `webhook_events` | id (uuid), event_id (unique), event_type, payload (jsonb), processed | |
 
-### 0.4 Define Drizzle relations
+### 0.4 Define Drizzle relations ✅
 **Create**: `nextjs/src/db/relations.ts`
 - All FK relationships for the relational query builder
 
-### 0.5 Create Drizzle client
+### 0.5 Create Drizzle client ✅
 **Create**: `nextjs/src/db/index.ts`
 - Use `postgres` driver with `DATABASE_URL`
 - Export `db` instance and `Database` type
 
-### 0.6 Generate initial migration + triggers
+### 0.6 Generate initial migration + triggers ✅
 - Run `drizzle-kit generate` for schema migration
 - Add custom SQL migration for 3 trigger functions:
   - `update_updated_at_column()` — on all main tables
   - `prevent_container_reassignment()` — on youtube_videos
   - `set_next_version_number()` — on description_history
 
-### 0.7 Set up Better Auth server
+### 0.7 Set up Better Auth server ✅
 **Create**: `nextjs/src/lib/auth.ts`
 - Drizzle adapter with `provider: 'pg'`
 - Google social provider
 - Magic link plugin with Resend email sending
-- UUID generation via `advanced.generateId`
 
-### 0.8 Set up Better Auth client
+### 0.8 Set up Better Auth client ✅
 **Create**: `nextjs/src/lib/auth-client.ts`
 - `createAuthClient` with `magicLinkClient` plugin
 
-### 0.9 Create Better Auth API route
+### 0.9 Create Better Auth API route ✅
 **Create**: `nextjs/src/pages/api/auth/[...all].ts`
 - `toNodeHandler(auth.handler)` with `bodyParser: false`
 
-### 0.10 Update env vars
+### 0.10 Update env vars ✅
 - **Remove**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - **Add**: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `RESEND_API_KEY`
 - Google OAuth creds for auth (separate from YouTube OAuth creds)
@@ -98,15 +97,15 @@ Define all 8 app tables + Better Auth's 4 tables:
 
 ---
 
-## Phase 1: Database Access Layer (Supabase queries → Drizzle)
+## Phase 1: Database Access Layer (Supabase queries → Drizzle) ✅ DONE
 
-### 1.1 Update tRPC context
+### 1.1 Update tRPC context ✅
 **Modify**: `nextjs/src/server/trpc/context.ts`
 - Import `db` from `@/db`
 - Keep Supabase auth temporarily (swapped in Phase 2)
 - Context type: `{ db: Database, user: User | null }`
 
-### 1.2 Convert YouTube router (~50 queries)
+### 1.2 Convert YouTube router (~50 queries) ✅
 **Modify**: `nextjs/src/server/api/routers/dashboard/youtube.ts`
 
 Key query conversions:
@@ -118,98 +117,104 @@ Key query conversions:
 - `.is('container_id', null)` → `isNull(youtubeVideos.containerId)`
 - `.ilike('title', '%search%')` → `` ilike(youtubeVideos.title, `%${search}%`) ``
 
-### 1.3 Convert billing router (~12 queries)
+### 1.3 Convert billing router (~12 queries) ✅
 **Modify**: `nextjs/src/server/api/routers/dashboard/billing.ts`
 
-### 1.4 Convert AI router (~10 queries)
+### 1.4 Convert AI router (~10 queries) ✅
 **Modify**: `nextjs/src/server/api/routers/dashboard/ai.ts`
 
-### 1.5 Convert Inngest jobs
+### 1.5 Convert Inngest jobs ✅
 **Modify**:
 - `nextjs/src/inngest/youtube/syncChannelVideos.ts` — replace `createClient<Database>(url, key)` with imported `db`
 - `nextjs/src/inngest/youtube/updateVideoDescriptions.ts` — same
 - `nextjs/src/inngest/youtube/scheduledSync.ts` — same
 
-### 1.6 Convert Stripe webhook
+### 1.6 Convert Stripe webhook ✅
 **Modify**: `nextjs/src/app/api/webhooks/stripe/route.ts`
 
-### 1.7 Convert YouTube OAuth callback (DB queries only)
+### 1.7 Convert YouTube OAuth callback (DB queries only) ✅
 **Modify**: `nextjs/src/pages/api/auth/youtube/callback.ts`
 - Swap DB queries to Drizzle; keep Supabase auth check temporarily
 
-### 1.8 Refactor plan-limits
+### 1.8 Refactor plan-limits ✅
 **Modify**: `nextjs/src/lib/plan-limits.ts`
 - Change signature from `(supabase: SupabaseClient)` to `(db: Database, userId: string)`
 - Update all callers in youtube.ts and youtube/callback.ts
 
-### 1.9 Delete Supabase service client
+### 1.9 Delete Supabase service client ✅
 **Delete**: `nextjs/src/lib/clients/supabase.ts` (after all imports removed)
 
 **Verify**: All tRPC procedures, Inngest jobs, webhooks, and OAuth callbacks work with Drizzle against PlanetScale.
 
 ---
 
-## Phase 2: Authentication (Supabase Auth → Better Auth)
+## Phase 2: Authentication (Supabase Auth → Better Auth) ✅ DONE
 
-### 2.1 Replace tRPC auth context
+### 2.1 Replace tRPC auth context ✅
 **Modify**: `nextjs/src/server/trpc/context.ts`
 - Replace `supabase.auth.getUser()` with `auth.api.getSession({ headers })`
 - Context user comes from Better Auth session
 
-### 2.2 Replace tRPC auth middleware
+### 2.2 Replace tRPC auth middleware ✅
 **Modify**: `nextjs/src/server/trpc/init.ts`
 - `isAuthed` middleware checks `ctx.user` from Better Auth (same pattern, different source)
 
-### 2.3 Replace route middleware
+### 2.3 Replace route middleware ✅
 **Modify**: `nextjs/src/middleware.ts`
-- Replace Supabase `updateSession()` with `auth.api.getSession({ headers })`
+- Replaced with cookie-based check for `better-auth.session_token` (Edge-compatible)
 - Redirect to `/sign-in` if no session on `/dashboard/*` routes
 
-**Delete**: `nextjs/src/utils/supabase/middleware.ts`
+**Delete**: `nextjs/src/utils/supabase/middleware.ts` ✅
 
-### 2.4 Replace client auth state
-**Delete**: `nextjs/src/stores/use-auth-store.ts`
+### 2.4 Replace client auth state ✅
+**Delete**: `nextjs/src/stores/use-auth-store.ts` ✅
 
-**Rewrite**: `nextjs/src/hooks/useUser.tsx`
+**Rewrite**: `nextjs/src/hooks/useUser.tsx` ✅
 - Use `authClient.useSession()` instead of Zustand store
 - Expose `{ user, session, loading, signOut }` (same interface)
 
-### 2.5 Rewrite sign-in page
+### 2.5 Rewrite sign-in page ✅
 **Modify**: `nextjs/src/pages/sign-in.tsx`
 - Replace `supabase.auth.signInWithOtp()` with `authClient.signIn.magicLink({ email })`
-- Keep OTP input UI if Better Auth magic link plugin supports OTP verification; otherwise simplify to link-only
-- Replace `supabase.auth.verifyOtp()` with Better Auth verification
+- OTP UI removed — Better Auth magic link is link-only (no 6-digit code support)
 
-### 2.6 Rewrite sign-up page
+### 2.6 Rewrite sign-up page ✅
 **Modify**: `nextjs/src/pages/sign-up.tsx`
-- Same pattern as sign-in with `shouldCreateUser` equivalent
+- Same magic link pattern as sign-in (Better Auth auto-creates users)
 
-### 2.7 Rewrite Google sign-in button
+### 2.7 Rewrite Google sign-in button ✅
 **Modify**: `nextjs/src/components/GoogleSignInButton.tsx`
 - Replace `supabase.auth.signInWithOAuth({ provider: 'google' })` with `authClient.signIn.social({ provider: 'google' })`
 
-### 2.8 Update auth callback page
+### 2.8 Update auth callback page ✅
 **Modify**: `nextjs/src/pages/auth/callback.tsx`
 - Simplify: check for active session, redirect to dashboard
 - Better Auth handles OAuth callbacks via its catch-all route
 
-**Delete**: `nextjs/src/pages/api/auth/callback.ts` (replaced by Better Auth catch-all)
+**Delete**: `nextjs/src/pages/api/auth/callback.ts` ✅ (replaced by Better Auth catch-all)
 
-### 2.9 Update YouTube OAuth routes
+### 2.9 Update YouTube OAuth routes ✅
 **Modify**: `nextjs/src/pages/api/auth/youtube/callback.ts`
-- Replace `supabase.auth.getSession()` with `auth.api.getSession({ headers })`
+- Replace `supabase.auth.getSession()` with `auth.api.getSession({ headers })` via `fromNodeHeaders`
 
-**Modify**: `nextjs/src/pages/api/auth/youtube/initiate.ts`
+**Modify**: `nextjs/src/pages/api/auth/youtube/initiate.ts` ✅
 - Same auth check swap
 
-### 2.10 Update settings page
+### 2.10 Update settings page ✅
 **Modify**: `nextjs/src/pages/dashboard/settings.tsx`
-- Replace Supabase browser client with Better Auth hooks for user info
+- Replace Supabase browser client with `useUser()` hook for user info
 
-### 2.11 Update `_app.tsx`
+### 2.11 Update `_app.tsx` ✅
 **Modify**: `nextjs/src/pages/_app.tsx`
-- Remove `useUser()` initialization call (Better Auth handles its own state)
-- Or keep `useUser()` if needed for global auth state
+- Kept `useUser()` — Better Auth handles its own state via `authClient.useSession()`
+
+### Additional Phase 2 work (done early from Phase 4):
+- ✅ Deleted all `nextjs/src/utils/supabase/*` (6 files)
+- ✅ Deleted `nextjs/src/stores/use-auth-store.ts`
+- ✅ Deleted `nextjs/src/pages/api/auth/callback.ts`
+- ✅ Updated `nextjs/src/env/schema.mjs` — removed Supabase vars, added Better Auth/Resend/Google vars
+- ✅ Fixed all snake_case → camelCase property access in frontend components (ChannelsTab, ContainersTab, EditContainerModal, EditVariablesSheet, HistoryDrawer, VideosTab, pricing, settings)
+- ✅ Fixed Inngest `JsonifyObject` type issues in `updateVideoDescriptions.ts`
 
 **Verify**: Full auth flow — magic link sign-in, Google OAuth, sign-out, middleware redirect, tRPC auth, YouTube OAuth callback.
 
@@ -237,15 +242,15 @@ Key query conversions:
 
 ---
 
-## Phase 4: Cleanup
+## Phase 4: Cleanup (partially done — items marked below)
 
 ### 4.1 Delete Supabase files
 - `supabase/` (entire directory)
 - `shared-types/database.types.ts`
-- `nextjs/src/utils/supabase/` (all 6 files)
-- `nextjs/src/lib/clients/supabase.ts`
-- `nextjs/src/stores/use-auth-store.ts`
-- `nextjs/src/pages/api/auth/callback.ts`
+- ✅ `nextjs/src/utils/supabase/` (all 6 files) — deleted in Phase 2
+- ✅ `nextjs/src/lib/clients/supabase.ts` — deleted in Phase 1
+- ✅ `nextjs/src/stores/use-auth-store.ts` — deleted in Phase 2
+- ✅ `nextjs/src/pages/api/auth/callback.ts` — deleted in Phase 2
 
 ### 4.2 Remove Supabase packages
 ```
@@ -253,8 +258,9 @@ npm uninstall @supabase/ssr @supabase/supabase-js
 ```
 
 ### 4.3 Update env files
-- Remove Supabase vars from `.env.example` and env schema
-- Document new vars: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `RESEND_API_KEY`
+- ✅ Remove Supabase vars from env schema — done in Phase 2
+- ✅ Add new vars: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `RESEND_API_KEY` — done in Phase 2
+- Update `.env.example`
 
 ### 4.4 Update CLAUDE.md
 - Replace Supabase migration workflow with Drizzle workflow
