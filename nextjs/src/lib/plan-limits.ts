@@ -5,23 +5,23 @@
 
 import { TRPCError } from "@trpc/server";
 import { PLAN_CONFIG, type PlanTier } from "./stripe";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@shared-types/database.types";
+import type { Database } from "@/db";
+import { subscriptions, youtubeChannels, youtubeVideos } from "@/db/schema";
+import { eq, count, inArray } from "drizzle-orm";
 
 /**
  * Get the user's current plan tier
  */
 export async function getUserPlanTier(
   userId: string,
-  supabase: SupabaseClient<Database>
+  db: Database
 ): Promise<PlanTier> {
-  const { data: subscription } = await supabase
-    .from("subscriptions")
-    .select("plan_tier")
-    .eq("user_id", userId)
-    .single();
+  const [subscription] = await db
+    .select({ planTier: subscriptions.planTier })
+    .from(subscriptions)
+    .where(eq(subscriptions.userId, userId));
 
-  return (subscription?.plan_tier as PlanTier) || "free";
+  return (subscription?.planTier as PlanTier) || "free";
 }
 
 /**
@@ -36,7 +36,7 @@ export function getPlanFeatures(planTier: PlanTier) {
  */
 export async function checkVideoLimit(
   userId: string,
-  supabase: SupabaseClient<Database>
+  db: Database
 ): Promise<{
   canAddVideo: boolean;
   currentCount: number;
@@ -44,16 +44,16 @@ export async function checkVideoLimit(
   planTier: PlanTier;
 }> {
   // Get user's plan tier
-  const planTier = await getUserPlanTier(userId, supabase);
+  const planTier = await getUserPlanTier(userId, db);
   const features = getPlanFeatures(planTier);
 
   // Get user's channels
-  const { data: channels } = await supabase
-    .from("youtube_channels")
-    .select("id")
-    .eq("user_id", userId);
+  const channels = await db
+    .select({ id: youtubeChannels.id })
+    .from(youtubeChannels)
+    .where(eq(youtubeChannels.userId, userId));
 
-  const channelIds = channels?.map((c) => c.id) || [];
+  const channelIds = channels.map((c) => c.id);
 
   // Get current video count
   if (channelIds.length === 0) {
@@ -65,12 +65,12 @@ export async function checkVideoLimit(
     };
   }
 
-  const { count } = await supabase
-    .from("youtube_videos")
-    .select("id", { count: "exact", head: true })
-    .in("channel_id", channelIds);
+  const [result] = await db
+    .select({ count: count() })
+    .from(youtubeVideos)
+    .where(inArray(youtubeVideos.channelId, channelIds));
 
-  const currentCount = count || 0;
+  const currentCount = result?.count || 0;
   const limit = features.videoLimit;
 
   return {
@@ -86,7 +86,7 @@ export async function checkVideoLimit(
  */
 export async function checkChannelLimit(
   userId: string,
-  supabase: SupabaseClient<Database>
+  db: Database
 ): Promise<{
   canAddChannel: boolean;
   currentCount: number;
@@ -94,16 +94,16 @@ export async function checkChannelLimit(
   planTier: PlanTier;
 }> {
   // Get user's plan tier
-  const planTier = await getUserPlanTier(userId, supabase);
+  const planTier = await getUserPlanTier(userId, db);
   const features = getPlanFeatures(planTier);
 
   // Get current channel count
-  const { count } = await supabase
-    .from("youtube_channels")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId);
+  const [result] = await db
+    .select({ count: count() })
+    .from(youtubeChannels)
+    .where(eq(youtubeChannels.userId, userId));
 
-  const currentCount = count || 0;
+  const currentCount = result?.count || 0;
   const limit = features.channelLimit;
 
   return {
@@ -119,9 +119,9 @@ export async function checkChannelLimit(
  */
 export async function enforceVideoLimit(
   userId: string,
-  supabase: SupabaseClient<Database>
+  db: Database
 ): Promise<void> {
-  const result = await checkVideoLimit(userId, supabase);
+  const result = await checkVideoLimit(userId, db);
 
   if (!result.canAddVideo) {
     throw new TRPCError({
@@ -136,9 +136,9 @@ export async function enforceVideoLimit(
  */
 export async function enforceChannelLimit(
   userId: string,
-  supabase: SupabaseClient<Database>
+  db: Database
 ): Promise<void> {
-  const result = await checkChannelLimit(userId, supabase);
+  const result = await checkChannelLimit(userId, db);
 
   if (!result.canAddChannel) {
     throw new TRPCError({
@@ -153,9 +153,9 @@ export async function enforceChannelLimit(
  */
 export async function hasAutoUpdateAccess(
   userId: string,
-  supabase: SupabaseClient<Database>
+  db: Database
 ): Promise<boolean> {
-  const planTier = await getUserPlanTier(userId, supabase);
+  const planTier = await getUserPlanTier(userId, db);
   const features = getPlanFeatures(planTier);
   return features.autoUpdate;
 }
@@ -165,9 +165,9 @@ export async function hasAutoUpdateAccess(
  */
 export async function hasTeamFeaturesAccess(
   userId: string,
-  supabase: SupabaseClient<Database>
+  db: Database
 ): Promise<boolean> {
-  const planTier = await getUserPlanTier(userId, supabase);
+  const planTier = await getUserPlanTier(userId, db);
   const features = getPlanFeatures(planTier);
   return 'teamFeatures' in features ? features.teamFeatures : false;
 }
