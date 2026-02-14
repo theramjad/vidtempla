@@ -18,7 +18,8 @@
       "WebFetch(domain:developers.google.com)",
       "mcp__exa__web_search_exa",
       "WebFetch(domain:www.better-auth.com)",
-      "WebFetch(domain:planetscale.com)"
+      "WebFetch(domain:planetscale.com)",
+      "Bash(npm uninstall:*)"
     ],
     "deny": [],
     "ask": []
