@@ -15,7 +15,9 @@ import {
   getFeatureDifference,
   formatCents,
 } from "@/lib/stripe";
-import { supabaseServer } from "@/lib/clients/supabase";
+import { db } from "@/db";
+import { subscriptions, youtubeChannels, youtubeVideos } from "@/db/schema";
+import { eq, and, desc, count, inArray } from "drizzle-orm";
 import { router } from "@/server/trpc/init";
 
 export const billingRouter = router({
@@ -23,40 +25,23 @@ export const billingRouter = router({
    * Get the current user's subscription plan
    */
   getCurrentPlan: protectedProcedure.query(async ({ ctx }) => {
-    const { data: subscription, error } = await supabaseServer
-      .from("subscriptions")
-      .select("*")
-      .eq("user_id", ctx.user.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (error && error.code !== "PGRST116") {
-      // PGRST116 is "no rows found"
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: error.message,
-      });
-    }
+    const [subscription] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, ctx.user.id))
+      .orderBy(desc(subscriptions.createdAt))
+      .limit(1);
 
     // If no subscription exists, create a free tier subscription
     if (!subscription) {
-      const { data: newSubscription, error: insertError } = await supabaseServer
-        .from("subscriptions")
-        .insert({
-          user_id: ctx.user.id,
-          plan_tier: "free",
+      const [newSubscription] = await db
+        .insert(subscriptions)
+        .values({
+          userId: ctx.user.id,
+          planTier: "free",
           status: "active",
         })
-        .select()
-        .single();
-
-      if (insertError) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: insertError.message,
-        });
-      }
+        .returning();
 
       return newSubscription;
     }
@@ -85,31 +70,21 @@ export const billingRouter = router({
         }
 
         // Get or create subscription record
-        let { data: subscription } = await supabaseServer
-          .from("subscriptions")
-          .select("*")
-          .eq("user_id", ctx.user.id)
-          .single();
+        let [subscription] = await db
+          .select()
+          .from(subscriptions)
+          .where(eq(subscriptions.userId, ctx.user.id));
 
         // Create subscription record if it doesn't exist
         if (!subscription) {
-          const { data: newSubscription, error: insertError } = await supabaseServer
-            .from("subscriptions")
-            .insert({
-              user_id: ctx.user.id,
-              plan_tier: "free",
+          const [newSubscription] = await db
+            .insert(subscriptions)
+            .values({
+              userId: ctx.user.id,
+              planTier: "free",
               status: "active",
             })
-            .select()
-            .single();
-
-          if (insertError) {
-            console.error("Error creating subscription record:", insertError);
-            throw new TRPCError({
-              code: "INTERNAL_SERVER_ERROR",
-              message: "Failed to create subscription record",
-            });
-          }
+            .returning();
 
           subscription = newSubscription;
         }
@@ -161,13 +136,12 @@ export const billingRouter = router({
    */
   getCustomerPortalUrl: protectedProcedure.query(async ({ ctx }) => {
     try {
-      const { data: subscription } = await supabaseServer
-        .from("subscriptions")
-        .select("stripe_customer_id")
-        .eq("user_id", ctx.user.id)
-        .single();
+      const [subscription] = await db
+        .select({ stripeCustomerId: subscriptions.stripeCustomerId })
+        .from(subscriptions)
+        .where(eq(subscriptions.userId, ctx.user.id));
 
-      if (!subscription?.stripe_customer_id) {
+      if (!subscription?.stripeCustomerId) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "No active subscription found",
@@ -176,7 +150,7 @@ export const billingRouter = router({
 
       // Create Stripe Customer Portal session
       const portalSession = await stripe.billingPortal.sessions.create({
-        customer: subscription.stripe_customer_id,
+        customer: subscription.stripeCustomerId,
         return_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/settings`,
       });
 
@@ -200,51 +174,38 @@ export const billingRouter = router({
    */
   getUsageStats: protectedProcedure.query(async ({ ctx }) => {
     // Get channel count
-    const { data: channels, error: channelsError } = await supabaseServer
-      .from("youtube_channels")
-      .select("id")
-      .eq("user_id", ctx.user.id);
-
-    if (channelsError) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: channelsError.message,
-      });
-    }
+    const channels = await db
+      .select({ id: youtubeChannels.id })
+      .from(youtubeChannels)
+      .where(eq(youtubeChannels.userId, ctx.user.id));
 
     // Get video count across all user's channels
-    const { data: videos, error: videosError } = await supabaseServer
-      .from("youtube_videos")
-      .select("id")
-      .in(
-        "channel_id",
-        channels?.map((c) => c.id) || []
-      );
+    const channelIds = channels.map((c) => c.id);
+    let videos: { id: string }[] = [];
 
-    if (videosError) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: videosError.message,
-      });
+    if (channelIds.length > 0) {
+      videos = await db
+        .select({ id: youtubeVideos.id })
+        .from(youtubeVideos)
+        .where(inArray(youtubeVideos.channelId, channelIds));
     }
 
     // Get current plan
-    const { data: subscription } = await supabaseServer
-      .from("subscriptions")
-      .select("plan_tier")
-      .eq("user_id", ctx.user.id)
-      .single();
+    const [subscription] = await db
+      .select({ planTier: subscriptions.planTier })
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, ctx.user.id));
 
-    const planTier = (subscription?.plan_tier as PlanTier) || "free";
+    const planTier = (subscription?.planTier as PlanTier) || "free";
     const limits = PLAN_CONFIG[planTier].features;
 
     return {
       channels: {
-        current: channels?.length || 0,
+        current: channels.length,
         limit: limits.channelLimit,
       },
       videos: {
-        current: videos?.length || 0,
+        current: videos.length,
         limit: limits.videoLimit,
       },
       planTier,
@@ -263,11 +224,10 @@ export const billingRouter = router({
     )
     .query(async ({ ctx, input }) => {
       // Get current subscription
-      const { data: subscription } = await supabaseServer
-        .from("subscriptions")
-        .select("*")
-        .eq("user_id", ctx.user.id)
-        .single();
+      const [subscription] = await db
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.userId, ctx.user.id));
 
       if (!subscription) {
         throw new TRPCError({
@@ -276,7 +236,7 @@ export const billingRouter = router({
         });
       }
 
-      const currentTier = subscription.plan_tier as PlanTier;
+      const currentTier = subscription.planTier as PlanTier;
       const targetTier = input.targetPlanTier;
 
       // Get plan configurations
@@ -288,11 +248,11 @@ export const billingRouter = router({
 
       // Calculate prorated amount if upgrading and has billing period
       let proratedAmount = 0;
-      if (isUpgrading && subscription.current_period_end) {
+      if (isUpgrading && subscription.currentPeriodEnd) {
         proratedAmount = calculateProratedAmount(
           currentConfig.priceMonthly,
           targetConfig.priceMonthly,
-          new Date(subscription.current_period_end)
+          new Date(subscription.currentPeriodEnd)
         );
       }
 
@@ -314,7 +274,7 @@ export const billingRouter = router({
         proratedAmount,
         proratedAmountFormatted: formatCents(proratedAmount),
         newMonthlyPriceFormatted: formatCents(targetConfig.priceMonthly),
-        currentPeriodEnd: subscription.current_period_end,
+        currentPeriodEnd: subscription.currentPeriodEnd,
         featuresGaining: featureDiff.gaining,
         featuresLosing: featureDiff.losing,
       };
@@ -331,11 +291,10 @@ export const billingRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       // Get current subscription
-      const { data: subscription } = await supabaseServer
-        .from("subscriptions")
-        .select("*")
-        .eq("user_id", ctx.user.id)
-        .single();
+      const [subscription] = await db
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.userId, ctx.user.id));
 
       if (!subscription) {
         throw new TRPCError({
@@ -345,7 +304,7 @@ export const billingRouter = router({
       }
 
       // Check if subscription has a Stripe subscription ID
-      if (!subscription.stripe_subscription_id) {
+      if (!subscription.stripeSubscriptionId) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message: "No active paid subscription found. Please subscribe first.",
@@ -360,7 +319,7 @@ export const billingRouter = router({
         });
       }
 
-      const currentTier = subscription.plan_tier as PlanTier;
+      const currentTier = subscription.planTier as PlanTier;
       const targetTier = input.targetPlanTier;
 
       // Check if same plan
@@ -376,22 +335,22 @@ export const billingRouter = router({
       try {
         // Handle downgrade to free (cancel subscription)
         if (targetTier === "free") {
-          await stripe.subscriptions.update(subscription.stripe_subscription_id, {
+          await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
             cancel_at_period_end: true,
           });
 
           // Update local subscription to reflect pending cancellation
-          await supabaseServer
-            .from("subscriptions")
-            .update({
-              cancel_at_period_end: true,
+          await db
+            .update(subscriptions)
+            .set({
+              cancelAtPeriodEnd: true,
             })
-            .eq("id", subscription.id);
+            .where(eq(subscriptions.id, subscription.id));
 
           return {
             success: true,
             message: `Your subscription will be canceled at the end of the current billing period`,
-            effectiveDate: subscription.current_period_end,
+            effectiveDate: subscription.currentPeriodEnd,
             isImmediate: false,
           };
         }
@@ -407,7 +366,7 @@ export const billingRouter = router({
 
         // Get current subscription from Stripe
         const stripeSubscription = await stripe.subscriptions.retrieve(
-          subscription.stripe_subscription_id
+          subscription.stripeSubscriptionId
         );
 
         const firstItem = stripeSubscription.items.data[0];
@@ -419,7 +378,7 @@ export const billingRouter = router({
         }
 
         // Update subscription with Stripe
-        await stripe.subscriptions.update(subscription.stripe_subscription_id, {
+        await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
           items: [
             {
               id: firstItem.id,
@@ -451,7 +410,7 @@ export const billingRouter = router({
           return {
             success: true,
             message: `Your plan will change to ${targetConfig.name} at the end of your billing period`,
-            effectiveDate: subscription.current_period_end,
+            effectiveDate: subscription.currentPeriodEnd,
             isImmediate: false,
           };
         }
