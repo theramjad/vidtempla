@@ -5,7 +5,9 @@
 
 import { inngestClient } from '@/lib/clients/inngest';
 import { NonRetriableError } from 'inngest';
-import { createClient } from '@supabase/supabase-js';
+import { db } from '@/db';
+import { youtubeChannels, youtubeVideos, descriptionHistory } from '@/db/schema';
+import { eq, and, inArray } from 'drizzle-orm';
 import { decrypt, encrypt } from '@/utils/encryption';
 import {
   refreshAccessToken,
@@ -13,10 +15,6 @@ import {
   fetchChannelInfo,
   getUploadsPlaylistId,
 } from '@/lib/clients/youtube';
-import type { Database } from '@shared-types/database.types';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export const syncChannelVideos = inngestClient.createFunction(
   {
@@ -35,42 +33,41 @@ export const syncChannelVideos = inngestClient.createFunction(
         errorMessage.includes('Failed to refresh access token');
 
       // Reset sync status and mark token as invalid if it's a token error
-      const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
-      await supabase
-        .from('youtube_channels')
-        .update({
-          sync_status: 'idle',
-          ...(isTokenError && { token_status: 'invalid' }),
+      await db
+        .update(youtubeChannels)
+        .set({
+          syncStatus: 'idle',
+          ...(isTokenError && { tokenStatus: 'invalid' }),
         })
-        .eq('id', channelId);
+        .where(eq(youtubeChannels.id, channelId));
     },
   },
   { event: 'youtube/channel.sync' },
   async ({ event, step }) => {
     const { channelId, userId } = event.data;
 
-    // Initialize Supabase client with service role
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
-
     // Step 0: Set sync status to 'syncing'
     await step.run('set-syncing-status', async () => {
-      await supabase
-        .from('youtube_channels')
-        .update({ sync_status: 'syncing' })
-        .eq('id', channelId);
+      await db
+        .update(youtubeChannels)
+        .set({ syncStatus: 'syncing' })
+        .where(eq(youtubeChannels.id, channelId));
     });
 
     // Step 1: Fetch channel from database and decrypt tokens
     const channel = await step.run('fetch-channel', async () => {
-      const { data, error } = await supabase
-        .from('youtube_channels')
-        .select('*')
-        .eq('id', channelId)
-        .eq('user_id', userId)
-        .single();
+      const [data] = await db
+        .select()
+        .from(youtubeChannels)
+        .where(
+          and(
+            eq(youtubeChannels.id, channelId),
+            eq(youtubeChannels.userId, userId)
+          )
+        );
 
-      if (error || !data) {
-        throw new Error(`Channel not found: ${error?.message || 'Unknown error'}`);
+      if (!data) {
+        throw new Error(`Channel not found`);
       }
 
       return data;
@@ -78,18 +75,18 @@ export const syncChannelVideos = inngestClient.createFunction(
 
     // Step 2: Get valid access token (refresh if needed)
     const accessToken = await step.run('get-access-token', async () => {
-      if (!channel.access_token_encrypted || !channel.refresh_token_encrypted) {
+      if (!channel.accessTokenEncrypted || !channel.refreshTokenEncrypted) {
         throw new Error('Channel tokens not found');
       }
 
-      const currentAccessToken = decrypt(channel.access_token_encrypted);
-      const expiresAt = channel.token_expires_at ? new Date(channel.token_expires_at) : null;
+      const currentAccessToken = decrypt(channel.accessTokenEncrypted);
+      const expiresAt = channel.tokenExpiresAt ? new Date(channel.tokenExpiresAt) : null;
       const now = new Date();
       const bufferTime = 5 * 60 * 1000; // 5 minutes
 
       // Check if token is expired or about to expire
       if (expiresAt && expiresAt.getTime() - now.getTime() < bufferTime) {
-        const refreshToken = decrypt(channel.refresh_token_encrypted);
+        const refreshToken = decrypt(channel.refreshTokenEncrypted);
 
         try {
           const newTokens = await refreshAccessToken(refreshToken);
@@ -98,13 +95,13 @@ export const syncChannelVideos = inngestClient.createFunction(
           const newExpiresAt = new Date();
           newExpiresAt.setSeconds(newExpiresAt.getSeconds() + newTokens.expires_in);
 
-          await supabase
-            .from('youtube_channels')
-            .update({
-              access_token_encrypted: encrypt(newTokens.access_token),
-              token_expires_at: newExpiresAt.toISOString(),
+          await db
+            .update(youtubeChannels)
+            .set({
+              accessTokenEncrypted: encrypt(newTokens.access_token),
+              tokenExpiresAt: newExpiresAt,
             })
-            .eq('id', channelId);
+            .where(eq(youtubeChannels.id, channelId));
 
           return newTokens.access_token;
         } catch (error) {
@@ -118,24 +115,24 @@ export const syncChannelVideos = inngestClient.createFunction(
 
           if (isTokenError) {
             // Mark channel as needing re-authentication immediately
-            await supabase
-              .from('youtube_channels')
-              .update({
-                token_status: 'invalid',
-                sync_status: 'idle',
+            await db
+              .update(youtubeChannels)
+              .set({
+                tokenStatus: 'invalid',
+                syncStatus: 'idle',
               })
-              .eq('id', channelId);
+              .where(eq(youtubeChannels.id, channelId));
 
             // Throw non-retryable error
             throw new NonRetriableError(
-              `Token invalid for channel ${channel.channel_id} (${channel.title || 'Unknown'}). ` +
+              `Token invalid for channel ${channel.channelId} (${channel.title || 'Unknown'}). ` +
               `Please re-authenticate. Error: ${errorMessage}`
             );
           }
 
           // For other errors, throw normally (will retry)
           throw new Error(
-            `Failed to refresh access token for channel ${channel.channel_id} (DB ID: ${channelId}). ` +
+            `Failed to refresh access token for channel ${channel.channelId} (DB ID: ${channelId}). ` +
             `Channel: ${channel.title || 'Unknown'}. ` +
             `Error: ${errorMessage}`
           );
@@ -150,14 +147,14 @@ export const syncChannelVideos = inngestClient.createFunction(
       try {
         const channelInfo = await fetchChannelInfo(accessToken);
 
-        await supabase
-          .from('youtube_channels')
-          .update({
+        await db
+          .update(youtubeChannels)
+          .set({
             title: channelInfo.snippet.title,
-            thumbnail_url: channelInfo.snippet.thumbnails.default.url,
-            subscriber_count: parseInt(channelInfo.statistics.subscriberCount || '0', 10),
+            thumbnailUrl: channelInfo.snippet.thumbnails.default.url,
+            subscriberCount: parseInt(channelInfo.statistics.subscriberCount || '0', 10),
           })
-          .eq('id', channelId);
+          .where(eq(youtubeChannels.id, channelId));
       } catch (error) {
         console.error('Failed to update channel info:', error);
         // Don't fail the entire job if this fails
@@ -166,7 +163,7 @@ export const syncChannelVideos = inngestClient.createFunction(
 
     // Step 4: Get uploads playlist ID (needed for PlaylistItems API)
     const uploadsPlaylistId = await step.run('get-uploads-playlist', async () => {
-      return await getUploadsPlaylistId(channel.channel_id, accessToken);
+      return await getUploadsPlaylistId(channel.channelId, accessToken);
     });
 
     // Step 5: Fetch all videos from YouTube (handle pagination)
@@ -183,7 +180,7 @@ export const syncChannelVideos = inngestClient.createFunction(
 
       do {
         const response = await fetchChannelVideos(
-          channel.channel_id,
+          channel.channelId,
           accessToken,
           pageToken,
           uploadsPlaylistId
@@ -201,13 +198,13 @@ export const syncChannelVideos = inngestClient.createFunction(
       const videoIds = allVideos.map((v) => v.id);
 
       // Get existing videos in database
-      const { data: existingVideos } = await supabase
-        .from('youtube_videos')
-        .select('video_id')
-        .eq('channel_id', channelId);
+      const existingVideos = await db
+        .select({ videoId: youtubeVideos.videoId })
+        .from(youtubeVideos)
+        .where(eq(youtubeVideos.channelId, channelId));
 
       const existingVideoIds = new Set(
-        existingVideos?.map((v) => v.video_id) || []
+        existingVideos.map((v) => v.videoId)
       );
 
       // Track new videos added
@@ -221,38 +218,41 @@ export const syncChannelVideos = inngestClient.createFunction(
 
         if (isNewVideo) {
           // Insert new video without checking limits
-          const { data: insertedVideo, error: insertError } = await supabase
-            .from('youtube_videos')
-            .insert({
-              channel_id: channelId,
-              video_id: videoId,
+          const [insertedVideo] = await db
+            .insert(youtubeVideos)
+            .values({
+              channelId: channelId,
+              videoId: videoId,
               title: ytVideo.snippet.title,
-              current_description: ytVideo.snippet.description,
-              published_at: ytVideo.snippet.publishedAt,
+              currentDescription: ytVideo.snippet.description,
+              publishedAt: new Date(ytVideo.snippet.publishedAt),
             })
-            .select()
-            .single();
+            .returning();
 
-          if (!insertError && insertedVideo) {
+          if (insertedVideo) {
             newVideosAdded++;
             // Create initial description history entry
-            await supabase.from('description_history').insert({
-              video_id: insertedVideo.id,
+            await db.insert(descriptionHistory).values({
+              videoId: insertedVideo.id,
               description: ytVideo.snippet.description || '',
-              version_number: 1,
-              created_by: userId,
+              versionNumber: 1,
+              createdBy: userId,
             });
           }
         } else {
           // Update existing video (title, published_at - don't change description)
-          await supabase
-            .from('youtube_videos')
-            .update({
+          await db
+            .update(youtubeVideos)
+            .set({
               title: ytVideo.snippet.title,
-              published_at: ytVideo.snippet.publishedAt,
+              publishedAt: new Date(ytVideo.snippet.publishedAt),
             })
-            .eq('video_id', videoId)
-            .eq('channel_id', channelId);
+            .where(
+              and(
+                eq(youtubeVideos.videoId, videoId),
+                eq(youtubeVideos.channelId, channelId)
+              )
+            );
         }
       }
 
@@ -262,11 +262,14 @@ export const syncChannelVideos = inngestClient.createFunction(
       );
 
       if (videosToDelete.length > 0) {
-        await supabase
-          .from('youtube_videos')
-          .delete()
-          .in('video_id', videosToDelete)
-          .eq('channel_id', channelId);
+        await db
+          .delete(youtubeVideos)
+          .where(
+            and(
+              inArray(youtubeVideos.videoId, videosToDelete),
+              eq(youtubeVideos.channelId, channelId)
+            )
+          );
       }
 
       return {
@@ -278,13 +281,13 @@ export const syncChannelVideos = inngestClient.createFunction(
 
     // Step 7: Update last_synced_at timestamp and set status to idle
     await step.run('update-sync-timestamp', async () => {
-      await supabase
-        .from('youtube_channels')
-        .update({
-          last_synced_at: new Date().toISOString(),
-          sync_status: 'idle'
+      await db
+        .update(youtubeChannels)
+        .set({
+          lastSyncedAt: new Date(),
+          syncStatus: 'idle'
         })
-        .eq('id', channelId);
+        .where(eq(youtubeChannels.id, channelId));
     });
 
     return {

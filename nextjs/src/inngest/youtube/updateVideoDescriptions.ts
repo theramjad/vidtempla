@@ -5,40 +5,35 @@
 
 import { inngestClient } from '@/lib/clients/inngest';
 import { NonRetriableError } from 'inngest';
-import { createClient } from '@supabase/supabase-js';
+import { db } from '@/db';
+import { youtubeChannels, youtubeVideos, templates, descriptionHistory } from '@/db/schema';
+import { eq, inArray, desc } from 'drizzle-orm';
 import { decrypt, encrypt } from '@/utils/encryption';
 import { refreshAccessToken, updateVideoDescription } from '@/lib/clients/youtube';
 import { buildDescription } from '@/utils/templateParser';
-import type { Database } from '@shared-types/database.types';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // Helper to get valid access token
 async function getValidAccessToken(
   channel: {
     id: string;
-    channel_id?: string;
+    channelId: string | null;
     title?: string | null;
-    access_token_encrypted: string | null;
-    refresh_token_encrypted: string | null;
-    token_expires_at: string | null;
-  },
-  supabase: ReturnType<typeof createClient<Database>>
+    accessTokenEncrypted: string | null;
+    refreshTokenEncrypted: string | null;
+    tokenExpiresAt: Date | null;
+  }
 ): Promise<string> {
-  if (!channel.access_token_encrypted || !channel.refresh_token_encrypted) {
+  if (!channel.accessTokenEncrypted || !channel.refreshTokenEncrypted) {
     throw new Error('Channel tokens not found');
   }
 
-  const accessToken = decrypt(channel.access_token_encrypted);
-  const expiresAt = channel.token_expires_at
-    ? new Date(channel.token_expires_at)
-    : null;
+  const accessToken = decrypt(channel.accessTokenEncrypted);
+  const expiresAt = channel.tokenExpiresAt;
   const now = new Date();
   const bufferTime = 5 * 60 * 1000; // 5 minutes
 
   if (expiresAt && expiresAt.getTime() - now.getTime() < bufferTime) {
-    const refreshToken = decrypt(channel.refresh_token_encrypted);
+    const refreshToken = decrypt(channel.refreshTokenEncrypted);
 
     try {
       const newTokens = await refreshAccessToken(refreshToken);
@@ -46,13 +41,13 @@ async function getValidAccessToken(
       const newExpiresAt = new Date();
       newExpiresAt.setSeconds(newExpiresAt.getSeconds() + newTokens.expires_in);
 
-      await supabase
-        .from('youtube_channels')
-        .update({
-          access_token_encrypted: encrypt(newTokens.access_token),
-          token_expires_at: newExpiresAt.toISOString(),
+      await db
+        .update(youtubeChannels)
+        .set({
+          accessTokenEncrypted: encrypt(newTokens.access_token),
+          tokenExpiresAt: newExpiresAt,
         })
-        .eq('id', channel.id);
+        .where(eq(youtubeChannels.id, channel.id));
 
       return newTokens.access_token;
     } catch (error) {
@@ -66,21 +61,21 @@ async function getValidAccessToken(
 
       if (isTokenError) {
         // Mark channel as needing re-authentication immediately
-        await supabase
-          .from('youtube_channels')
-          .update({ token_status: 'invalid' })
-          .eq('id', channel.id);
+        await db
+          .update(youtubeChannels)
+          .set({ tokenStatus: 'invalid' })
+          .where(eq(youtubeChannels.id, channel.id));
 
         // Throw non-retryable error
         throw new NonRetriableError(
-          `Token invalid for channel ${channel.channel_id || 'unknown'} (${channel.title || 'Unknown'}). ` +
+          `Token invalid for channel ${channel.channelId || 'unknown'} (${channel.title || 'Unknown'}). ` +
           `Please re-authenticate. Error: ${errorMessage}`
         );
       }
 
       // For other errors, throw normally (will retry)
       throw new Error(
-        `Failed to refresh access token for channel ${channel.channel_id || 'unknown'} (DB ID: ${channel.id}). ` +
+        `Failed to refresh access token for channel ${channel.channelId || 'unknown'} (DB ID: ${channel.id}). ` +
         `Channel: ${channel.title || 'Unknown'}. ` +
         `Error: ${errorMessage}`
       );
@@ -104,30 +99,16 @@ export const updateVideoDescriptions = inngestClient.createFunction(
   async ({ event, step }) => {
     const { videoIds, userId } = event.data;
 
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
-
     // Step 1: Fetch videos with their containers, templates, and variables
     const videosToUpdate = await step.run('fetch-videos-data', async () => {
-      const { data: videos, error } = await supabase
-        .from('youtube_videos')
-        .select(
-          `
-          *,
-          channel:youtube_channels!youtube_videos_channel_id_fkey(*),
-          container:containers(
-            id,
-            name,
-            template_order,
-            separator
-          ),
-          variables:video_variables(*)
-        `
-        )
-        .in('id', videoIds);
-
-      if (error) {
-        throw new Error(`Failed to fetch videos: ${error.message}`);
-      }
+      const videos = await db.query.youtubeVideos.findMany({
+        where: inArray(youtubeVideos.id, videoIds),
+        with: {
+          youtubeChannel: true,
+          container: true,
+          videoVariables: true,
+        },
+      });
 
       return videos || [];
     });
@@ -140,32 +121,32 @@ export const updateVideoDescriptions = inngestClient.createFunction(
 
         for (const video of videosToUpdate) {
           // Skip videos without containers
-          if (!video.container || !video.container.template_order) {
+          if (!video.container || !video.container.templateOrder) {
             continue;
           }
 
           // Fetch templates in order
-          const { data: templates } = await supabase
-            .from('templates')
-            .select('*')
-            .in('id', video.container.template_order);
+          const templatesList = await db
+            .select()
+            .from(templates)
+            .where(inArray(templates.id, video.container.templateOrder));
 
-          if (!templates || templates.length === 0) {
+          if (!templatesList || templatesList.length === 0) {
             continue;
           }
 
           // Order templates according to template_order array
-          const orderedTemplates = video.container.template_order
+          const orderedTemplates = video.container.templateOrder
             .map((templateId) =>
-              templates.find((t) => t.id === templateId)
+              templatesList.find((t) => t.id === templateId)
             )
             .filter((t): t is NonNullable<typeof t> => t !== undefined);
 
           // Build variables map
           const variablesMap: Record<string, string> = {};
-          if (video.variables) {
-            video.variables.forEach((v: { variable_name: string; variable_value: string | null }) => {
-              variablesMap[v.variable_name] = v.variable_value || '';
+          if (video.videoVariables) {
+            video.videoVariables.forEach((v: { variableName: string; variableValue: string | null }) => {
+              variablesMap[v.variableName] = v.variableValue || '';
             });
           }
 
@@ -174,17 +155,17 @@ export const updateVideoDescriptions = inngestClient.createFunction(
             orderedTemplates,
             variablesMap,
             video.container.separator,
-            video.video_id // Pass YouTube video ID for default variables
+            video.videoId // Pass YouTube video ID for default variables
           );
 
           // Only update if description changed
-          if (newDescription !== video.current_description) {
+          if (newDescription !== video.currentDescription) {
             results.push({
               videoId: video.id,
-              videoIdYouTube: video.video_id,
-              channelId: video.channel_id,
+              videoIdYouTube: video.videoId,
+              channelId: video.channelId,
               newDescription,
-              channel: video.channel,
+              channel: video.youtubeChannel,
             });
           }
         }
@@ -213,10 +194,7 @@ export const updateVideoDescriptions = inngestClient.createFunction(
           for (const item of batch) {
             try {
               // Get valid access token for this channel
-              const accessToken = await getValidAccessToken(
-                item.channel,
-                supabase
-              );
+              const accessToken = await getValidAccessToken(item.channel);
 
               // Update YouTube
               await updateVideoDescription(
@@ -259,28 +237,27 @@ export const updateVideoDescriptions = inngestClient.createFunction(
         const description = update.description!;
 
         // Get current version number
-        const { data: historyData } = await supabase
-          .from('description_history')
-          .select('version_number')
-          .eq('video_id', update.videoId)
-          .order('version_number', { ascending: false })
-          .limit(1)
-          .single();
+        const historyData = await db
+          .select({ versionNumber: descriptionHistory.versionNumber })
+          .from(descriptionHistory)
+          .where(eq(descriptionHistory.videoId, update.videoId))
+          .orderBy(desc(descriptionHistory.versionNumber))
+          .limit(1);
 
-        const nextVersion = (historyData?.version_number || 0) + 1;
+        const nextVersion = (historyData[0]?.versionNumber || 0) + 1;
 
         // Update current_description
-        await supabase
-          .from('youtube_videos')
-          .update({ current_description: description })
-          .eq('id', update.videoId);
+        await db
+          .update(youtubeVideos)
+          .set({ currentDescription: description })
+          .where(eq(youtubeVideos.id, update.videoId));
 
         // Create history entry
-        await supabase.from('description_history').insert({
-          video_id: update.videoId,
+        await db.insert(descriptionHistory).values({
+          videoId: update.videoId,
           description: description,
-          version_number: nextVersion,
-          created_by: userId,
+          versionNumber: nextVersion,
+          createdBy: userId,
         });
       }
 

@@ -4,11 +4,8 @@
  */
 
 import { inngestClient } from '@/lib/clients/inngest';
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '@shared-types/database.types';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import { db } from '@/db';
+import { youtubeChannels } from '@/db/schema';
 
 export const scheduledSync = inngestClient.createFunction(
   {
@@ -17,17 +14,11 @@ export const scheduledSync = inngestClient.createFunction(
   },
   { cron: '0 */6 * * *' }, // Run every 6 hours
   async ({ step }) => {
-    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
-
     // Step 1: Fetch all YouTube channels
     const channels = await step.run('fetch-all-channels', async () => {
-      const { data, error } = await supabase
-        .from('youtube_channels')
-        .select('id, user_id');
-
-      if (error) {
-        throw new Error(`Failed to fetch channels: ${error.message}`);
-      }
+      const data = await db
+        .select({ id: youtubeChannels.id, userId: youtubeChannels.userId })
+        .from(youtubeChannels);
 
       return data || [];
     });
@@ -39,7 +30,7 @@ export const scheduledSync = inngestClient.createFunction(
           name: 'youtube/channel.sync',
           data: {
             channelId: channel.id,
-            userId: channel.user_id,
+            userId: channel.userId,
           },
         });
       }
