@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { protectedProcedure } from '@/server/trpc/init';
 import { TRPCError } from '@trpc/server';
-import { supabaseServer } from '@/lib/clients/supabase';
+import { db } from '@/db';
+import { youtubeVideos, templates, containers, videoVariables } from '@/db/schema';
+import { eq, and, isNull, desc, inArray, sql } from 'drizzle-orm';
 import { openai } from '@/lib/clients/openai';
 import { zodResponseFormat, zodTextFormat } from 'openai/helpers/zod';
 import { env } from '@/env/server.mjs';
@@ -42,15 +44,23 @@ export const aiRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       // 1. Fetch recent videos
-      const { data: videos, error } = await supabaseServer
-        .from('youtube_videos')
-        .select('id, title, current_description, video_id')
-        .eq('channel_id', input.channelId)
-        .is('container_id', null)
-        .order('published_at', { ascending: false })
+      const videos = await db
+        .select({
+          id: youtubeVideos.id,
+          title: youtubeVideos.title,
+          currentDescription: youtubeVideos.currentDescription,
+          videoId: youtubeVideos.videoId,
+        })
+        .from(youtubeVideos)
+        .where(
+          and(
+            eq(youtubeVideos.channelId, input.channelId),
+            isNull(youtubeVideos.containerId)
+          )
+        )
+        .orderBy(desc(youtubeVideos.publishedAt))
         .limit(input.limit);
 
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
       if (!videos || videos.length === 0) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -59,16 +69,19 @@ export const aiRouter = router({
       }
 
       // 2. Fetch existing templates
-      const { data: existingTemplates } = await supabaseServer
-        .from('templates')
-        .select('name, content')
-        .eq('user_id', ctx.user.id);
+      const existingTemplates = await db
+        .select({
+          name: templates.name,
+          content: templates.content,
+        })
+        .from(templates)
+        .where(eq(templates.userId, ctx.user.id));
 
       // 3. Construct Prompt
       const videosText = videos
         .map(
           (v, i) =>
-            `--- VIDEO ${i + 1} (ID: ${v.id}) ---\nTITLE: ${v.title}\nDESCRIPTION:\n${v.current_description}\n`
+            `--- VIDEO ${i + 1} (ID: ${v.id}) ---\nTITLE: ${v.title}\nDESCRIPTION:\n${v.currentDescription}\n`
         )
         .join('\n');
 
@@ -106,19 +119,19 @@ export const aiRouter = router({
       <EXAMPLE_1>
         <INPUT_DESCRIPTION>
         Welcome to Episode 45! In this video, we talk about React 19.
-        
+
         Timestamps:
         0:00 Intro
         1:00 React 19
-        
+
         Follow me:
         Twitter: @example
         Instagram: @example
-        
+
         Gear I use:
         Camera: Sony A7
         Lens: 24mm
-        
+
         Disclaimer: This video contains affiliate links.
         </INPUT_DESCRIPTION>
 
@@ -126,7 +139,7 @@ export const aiRouter = router({
           <TEMPLATE name="Episode Content">
             Welcome to {{episode_title}}! In this video, {{episode_summary}}.
           </TEMPLATE>
-            
+
           <TEMPLATE name="Timestamps">
             Timestamps:
             {{timestamps}}
@@ -137,12 +150,12 @@ export const aiRouter = router({
             Twitter: @example
             Instagram: @example
           </TEMPLATE>
-            
+
           <TEMPLATE name="Gear">
             Gear I use:
             Camera: Sony A7
             Lens: 24mm
-            
+
             Disclaimer: This video contains affiliate links.
           </TEMPLATE>
         </DESIRED_OUTPUT_STRUCTURE>
@@ -152,9 +165,9 @@ export const aiRouter = router({
         <INPUT_DESCRIPTION>
         Today's guest is John Doe, CEO of TechCorp.
         We discuss the future of AI.
-        
+
         Get 20% off at ExampleStore with code: TECH20
-        
+
         Join our Discord: discord.gg/example
         Subscribe for more!
         </INPUT_DESCRIPTION>
@@ -184,7 +197,7 @@ export const aiRouter = router({
         <INPUT_DESCRIPTION>
         My Daily Vlog #102
         Just walking around Tokyo today.
-        
+
         Music by Epidemic Sound.
         </INPUT_DESCRIPTION>
 
@@ -274,53 +287,63 @@ export const aiRouter = router({
         // Logic based on AI's 'action'
         if (tpl.action === 'reuse') {
           // AI says reuse -> Try to find by NAME first (as it should have used the existing name)
-          const { data: existingByName } = await supabaseServer
-            .from('templates')
-            .select('id')
-            .eq('user_id', ctx.user.id)
-            .eq('name', tpl.name)
-            .maybeSingle();
+          const existingByName = await db
+            .select({ id: templates.id })
+            .from(templates)
+            .where(
+              and(
+                eq(templates.userId, ctx.user.id),
+                eq(templates.name, tpl.name)
+              )
+            )
+            .limit(1);
 
-          if (existingByName) {
-            tplId = existingByName.id;
+          if (existingByName[0]) {
+            tplId = existingByName[0].id;
           } else {
             // Fallback: maybe it hallucinated the name but content matches?
-            const { data: existingByContent } = await supabaseServer
-              .from('templates')
-              .select('id')
-              .eq('user_id', ctx.user.id)
-              .eq('content', tpl.content)
-              .maybeSingle();
+            const existingByContent = await db
+              .select({ id: templates.id })
+              .from(templates)
+              .where(
+                and(
+                  eq(templates.userId, ctx.user.id),
+                  eq(templates.content, tpl.content)
+                )
+              )
+              .limit(1);
 
-            if (existingByContent) tplId = existingByContent.id;
+            if (existingByContent[0]) tplId = existingByContent[0].id;
           }
         }
 
         // If action was 'create' OR if 'reuse' failed to find a match (safety fallback)
         if (!tplId) {
           // Check for duplicate content even if AI said create (deduplication safety)
-          const { data: existingByContent } = await supabaseServer
-            .from('templates')
-            .select('id')
-            .eq('user_id', ctx.user.id)
-            .eq('content', tpl.content)
-            .maybeSingle();
+          const existingByContent = await db
+            .select({ id: templates.id })
+            .from(templates)
+            .where(
+              and(
+                eq(templates.userId, ctx.user.id),
+                eq(templates.content, tpl.content)
+              )
+            )
+            .limit(1);
 
-          if (existingByContent) {
-            tplId = existingByContent.id;
+          if (existingByContent[0]) {
+            tplId = existingByContent[0].id;
           } else {
             // Actually create it
-            const { data: newTpl, error: tplError } = await supabaseServer
-              .from('templates')
-              .insert({
-                user_id: ctx.user.id,
+            const [newTpl] = await db
+              .insert(templates)
+              .values({
+                userId: ctx.user.id,
                 name: tpl.name,
                 content: tpl.content,
               })
-              .select('id')
-              .single();
+              .returning({ id: templates.id });
 
-            if (tplError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: tplError.message });
             tplId = newTpl.id;
           }
         }
@@ -330,28 +353,25 @@ export const aiRouter = router({
       }
 
       // 2. Create Container
-      const { data: container, error: containerError } = await supabaseServer
-        .from('containers')
-        .insert({
-          user_id: ctx.user.id,
+      const [container] = await db
+        .insert(containers)
+        .values({
+          userId: ctx.user.id,
           name: proposal.containerName,
-          template_order: templateIdsInOrder,
+          templateOrder: templateIdsInOrder,
           separator: proposal.separator,
         })
-        .select('id')
-        .single();
-
-      if (containerError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: containerError.message });
+        .returning({ id: containers.id });
 
       // 3. Apply to Videos (Migration)
       if (input.applyToAllAnalyzed) {
         // For each analyzed video
         for (const videoAnalysis of proposal.videoAnalysis) {
           // A. Assign Container
-          await supabaseServer
-            .from('youtube_videos')
-            .update({ container_id: container.id })
-            .eq('id', videoAnalysis.videoId);
+          await db
+            .update(youtubeVideos)
+            .set({ containerId: container.id })
+            .where(eq(youtubeVideos.id, videoAnalysis.videoId));
 
           // B. Insert Variables
           const variablesToInsert = [];
@@ -373,10 +393,10 @@ export const aiRouter = router({
                 const tplId = templateIdMap.get(tpl.name);
                 if (tplId) {
                   variablesToInsert.push({
-                    video_id: videoAnalysis.videoId,
-                    template_id: tplId,
-                    variable_name: varName,
-                    variable_value: varValue || '',
+                    videoId: videoAnalysis.videoId,
+                    templateId: tplId,
+                    variableName: varName,
+                    variableValue: varValue || '',
                   });
                 }
               }
@@ -384,7 +404,7 @@ export const aiRouter = router({
           }
 
           if (variablesToInsert.length > 0) {
-            await supabaseServer.from('video_variables').insert(variablesToInsert);
+            await db.insert(videoVariables).values(variablesToInsert);
           }
         }
       }
