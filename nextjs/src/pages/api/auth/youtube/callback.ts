@@ -12,6 +12,9 @@ import {
 import { encrypt } from '@/utils/encryption';
 import { checkChannelLimit } from '@/lib/plan-limits';
 import { inngestClient } from '@/lib/clients/inngest';
+import { db } from '@/db';
+import { youtubeChannels } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 export default async function handler(
   req: NextApiRequest,
@@ -38,7 +41,7 @@ export default async function handler(
       );
     }
 
-    // Create Supabase client
+    // Create Supabase client (for auth only)
     const supabase = createClient(req, res);
 
     // Get current user
@@ -67,26 +70,25 @@ export default async function handler(
       : null;
 
     // Check if channel already exists
-    const { data: existingChannel } = await supabase
-      .from('youtube_channels')
-      .select('id')
-      .eq('channel_id', channelInfo.id)
-      .single();
+    const [existingChannel] = await db
+      .select({ id: youtubeChannels.id })
+      .from(youtubeChannels)
+      .where(eq(youtubeChannels.channelId, channelInfo.id));
 
     if (existingChannel) {
       // Update existing channel (re-authentication)
-      await supabase
-        .from('youtube_channels')
-        .update({
-          access_token_encrypted: encryptedAccessToken,
-          refresh_token_encrypted: encryptedRefreshToken,
-          token_expires_at: expiresAt.toISOString(),
-          token_status: 'valid', // Reset token status on re-authentication
+      await db
+        .update(youtubeChannels)
+        .set({
+          accessTokenEncrypted: encryptedAccessToken,
+          refreshTokenEncrypted: encryptedRefreshToken,
+          tokenExpiresAt: expiresAt,
+          tokenStatus: 'valid', // Reset token status on re-authentication
           title: channelInfo.snippet.title,
-          thumbnail_url: channelInfo.snippet.thumbnails.high.url,
-          subscriber_count: parseInt(channelInfo.statistics.subscriberCount),
+          thumbnailUrl: channelInfo.snippet.thumbnails.high.url,
+          subscriberCount: parseInt(channelInfo.statistics.subscriberCount),
         })
-        .eq('id', existingChannel.id);
+        .where(eq(youtubeChannels.id, existingChannel.id));
 
       // Trigger automatic sync for reconnected channel
       await inngestClient.send({
@@ -98,7 +100,7 @@ export default async function handler(
       });
     } else {
       // Check channel limit before adding a new channel
-      const limitCheck = await checkChannelLimit(session.user.id, supabase);
+      const limitCheck = await checkChannelLimit(session.user.id, db);
 
       if (!limitCheck.canAddChannel) {
         return res.redirect(
@@ -109,20 +111,19 @@ export default async function handler(
       }
 
       // Insert new channel
-      const { data: newChannel } = await supabase
-        .from('youtube_channels')
-        .insert({
-          user_id: session.user.id,
-          channel_id: channelInfo.id,
+      const [newChannel] = await db
+        .insert(youtubeChannels)
+        .values({
+          userId: session.user.id,
+          channelId: channelInfo.id,
           title: channelInfo.snippet.title,
-          thumbnail_url: channelInfo.snippet.thumbnails.high.url,
-          subscriber_count: parseInt(channelInfo.statistics.subscriberCount),
-          access_token_encrypted: encryptedAccessToken,
-          refresh_token_encrypted: encryptedRefreshToken,
-          token_expires_at: expiresAt.toISOString(),
+          thumbnailUrl: channelInfo.snippet.thumbnails.high.url,
+          subscriberCount: parseInt(channelInfo.statistics.subscriberCount),
+          accessTokenEncrypted: encryptedAccessToken,
+          refreshTokenEncrypted: encryptedRefreshToken,
+          tokenExpiresAt: expiresAt,
         })
-        .select('id')
-        .single();
+        .returning({ id: youtubeChannels.id });
 
       // Trigger automatic sync for newly connected channel
       if (newChannel) {
