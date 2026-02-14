@@ -1,109 +1,25 @@
 import Head from "next/head";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/useUser";
-import { createClient } from "@/utils/supabase/component";
+import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/router";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { appConfig } from "@/config/app";
 import Link from "next/link";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
-import { OTPInput, SlotProps, REGEXP_ONLY_DIGITS } from "input-otp";
-import { cn } from "@/lib/utils";
 
 export default function Page() {
   const router = useRouter();
-  const supabase = createClient();
   const { user, loading: userLoading } = useUser();
   const { toast } = useToast();
 
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
-  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
-  const [justSignedIn, setJustSignedIn] = useState(false);
 
-  // Refs
-  const shownErrorsRef = useRef(new Set<string>());
-  const verificationAttemptedRef = useRef(false);
-
-  /**
-   * Handle OTP verification
-   * @param code - The OTP code to verify
-   */
-  const handleVerifyOtp = useCallback(async (code: string) => {
-    if (code.length !== 6) return;
-
-    // Prevent duplicate submissions
-    if (verificationAttemptedRef.current) return;
-    verificationAttemptedRef.current = true;
-
-    setIsVerifyingOtp(true);
-
-    try {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.verifyOtp({
-        email,
-        token: code,
-        type: "email",
-      });
-
-      if (error) {
-        console.error("OTP verification error:", error);
-        toast({
-          variant: "destructive",
-          title: "Verification failed",
-          description: error.message,
-        });
-        setOtpCode(""); // Clear the OTP input on error
-        verificationAttemptedRef.current = false; // Allow retry on error
-      } else if (session) {
-        setJustSignedIn(true);
-        toast({
-          title: "Success",
-          description: "Account created successfully!",
-        });
-
-        // Wait a bit for the session to be properly established
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Redirect to the return URL or dashboard
-        const returnTo = router.query.returnTo as string;
-        if (returnTo && returnTo.startsWith('/')) {
-          router.push(decodeURIComponent(returnTo));
-        } else {
-          router.push("/dashboard/youtube");
-        }
-      } else {
-        // No error but no session - unexpected state
-        console.error("No session returned from verifyOtp");
-        toast({
-          variant: "destructive",
-          title: "Verification failed",
-          description: "Unable to create session. Please try again.",
-        });
-        setOtpCode("");
-        verificationAttemptedRef.current = false;
-      }
-    } catch (err) {
-      console.error("OTP verification exception:", err);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
-      });
-      setOtpCode("");
-      verificationAttemptedRef.current = false; // Allow retry on error
-    } finally {
-      setIsVerifyingOtp(false);
-    }
-  }, [email, supabase, router.query.returnTo, toast]);
-
-  // If user is already signed in, show message and redirect
+  // If user is already signed in, redirect
   useEffect(() => {
-    if (user && !userLoading && !justSignedIn) {
+    if (user && !userLoading) {
       const returnTo = router.query.returnTo as string;
       if (returnTo && returnTo.startsWith('/')) {
         router.push(decodeURIComponent(returnTo));
@@ -114,14 +30,7 @@ export default function Page() {
         });
       }
     }
-  }, [user, userLoading, justSignedIn, router, toast]);
-
-  // Auto-verify when OTP code is complete
-  useEffect(() => {
-    if (otpCode.length === 6 && !isVerifyingOtp) {
-      handleVerifyOtp(otpCode);
-    }
-  }, [otpCode, isVerifyingOtp, handleVerifyOtp]);
+  }, [user, userLoading]);
 
   // Check if sign-up is enabled
   if (!appConfig.auth.enableSignUp) {
@@ -152,21 +61,14 @@ export default function Page() {
     );
   }
 
-  /**
-   * Handle sign up with magic link
-   * @param e - Form event
-   */
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithOtp({
+      const { error } = await authClient.signIn.magicLink({
         email,
-        options: {
-          shouldCreateUser: true,
-          emailRedirectTo: process.env.NEXT_PUBLIC_APP_URL,
-        },
+        callbackURL: "/dashboard/youtube",
       });
 
       if (error) {
@@ -178,8 +80,8 @@ export default function Page() {
       } else {
         setMagicLinkSent(true);
         toast({
-          title: "Code sent",
-          description: "Check your email for the login link and verification code!",
+          title: "Magic link sent",
+          description: "Check your email for the login link!",
         });
       }
     } catch (err) {
@@ -191,48 +93,6 @@ export default function Page() {
     } finally {
       setIsSubmitting(false);
     }
-  }
-
-  // Helper component for OTP slot
-  function Slot(props: SlotProps) {
-    return (
-      <div
-        className={cn(
-          "relative w-10 h-14 text-[2rem]",
-          "flex items-center justify-center",
-          "transition-all duration-300",
-          "border-gray-300 border-y border-r first:border-l first:rounded-l-md last:rounded-r-md",
-          "group-hover:border-emerald-400 group-focus-within:border-emerald-400",
-          "outline outline-0 outline-emerald-400",
-          {
-            "outline-4 outline-emerald-500": props.isActive,
-          }
-        )}
-      >
-        <div className="group-has-[input[data-input-otp-placeholder-shown]]:opacity-20">
-          {props.char ?? props.placeholderChar}
-        </div>
-        {props.hasFakeCaret && <FakeCaret />}
-      </div>
-    );
-  }
-
-  // Fake caret for empty slots
-  function FakeCaret() {
-    return (
-      <div className="absolute pointer-events-none inset-0 flex items-center justify-center animate-caret-blink">
-        <div className="w-px h-8 bg-gray-900" />
-      </div>
-    );
-  }
-
-  // Fake dash separator
-  function FakeDash() {
-    return (
-      <div className="flex w-10 justify-center items-center">
-        <div className="w-3 h-1 rounded-full bg-gray-300" />
-      </div>
-    );
   }
 
   return (
@@ -337,56 +197,15 @@ export default function Page() {
                 </div>
                 <h3 className="text-xl font-medium text-gray-900">Check your email</h3>
                 <p className="text-center text-gray-600">
-                  We've sent a verification code to <span className="font-semibold">{email}</span>
+                  We've sent a magic link to <span className="font-semibold">{email}</span>
                 </p>
-
-                <div className="w-full space-y-4">
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-200"></div>
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-2 bg-white text-gray-500">
-                        Enter the code or click the link in your email
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-center space-y-2">
-                    <OTPInput
-                      maxLength={6}
-                      value={otpCode}
-                      onChange={setOtpCode}
-                      disabled={isVerifyingOtp}
-                      pattern={REGEXP_ONLY_DIGITS}
-                      containerClassName="group flex items-center has-[:disabled]:opacity-30"
-                      render={({ slots }) => (
-                        <>
-                          <div className="flex">
-                            {slots.slice(0, 3).map((slot, idx) => (
-                              <Slot key={idx} {...slot} />
-                            ))}
-                          </div>
-                          <FakeDash />
-                          <div className="flex">
-                            {slots.slice(3).map((slot, idx) => (
-                              <Slot key={idx} {...slot} />
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    />
-                    {isVerifyingOtp && (
-                      <p className="text-sm text-emerald-600">Verifying...</p>
-                    )}
-                  </div>
-                </div>
+                <p className="text-center text-sm text-gray-500">
+                  Click the link in your email to sign up.
+                </p>
 
                 <button
                   onClick={() => {
                     setMagicLinkSent(false);
-                    setOtpCode("");
-                    verificationAttemptedRef.current = false;
                   }}
                   className="text-sm text-emerald-600 hover:text-emerald-500"
                 >

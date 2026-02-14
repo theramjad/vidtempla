@@ -1,4 +1,4 @@
-import { createClient } from "@/utils/supabase/component";
+import { authClient } from "@/lib/auth-client";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -9,31 +9,15 @@ interface GoogleSignInButtonProps {
 
 export function GoogleSignInButton({ className }: GoogleSignInButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const supabase = createClient();
   const { toast } = useToast();
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
+      await authClient.signIn.social({
+        provider: "google",
+        callbackURL: "/dashboard/youtube",
       });
-
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Sign in failed",
-          description: error.message,
-        });
-        setIsLoading(false);
-      }
     } catch (err) {
       toast({
         variant: "destructive",

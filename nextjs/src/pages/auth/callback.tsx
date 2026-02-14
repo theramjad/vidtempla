@@ -1,79 +1,53 @@
 import { useEffect } from "react";
 import { useRouter } from "next/router";
-import { createClient } from "@/utils/supabase/component";
+import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/hooks/use-toast";
 import Head from "next/head";
 
 export default function AuthCallback() {
   const router = useRouter();
-  const supabase = createClient();
+  const { data: session, isPending } = authClient.useSession();
   const { toast } = useToast();
 
   useEffect(() => {
-    const handleCallback = async () => {
-      // Check for error parameters in URL (both query and hash)
-      const { error, error_description, error_code } = router.query;
+    if (!router.isReady) return;
 
-      if (error && error_description) {
-        // Customize error message for signup disabled errors
-        let displayDescription = error_description as string;
-        if (error_code === 'signup_disabled' || displayDescription.toLowerCase().includes('signups not allowed')) {
-          displayDescription = "Can't find an account associated with this email";
-        }
+    // Check for error parameters in URL
+    const { error, error_description, error_code } = router.query;
 
-        // Redirect to sign-in page with error params so they can be displayed there
-        const params = new URLSearchParams({
-          error: error as string,
-          error_description: displayDescription,
-          ...(error_code && { error_code: error_code as string }),
-        });
-        router.push(`/sign-in?${params.toString()}`);
-        return;
+    if (error && error_description) {
+      let displayDescription = error_description as string;
+      if (error_code === 'signup_disabled' || displayDescription.toLowerCase().includes('signups not allowed')) {
+        displayDescription = "Can't find an account associated with this email";
       }
 
-      try {
-        const { data, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError) {
-          // Redirect to sign-in with error params
-          const params = new URLSearchParams({
-            error: 'auth_error',
-            error_description: sessionError.message,
-          });
-          router.push(`/sign-in?${params.toString()}`);
-          return;
-        }
-
-        if (data.session) {
-          toast({
-            title: "Success",
-            description: "You've been signed in!",
-          });
-          // Check if there's a returnTo query parameter
-          const returnTo = router.query.returnTo as string;
-          if (returnTo && returnTo.startsWith('/')) {
-            router.push(decodeURIComponent(returnTo));
-          } else {
-            router.push("/dashboard/youtube");
-          }
-        } else {
-          router.push("/sign-in");
-        }
-      } catch (err) {
-        console.error("Callback error:", err);
-        // Redirect to sign-in with error params
-        const params = new URLSearchParams({
-          error: 'unexpected_error',
-          error_description: 'An unexpected error occurred during authentication.',
-        });
-        router.push(`/sign-in?${params.toString()}`);
-      }
-    };
-
-    if (router.isReady) {
-      handleCallback();
+      const params = new URLSearchParams({
+        error: error as string,
+        error_description: displayDescription,
+        ...(error_code && { error_code: error_code as string }),
+      });
+      router.push(`/sign-in?${params.toString()}`);
+      return;
     }
-  }, [router.isReady]);
+
+    // If session check is done, redirect accordingly
+    if (!isPending) {
+      if (session) {
+        toast({
+          title: "Success",
+          description: "You've been signed in!",
+        });
+        const returnTo = router.query.returnTo as string;
+        if (returnTo && returnTo.startsWith('/')) {
+          router.push(decodeURIComponent(returnTo));
+        } else {
+          router.push("/dashboard/youtube");
+        }
+      } else {
+        router.push("/sign-in");
+      }
+    }
+  }, [router.isReady, isPending, session]);
 
   return (
     <>
