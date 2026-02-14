@@ -4,7 +4,8 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import createClient from '@/utils/supabase/api';
+import { auth } from '@/lib/auth';
+import { fromNodeHeaders } from 'better-auth/node';
 import {
   exchangeCodeForTokens,
   fetchChannelInfo,
@@ -41,13 +42,10 @@ export default async function handler(
       );
     }
 
-    // Create Supabase client (for auth only)
-    const supabase = createClient(req, res);
-
-    // Get current user
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    // Get current user via Better Auth
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+    });
 
     if (!session) {
       return res.redirect('/sign-in?redirect=/dashboard/youtube');

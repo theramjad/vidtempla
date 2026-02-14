@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { createClient } from '@/utils/supabase/component';
+import { useUser } from '@/hooks/useUser';
 import { Loader2, ExternalLink } from 'lucide-react';
 import { api } from '@/utils/api';
 import { toast } from 'sonner';
@@ -19,8 +19,7 @@ import Link from 'next/link';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [userEmail, setUserEmail] = useState<string>('');
-  const [loading, setLoading] = useState(true);
+  const { user, loading: userLoading } = useUser();
   const [portalLoading, setPortalLoading] = useState(false);
 
   // Fetch current subscription
@@ -39,20 +38,6 @@ export default function SettingsPage() {
       enabled: false, // Don't fetch automatically
     }
   );
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (user?.email) {
-        setUserEmail(user.email);
-      }
-      setLoading(false);
-    };
-
-    fetchUser();
-  }, []);
 
   // Check for checkout success
   useEffect(() => {
@@ -115,7 +100,7 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
-                {loading ? (
+                {userLoading ? (
                   <div className="flex items-center gap-2 p-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span className="text-sm text-muted-foreground">Loading...</span>
@@ -124,7 +109,7 @@ export default function SettingsPage() {
                   <Input
                     id="email"
                     type="email"
-                    value={userEmail}
+                    value={user?.email ?? ''}
                     disabled
                     className="bg-muted"
                   />
