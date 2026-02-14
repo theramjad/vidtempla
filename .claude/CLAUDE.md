@@ -35,4 +35,5 @@ NEVER apply migrations to the remote server. Prompt the user to do this manually
 - Avoid `any` type - use proper TypeScript types
 
 # Security Considerations
+- **This is a public GitHub repository.** Never commit secrets, API keys, passwords, database URLs, or any sensitive credentials. Always use environment variables and ensure `.env.local` is gitignored. Before committing, review staged changes for anything that could expose sensitive information.
 - User isolation via tRPC WHERE clauses (no database-level RLS)
