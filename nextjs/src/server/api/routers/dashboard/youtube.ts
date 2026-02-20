@@ -251,15 +251,13 @@ export const youtubeRouter = router({
         // Only trigger if content changed (affects description)
         if (input.content !== undefined) {
           // Find all containers that use this template
-          const containersData = await db
-            .select({ id: containers.id })
+          const allContainers = await db
+            .select({ id: containers.id, templateOrder: containers.templateOrder })
             .from(containers)
-            .where(
-              and(
-                eq(containers.userId, ctx.user.id),
-                sql`${containers.templateOrder}::jsonb @> ${JSON.stringify([input.id])}::jsonb`
-              )
-            );
+            .where(eq(containers.userId, ctx.user.id));
+          const containersData = allContainers.filter((c) =>
+            Array.isArray(c.templateOrder) && c.templateOrder.includes(input.id)
+          );
 
           if (containersData && containersData.length > 0) {
             const containerIds = containersData.map((c) => c.id);
@@ -305,19 +303,17 @@ export const youtubeRouter = router({
       .input(z.object({ templateId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         // First, find all containers that use this template
-        const containersData = await db
+        const allContainers = await db
           .select({
             id: containers.id,
             name: containers.name,
             templateOrder: containers.templateOrder,
           })
           .from(containers)
-          .where(
-            and(
-              eq(containers.userId, ctx.user.id),
-              sql`${containers.templateOrder}::jsonb @> ${JSON.stringify([input.templateId])}::jsonb`
-            )
-          );
+          .where(eq(containers.userId, ctx.user.id));
+        const containersData = allContainers.filter((c) =>
+          Array.isArray(c.templateOrder) && c.templateOrder.includes(input.templateId)
+        );
 
         if (!containersData || containersData.length === 0) {
           return {
