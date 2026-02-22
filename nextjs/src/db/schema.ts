@@ -7,6 +7,7 @@ import {
   timestamp,
   jsonb,
   unique,
+  index,
 } from "drizzle-orm/pg-core";
 
 // Better Auth tables (4)
@@ -252,3 +253,52 @@ export const webhookEvents = pgTable("webhook_events", {
     .notNull()
     .defaultNow(),
 });
+
+// API tables
+
+export const apiKeys = pgTable("api_keys", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  keyHash: text("key_hash").notNull(),
+  keyPrefix: text("key_prefix").notNull(),
+  lastUsedAt: timestamp("last_used_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
+  expiresAt: timestamp("expires_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const apiRequestLog = pgTable(
+  "api_request_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    apiKeyId: uuid("api_key_id")
+      .notNull()
+      .references(() => apiKeys.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    method: text("method").notNull(),
+    statusCode: integer("status_code").notNull(),
+    quotaUnits: integer("quota_units").notNull().default(0),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userCreatedAtIdx: index("api_request_log_user_created_at_idx").on(
+      table.userId,
+      table.createdAt
+    ),
+  })
+);

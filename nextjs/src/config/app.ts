@@ -15,7 +15,7 @@ export const appConfig = {
   brand: {
     name: "VidTempla",
     shortName: "VidTempla",
-    tagline: "Manage YouTube descriptions with ease",
+    tagline: "Let AI agents manage your YouTube channel",
   },
 
   // Authentication settings

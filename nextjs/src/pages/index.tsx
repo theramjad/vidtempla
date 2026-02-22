@@ -16,7 +16,9 @@ import {
   Youtube,
   Check,
   ArrowRight,
-  Menu
+  Menu,
+  Code,
+  BarChart3,
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -24,7 +26,7 @@ export default function LandingPage() {
     <>
       <Head>
         <title>VidTempla</title>
-        <meta name="description" content="Manage YouTube descriptions at scale with dynamic templates and variables" />
+        <meta name="description" content="REST API and dashboard for AI agents to securely manage YouTube channels — descriptions, analytics, playlists, and more" />
       </Head>
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -33,15 +35,15 @@ export default function LandingPage() {
         <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
           <div className="text-center max-w-4xl mx-auto">
             <Badge className="mb-4" variant="secondary">
-              YouTube Description Manager
+              YouTube Channel Management for Agents
             </Badge>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-              Manage YouTube Descriptions{" "}
-              <span className="text-primary">at Scale</span>
+              Let AI Agents Securely Manage{" "}
+              <span className="text-primary">Your YouTube Channel</span>
             </h1>
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Update hundreds of video descriptions instantly with dynamic templates and variables.
-              Keep your content fresh without the manual work.
+              REST API and dashboard for managing descriptions, gathering analytics,
+              and controlling playlists. OAuth handled for you.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/sign-in">
@@ -71,15 +73,41 @@ export default function LandingPage() {
               Features
             </Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Everything you need to manage descriptions
+              Everything agents need to manage YouTube
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Powerful tools to streamline your YouTube workflow
+              API-first platform with a dashboard for humans when you need it
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Feature 1 */}
+            {/* Feature 1 - REST API */}
+            <Card>
+              <CardHeader>
+                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                  <Code className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>REST API</CardTitle>
+                <CardDescription>
+                  Full REST API with Bearer token auth. Manage templates, videos, playlists, and more programmatically. Built for AI agents.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            {/* Feature 2 - Analytics */}
+            <Card>
+              <CardHeader>
+                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                  <BarChart3 className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>Analytics & Data Gathering</CardTitle>
+                <CardDescription>
+                  Proxy YouTube Analytics API without handling OAuth yourself. Views, watch time, retention curves, and flexible queries.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            {/* Feature 3 - Smart Templates */}
             <Card>
               <CardHeader>
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
@@ -92,7 +120,7 @@ export default function LandingPage() {
               </CardHeader>
             </Card>
 
-            {/* Feature 2 */}
+            {/* Feature 4 - Multi-Channel */}
             <Card>
               <CardHeader>
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
@@ -100,12 +128,12 @@ export default function LandingPage() {
                 </div>
                 <CardTitle>Multi-Channel Support</CardTitle>
                 <CardDescription>
-                  Manage unlimited YouTube channels with secure OAuth authentication and automatic video syncing.
+                  Manage multiple YouTube channels with secure OAuth. Tokens encrypted at rest, auto-refreshed on every API call.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            {/* Feature 3 */}
+            {/* Feature 5 - Automatic Updates */}
             <Card>
               <CardHeader>
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
@@ -113,25 +141,12 @@ export default function LandingPage() {
                 </div>
                 <CardTitle>Automatic Updates</CardTitle>
                 <CardDescription>
-                  Change your template once and automatically update all associated video descriptions in seconds.
+                  Change a template via API or dashboard and all associated video descriptions update automatically.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            {/* Feature 4 */}
-            <Card>
-              <CardHeader>
-                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                  <History className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle>Version Control</CardTitle>
-                <CardDescription>
-                  Full change history for every video with one-click rollback to any previous version.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            {/* Feature 5 */}
+            {/* Feature 6 - Container System */}
             <Card>
               <CardHeader>
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
@@ -139,20 +154,7 @@ export default function LandingPage() {
                 </div>
                 <CardTitle>Container System</CardTitle>
                 <CardDescription>
-                  Organize multiple templates into reusable containers with customizable ordering and separators.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            {/* Feature 6 */}
-            <Card>
-              <CardHeader>
-                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                  <Zap className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle>Bulk Operations</CardTitle>
-                <CardDescription>
-                  Update descriptions for multiple videos simultaneously with powerful bulk editing tools.
+                  Compose multiple templates into reusable containers with customizable ordering and separators.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -461,6 +463,42 @@ export default function LandingPage() {
                 time to export or reactivate. You can request a complete data export at any time.
               </AccordionContent>
             </AccordionItem>
+
+            <AccordionItem value="item-12">
+              <AccordionTrigger className="text-left">
+                How does the REST API work?
+              </AccordionTrigger>
+              <AccordionContent>
+                Generate an API key from Settings, then use Bearer token authentication to call any endpoint.
+                The API covers templates, containers, videos, YouTube playlists, analytics, and more. All responses
+                use a consistent JSON envelope with error suggestions so AI agents can self-correct.
+                See the{" "}
+                <a href="/docs/api" className="text-primary hover:underline">API documentation</a>
+                {" "}for details.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-13">
+              <AccordionTrigger className="text-left">
+                Do I need to handle YouTube OAuth myself?
+              </AccordionTrigger>
+              <AccordionContent>
+                No. You connect your YouTube channel once through VidTempla&apos;s dashboard. After that, the API
+                handles all OAuth token management transparently. Your agent just uses a VidTempla API key and never
+                touches YouTube credentials directly.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-14">
+              <AccordionTrigger className="text-left">
+                What YouTube data can I access through the API?
+              </AccordionTrigger>
+              <AccordionContent>
+                The API proxies YouTube&apos;s Data API and Analytics API. You can fetch video statistics, channel
+                details, search within channels, read comments, manage playlists, query analytics (views, watch time,
+                audience retention), and more. All in real-time without storing YouTube data on our side.
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
           </div>
         </section>
@@ -469,10 +507,10 @@ export default function LandingPage() {
         <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="bg-primary/5 rounded-2xl p-12 text-center">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Ready to streamline your YouTube workflow?
+              Ready to let agents manage your YouTube channel?
             </h2>
             <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Join content creators who save hours every week managing their video descriptions.
+              Connect your channel, generate an API key, and start building in minutes.
             </p>
             <Link href="/sign-in">
               <Button size="lg">

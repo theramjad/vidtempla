@@ -1,0 +1,94 @@
+import { NextRequest } from "next/server";
+import {
+  withApiKey,
+  apiSuccess,
+  apiError,
+  getChannelTokens,
+  logRequest,
+} from "@/lib/api-auth";
+import axios from "axios";
+
+const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
+
+/**
+ * GET /api/v1/youtube/comments/[videoId]?channelId=...&maxResults=100&order=relevance|time&pageToken=...
+ * List comment threads for a video
+ * Quota cost: 1 unit
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ videoId: string }> }
+) {
+  const ctx = await withApiKey(request);
+  if (ctx instanceof Response) return ctx;
+
+  const { videoId } = await params;
+  const { searchParams } = new URL(request.url);
+  const channelId = searchParams.get("channelId");
+  const pageToken = searchParams.get("pageToken");
+  const maxResults = Math.min(
+    parseInt(searchParams.get("maxResults") || "20", 10),
+    100
+  );
+  const order = searchParams.get("order") || "relevance";
+
+  if (!channelId) {
+    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", 0, 400);
+    return apiError(
+      "MISSING_PARAMETER",
+      "channelId is required",
+      "Provide a channelId query parameter to identify the channel",
+      400
+    );
+  }
+
+  if (!["relevance", "time"].includes(order)) {
+    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", 0, 400);
+    return apiError(
+      "INVALID_PARAMETER",
+      "order must be 'relevance' or 'time'",
+      "Use order=relevance for top comments or order=time for newest first",
+      400
+    );
+  }
+
+  const tokens = await getChannelTokens(channelId, ctx.user.id);
+  if (tokens instanceof Response) {
+    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", 0, 403);
+    return tokens;
+  }
+
+  try {
+    const response = await axios.get(`${YOUTUBE_API_BASE}/commentThreads`, {
+      params: {
+        part: "snippet,replies",
+        videoId,
+        maxResults,
+        order,
+        ...(pageToken && { pageToken }),
+      },
+      headers: { Authorization: `Bearer ${tokens.accessToken}` },
+    });
+
+    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", 1, 200);
+    return apiSuccess(response.data.items || [], {
+      quotaUnits: 1,
+      pageInfo: response.data.pageInfo,
+      nextPageToken: response.data.nextPageToken || null,
+    });
+  } catch (error) {
+    const status = axios.isAxiosError(error)
+      ? error.response?.status || 500
+      : 500;
+    const message = axios.isAxiosError(error)
+      ? error.response?.data?.error?.message || error.message
+      : "Unknown error";
+    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", 1, status);
+    return apiError(
+      "YOUTUBE_API_ERROR",
+      message,
+      "Check that the videoId is correct and comments are enabled",
+      status
+    );
+  }
+}

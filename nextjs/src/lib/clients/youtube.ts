@@ -12,6 +12,7 @@ import axios from 'axios';
 const YOUTUBE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const YOUTUBE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
+const YOUTUBE_ANALYTICS_BASE = 'https://youtubeanalytics.googleapis.com/v2';
 
 /**
  * Custom type for OAuth 2.0 token response
@@ -92,6 +93,7 @@ export function getOAuthUrl(): string {
     scope: [
       'https://www.googleapis.com/auth/youtube.readonly',
       'https://www.googleapis.com/auth/youtube.force-ssl',
+      'https://www.googleapis.com/auth/yt-analytics.readonly',
     ].join(' '),
     access_type: 'offline',
     prompt: 'consent',
@@ -417,4 +419,242 @@ export async function batchUpdateDescriptions(
   }
 
   return { successful, failed };
+}
+
+// ─── YouTube Analytics API functions ──────────────────────────────────
+
+export interface AnalyticsReportResponse {
+  kind: string;
+  columnHeaders: Array<{
+    name: string;
+    columnType: string;
+    dataType: string;
+  }>;
+  rows: Array<Array<string | number>>;
+}
+
+export interface AnalyticsQueryParams {
+  ids: string;
+  startDate: string;
+  endDate: string;
+  metrics: string;
+  dimensions?: string;
+  filters?: string;
+  sort?: string;
+  maxResults?: number;
+}
+
+/**
+ * Fetches channel-level analytics from the YouTube Analytics API
+ */
+export async function fetchChannelAnalytics(
+  accessToken: string,
+  channelId: string,
+  metrics: string,
+  dimensions: string,
+  startDate: string,
+  endDate: string,
+  filters?: string,
+  sort?: string,
+  maxResults?: number
+): Promise<AnalyticsReportResponse> {
+  const params: Record<string, string | number> = {
+    ids: `channel==${channelId}`,
+    startDate,
+    endDate,
+    metrics,
+    dimensions,
+  };
+  if (filters) params.filters = filters;
+  if (sort) params.sort = sort;
+  if (maxResults) params.maxResults = maxResults;
+
+  const response = await axios.get<AnalyticsReportResponse>(
+    `${YOUTUBE_ANALYTICS_BASE}/reports`,
+    {
+      params,
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  return response.data;
+}
+
+/**
+ * Fetches video-level analytics from the YouTube Analytics API
+ */
+export async function fetchVideoAnalytics(
+  accessToken: string,
+  videoId: string,
+  metrics: string,
+  dimensions: string,
+  startDate: string,
+  endDate: string
+): Promise<AnalyticsReportResponse> {
+  const response = await axios.get<AnalyticsReportResponse>(
+    `${YOUTUBE_ANALYTICS_BASE}/reports`,
+    {
+      params: {
+        ids: `channel==MINE`,
+        startDate,
+        endDate,
+        metrics,
+        dimensions,
+        filters: `video==${videoId}`,
+      },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  return response.data;
+}
+
+/**
+ * Fetches audience retention data for a video using elapsedVideoTimeRatio
+ */
+export async function fetchVideoRetention(
+  accessToken: string,
+  videoId: string
+): Promise<AnalyticsReportResponse> {
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const response = await axios.get<AnalyticsReportResponse>(
+    `${YOUTUBE_ANALYTICS_BASE}/reports`,
+    {
+      params: {
+        ids: `channel==MINE`,
+        startDate: thirtyDaysAgo.toISOString().split('T')[0],
+        endDate: now.toISOString().split('T')[0],
+        metrics: 'audienceWatchRatio,relativeRetentionPerformance',
+        dimensions: 'elapsedVideoTimeRatio',
+        filters: `video==${videoId}`,
+      },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  return response.data;
+}
+
+/**
+ * Raw pass-through for flexible YouTube Analytics queries
+ */
+export async function queryAnalytics(
+  accessToken: string,
+  params: AnalyticsQueryParams
+): Promise<AnalyticsReportResponse> {
+  const response = await axios.get<AnalyticsReportResponse>(
+    `${YOUTUBE_ANALYTICS_BASE}/reports`,
+    {
+      params,
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  return response.data;
+}
+
+// ─── YouTube Data API proxy functions ─────────────────────────────────
+
+export interface YouTubeVideoDetails {
+  id: string;
+  snippet: {
+    title: string;
+    description: string;
+    publishedAt: string;
+    channelId: string;
+    tags?: string[];
+    categoryId: string;
+    thumbnails: Record<string, { url: string; width: number; height: number }>;
+  };
+  statistics: {
+    viewCount: string;
+    likeCount: string;
+    commentCount: string;
+  };
+  contentDetails: {
+    duration: string;
+    definition: string;
+    caption: string;
+  };
+  status: {
+    uploadStatus: string;
+    privacyStatus: string;
+    publishAt?: string;
+    embeddable: boolean;
+  };
+}
+
+export interface YouTubeChannelDetails {
+  id: string;
+  snippet: {
+    title: string;
+    description: string;
+    customUrl: string;
+    publishedAt: string;
+    thumbnails: Record<string, { url: string; width: number; height: number }>;
+    country?: string;
+  };
+  statistics: {
+    viewCount: string;
+    subscriberCount: string;
+    videoCount: string;
+  };
+  contentDetails: {
+    relatedPlaylists: {
+      uploads: string;
+    };
+  };
+  brandingSettings: {
+    channel: {
+      title: string;
+      description: string;
+      keywords?: string;
+    };
+    image?: {
+      bannerExternalUrl?: string;
+    };
+  };
+}
+
+/**
+ * Fetches detailed video information from the YouTube Data API
+ */
+export async function fetchVideoDetails(
+  accessToken: string,
+  videoIds: string[]
+): Promise<YouTubeVideoDetails[]> {
+  const response = await axios.get<{ items: YouTubeVideoDetails[] }>(
+    `${YOUTUBE_API_BASE}/videos`,
+    {
+      params: {
+        part: 'snippet,statistics,contentDetails,status',
+        id: videoIds.join(','),
+      },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  return response.data.items || [];
+}
+
+/**
+ * Fetches detailed channel information from the YouTube Data API
+ */
+export async function fetchChannelDetails(
+  accessToken: string
+): Promise<YouTubeChannelDetails | null> {
+  const response = await axios.get<{ items: YouTubeChannelDetails[] }>(
+    `${YOUTUBE_API_BASE}/channels`,
+    {
+      params: {
+        part: 'snippet,statistics,contentDetails,brandingSettings',
+        mine: true,
+      },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  return response.data.items?.[0] || null;
 }

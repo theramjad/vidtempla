@@ -37,3 +37,34 @@ NEVER apply migrations to the remote server. Prompt the user to do this manually
 # Security Considerations
 - **This is a public GitHub repository.** Never commit secrets, API keys, passwords, database URLs, or any sensitive credentials. Always use environment variables and ensure `.env.local` is gitignored. Before committing, review staged changes for anything that could expose sensitive information.
 - User isolation via tRPC WHERE clauses (no database-level RLS)
+
+# Long-Term Vision
+VidTempla is an API-first platform where AI agents securely manage YouTube channels. The dashboard serves humans; the REST API serves agents. Instead of storing YouTube data, the API proxies YouTube's APIs on-demand so agents get real-time data while VidTempla handles OAuth complexity.
+
+# REST API Architecture (`/api/v1/`)
+
+## Design Principles
+- Response envelope: `{ data, error, meta }` — never bare arrays
+- Error format: `{ code, message, suggestion, status }` — always include `suggestion` so agents can self-correct
+- Cursor-based pagination on all list endpoints (`?cursor=...&limit=50`)
+- Field selection on proxy endpoints (`?fields=id,title,viewCount`)
+- camelCase JSON, kebab-case URLs
+- Every proxy endpoint documents its YouTube API quota cost
+
+## Key Files
+- `nextjs/src/lib/api-auth.ts` — `withApiKey()` middleware, `apiSuccess()`, `apiError()`, `logRequest()`
+- `nextjs/src/lib/api-keys.ts` — `generateApiKey()`, `hashApiKey()`
+- `nextjs/src/app/api/v1/` — all REST endpoints (see `CLAUDE.md` in that directory)
+- `nextjs/src/db/schema.ts` — `apiKeys` and `apiRequestLog` tables
+
+## Endpoint Groups
+- **Channels**: list, details, overview, sync, analytics, search
+- **Videos**: list, details, analytics, retention, assign, variables
+- **Templates**: CRUD + impact analysis
+- **Containers**: CRUD
+- **YouTube Management**: playlists, comments, thumbnails, captions (proxy)
+- **Analytics**: flexible YouTube Analytics API queries
+- **Usage**: API request tracking and quota monitoring
+
+## Adding New Endpoints
+Follow the `withApiKey` pattern in `nextjs/src/lib/api-auth.ts`. See `nextjs/src/app/api/v1/CLAUDE.md` for the full guide.
