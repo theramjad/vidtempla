@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   withApiKey,
   apiSuccess,
@@ -20,7 +20,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const ctx = await withApiKey(request);
-  if (ctx instanceof Response) return ctx;
+  if (ctx instanceof NextResponse) return ctx;
 
   const { id } = await params;
   const { searchParams } = new URL(request.url);
@@ -28,18 +28,21 @@ export async function GET(
 
   if (!channelId) {
     await logRequest(ctx, `/youtube/playlists/${id}`, "GET", 0, 400);
-    return apiError(
-      "MISSING_PARAMETER",
-      "channelId is required",
-      "Provide a channelId query parameter to identify the channel",
-      400
+    return NextResponse.json(
+      apiError(
+        "MISSING_PARAMETER",
+        "channelId is required",
+        "Provide a channelId query parameter to identify the channel",
+        400
+      ),
+      { status: 400 }
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.user.id);
-  if (tokens instanceof Response) {
-    await logRequest(ctx, `/youtube/playlists/${id}`, "GET", 0, 403);
-    return tokens;
+  const tokens = await getChannelTokens(channelId, ctx.userId);
+  if ("error" in tokens) {
+    await logRequest(ctx, `/youtube/playlists/${id}`, "GET", 0, tokens.status);
+    return NextResponse.json(tokens.error, { status: tokens.status });
   }
 
   try {
@@ -54,16 +57,19 @@ export async function GET(
     const playlist = response.data.items?.[0];
     if (!playlist) {
       await logRequest(ctx, `/youtube/playlists/${id}`, "GET", 1, 404);
-      return apiError(
-        "NOT_FOUND",
-        "Playlist not found",
-        "Check the playlist ID is correct",
-        404
+      return NextResponse.json(
+        apiError(
+          "NOT_FOUND",
+          "Playlist not found",
+          "Check the playlist ID is correct",
+          404
+        ),
+        { status: 404 }
       );
     }
 
     await logRequest(ctx, `/youtube/playlists/${id}`, "GET", 1, 200);
-    return apiSuccess(playlist, { quotaUnits: 1 });
+    return NextResponse.json(apiSuccess(playlist, { quotaUnits: 1 }));
   } catch (error) {
     const status = axios.isAxiosError(error)
       ? error.response?.status || 500
@@ -72,7 +78,10 @@ export async function GET(
       ? error.response?.data?.error?.message || error.message
       : "Unknown error";
     await logRequest(ctx, `/youtube/playlists/${id}`, "GET", 1, status);
-    return apiError("YOUTUBE_API_ERROR", message, "Check the playlist ID", status);
+    return NextResponse.json(
+      apiError("YOUTUBE_API_ERROR", message, "Check the playlist ID", status),
+      { status }
+    );
   }
 }
 
@@ -87,7 +96,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const ctx = await withApiKey(request);
-  if (ctx instanceof Response) return ctx;
+  if (ctx instanceof NextResponse) return ctx;
 
   const { id } = await params;
 
@@ -101,11 +110,14 @@ export async function PATCH(
     body = await request.json();
   } catch {
     await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 0, 400);
-    return apiError(
-      "INVALID_BODY",
-      "Request body must be valid JSON",
-      "Send a JSON body with { channelId, title?, description?, privacyStatus? }",
-      400
+    return NextResponse.json(
+      apiError(
+        "INVALID_BODY",
+        "Request body must be valid JSON",
+        "Send a JSON body with { channelId, title?, description?, privacyStatus? }",
+        400
+      ),
+      { status: 400 }
     );
   }
 
@@ -113,18 +125,21 @@ export async function PATCH(
 
   if (!channelId) {
     await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 0, 400);
-    return apiError(
-      "MISSING_PARAMETER",
-      "channelId is required",
-      "Provide channelId in the request body",
-      400
+    return NextResponse.json(
+      apiError(
+        "MISSING_PARAMETER",
+        "channelId is required",
+        "Provide channelId in the request body",
+        400
+      ),
+      { status: 400 }
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.user.id);
-  if (tokens instanceof Response) {
-    await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 0, 403);
-    return tokens;
+  const tokens = await getChannelTokens(channelId, ctx.userId);
+  if ("error" in tokens) {
+    await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 0, tokens.status);
+    return NextResponse.json(tokens.error, { status: tokens.status });
   }
 
   // First fetch the current playlist to preserve fields not being updated
@@ -137,11 +152,14 @@ export async function PATCH(
     const existing = current.data.items?.[0];
     if (!existing) {
       await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 1, 404);
-      return apiError(
-        "NOT_FOUND",
-        "Playlist not found",
-        "Check the playlist ID is correct",
-        404
+      return NextResponse.json(
+        apiError(
+          "NOT_FOUND",
+          "Playlist not found",
+          "Check the playlist ID is correct",
+          404
+        ),
+        { status: 404 }
       );
     }
 
@@ -170,7 +188,7 @@ export async function PATCH(
     );
 
     await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 50, 200);
-    return apiSuccess(response.data, { quotaUnits: 50 });
+    return NextResponse.json(apiSuccess(response.data, { quotaUnits: 50 }));
   } catch (error) {
     const status = axios.isAxiosError(error)
       ? error.response?.status || 500
@@ -179,7 +197,10 @@ export async function PATCH(
       ? error.response?.data?.error?.message || error.message
       : "Unknown error";
     await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 50, status);
-    return apiError("YOUTUBE_API_ERROR", message, "Check your input values", status);
+    return NextResponse.json(
+      apiError("YOUTUBE_API_ERROR", message, "Check your input values", status),
+      { status }
+    );
   }
 }
 
@@ -193,7 +214,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const ctx = await withApiKey(request);
-  if (ctx instanceof Response) return ctx;
+  if (ctx instanceof NextResponse) return ctx;
 
   const { id } = await params;
   const { searchParams } = new URL(request.url);
@@ -201,18 +222,21 @@ export async function DELETE(
 
   if (!channelId) {
     await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", 0, 400);
-    return apiError(
-      "MISSING_PARAMETER",
-      "channelId is required",
-      "Provide a channelId query parameter",
-      400
+    return NextResponse.json(
+      apiError(
+        "MISSING_PARAMETER",
+        "channelId is required",
+        "Provide a channelId query parameter",
+        400
+      ),
+      { status: 400 }
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.user.id);
-  if (tokens instanceof Response) {
-    await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", 0, 403);
-    return tokens;
+  const tokens = await getChannelTokens(channelId, ctx.userId);
+  if ("error" in tokens) {
+    await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", 0, tokens.status);
+    return NextResponse.json(tokens.error, { status: tokens.status });
   }
 
   try {
@@ -222,7 +246,7 @@ export async function DELETE(
     });
 
     await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", 50, 200);
-    return apiSuccess({ deleted: true }, { quotaUnits: 50 });
+    return NextResponse.json(apiSuccess({ deleted: true }, { quotaUnits: 50 }));
   } catch (error) {
     const status = axios.isAxiosError(error)
       ? error.response?.status || 500
@@ -231,11 +255,14 @@ export async function DELETE(
       ? error.response?.data?.error?.message || error.message
       : "Unknown error";
     await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", 50, status);
-    return apiError(
-      "YOUTUBE_API_ERROR",
-      message,
-      "Check the playlist ID and your permissions",
-      status
+    return NextResponse.json(
+      apiError(
+        "YOUTUBE_API_ERROR",
+        message,
+        "Check the playlist ID and your permissions",
+        status
+      ),
+      { status }
     );
   }
 }

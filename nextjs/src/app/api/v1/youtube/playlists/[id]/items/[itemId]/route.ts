@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   withApiKey,
   apiSuccess,
@@ -20,7 +20,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; itemId: string }> }
 ) {
   const ctx = await withApiKey(request);
-  if (ctx instanceof Response) return ctx;
+  if (ctx instanceof NextResponse) return ctx;
 
   const { id, itemId } = await params;
   const { searchParams } = new URL(request.url);
@@ -34,24 +34,27 @@ export async function DELETE(
       0,
       400
     );
-    return apiError(
-      "MISSING_PARAMETER",
-      "channelId is required",
-      "Provide a channelId query parameter",
-      400
+    return NextResponse.json(
+      apiError(
+        "MISSING_PARAMETER",
+        "channelId is required",
+        "Provide a channelId query parameter",
+        400
+      ),
+      { status: 400 }
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.user.id);
-  if (tokens instanceof Response) {
+  const tokens = await getChannelTokens(channelId, ctx.userId);
+  if ("error" in tokens) {
     await logRequest(
       ctx,
       `/youtube/playlists/${id}/items/${itemId}`,
       "DELETE",
       0,
-      403
+      tokens.status
     );
-    return tokens;
+    return NextResponse.json(tokens.error, { status: tokens.status });
   }
 
   try {
@@ -67,7 +70,7 @@ export async function DELETE(
       50,
       200
     );
-    return apiSuccess({ deleted: true }, { quotaUnits: 50 });
+    return NextResponse.json(apiSuccess({ deleted: true }, { quotaUnits: 50 }));
   } catch (error) {
     const status = axios.isAxiosError(error)
       ? error.response?.status || 500
@@ -82,11 +85,14 @@ export async function DELETE(
       50,
       status
     );
-    return apiError(
-      "YOUTUBE_API_ERROR",
-      message,
-      "Check the item ID and playlist permissions",
-      status
+    return NextResponse.json(
+      apiError(
+        "YOUTUBE_API_ERROR",
+        message,
+        "Check the item ID and playlist permissions",
+        status
+      ),
+      { status }
     );
   }
 }

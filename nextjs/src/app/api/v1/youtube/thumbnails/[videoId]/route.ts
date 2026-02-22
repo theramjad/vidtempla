@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   withApiKey,
   apiSuccess,
@@ -19,7 +19,7 @@ export async function PUT(
   { params }: { params: Promise<{ videoId: string }> }
 ) {
   const ctx = await withApiKey(request);
-  if (ctx instanceof Response) return ctx;
+  if (ctx instanceof NextResponse) return ctx;
 
   const { videoId } = await params;
   const { searchParams } = new URL(request.url);
@@ -27,18 +27,21 @@ export async function PUT(
 
   if (!channelId) {
     await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 0, 400);
-    return apiError(
-      "MISSING_PARAMETER",
-      "channelId is required",
-      "Provide a channelId query parameter",
-      400
+    return NextResponse.json(
+      apiError(
+        "MISSING_PARAMETER",
+        "channelId is required",
+        "Provide a channelId query parameter",
+        400
+      ),
+      { status: 400 }
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.user.id);
-  if (tokens instanceof Response) {
-    await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 0, 403);
-    return tokens;
+  const tokens = await getChannelTokens(channelId, ctx.userId);
+  if ("error" in tokens) {
+    await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 0, tokens.status);
+    return NextResponse.json(tokens.error, { status: tokens.status });
   }
 
   // Handle multipart or raw image upload
@@ -58,11 +61,14 @@ export async function PUT(
           0,
           400
         );
-        return apiError(
-          "MISSING_PARAMETER",
-          "thumbnail file is required in form data",
-          'Upload an image file with the field name "thumbnail"',
-          400
+        return NextResponse.json(
+          apiError(
+            "MISSING_PARAMETER",
+            "thumbnail file is required in form data",
+            'Upload an image file with the field name "thumbnail"',
+            400
+          ),
+          { status: 400 }
         );
       }
       const arrayBuffer = await file.arrayBuffer();
@@ -74,22 +80,28 @@ export async function PUT(
       imageContentType = contentType;
     } else {
       await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 0, 400);
-      return apiError(
-        "INVALID_CONTENT_TYPE",
-        "Request must be multipart/form-data or image/*",
-        'Send the image as multipart/form-data with field "thumbnail", or as raw binary with Content-Type: image/png (or image/jpeg)',
-        400
+      return NextResponse.json(
+        apiError(
+          "INVALID_CONTENT_TYPE",
+          "Request must be multipart/form-data or image/*",
+          'Send the image as multipart/form-data with field "thumbnail", or as raw binary with Content-Type: image/png (or image/jpeg)',
+          400
+        ),
+        { status: 400 }
       );
     }
 
     // Validate image size (YouTube limit: 2 MB)
     if (imageBuffer.length > 2 * 1024 * 1024) {
       await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 0, 400);
-      return apiError(
-        "FILE_TOO_LARGE",
-        "Thumbnail must be under 2 MB",
-        "Resize or compress your image to under 2 MB",
-        400
+      return NextResponse.json(
+        apiError(
+          "FILE_TOO_LARGE",
+          "Thumbnail must be under 2 MB",
+          "Resize or compress your image to under 2 MB",
+          400
+        ),
+        { status: 400 }
       );
     }
 
@@ -107,7 +119,7 @@ export async function PUT(
     );
 
     await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 50, 200);
-    return apiSuccess(response.data, { quotaUnits: 50 });
+    return NextResponse.json(apiSuccess(response.data, { quotaUnits: 50 }));
   } catch (error) {
     const status = axios.isAxiosError(error)
       ? error.response?.status || 500
@@ -116,11 +128,14 @@ export async function PUT(
       ? error.response?.data?.error?.message || error.message
       : "Unknown error";
     await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 50, status);
-    return apiError(
-      "YOUTUBE_API_ERROR",
-      message,
-      "Ensure the image is a valid JPEG/PNG under 2 MB and the video ID is correct",
-      status
+    return NextResponse.json(
+      apiError(
+        "YOUTUBE_API_ERROR",
+        message,
+        "Ensure the image is a valid JPEG/PNG under 2 MB and the video ID is correct",
+        status
+      ),
+      { status }
     );
   }
 }
