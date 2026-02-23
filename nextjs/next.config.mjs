@@ -9,6 +9,7 @@ import createMDX from "@next/mdx";
 /** @type {import("next").NextConfig} */
 const config = {
   reactStrictMode: true,
+  serverExternalPackages: ["postgres"],
   images: {
     remotePatterns: [
       /* YouTube thumbnails */
