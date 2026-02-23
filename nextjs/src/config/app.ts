@@ -36,6 +36,10 @@ export const appConfig = {
         title: "API Keys",
         url: "/dashboard/api-keys",
       },
+      {
+        title: "Usage",
+        url: "/dashboard/usage",
+      },
     ],
   },
 } as const;

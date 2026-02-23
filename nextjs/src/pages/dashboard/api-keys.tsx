@@ -53,9 +53,6 @@ export default function ApiKeysPage() {
   const { data: apiKeysList, isLoading: keysLoading } =
     api.dashboard.apiKeys.list.useQuery();
 
-  const { data: apiUsage } =
-    api.dashboard.apiKeys.getUsage.useQuery({});
-
   const utils = api.useUtils();
 
   const createKeyMutation = api.dashboard.apiKeys.create.useMutation({
@@ -72,7 +69,6 @@ export default function ApiKeysPage() {
   const revokeKeyMutation = api.dashboard.apiKeys.revoke.useMutation({
     onSuccess: () => {
       utils.dashboard.apiKeys.list.invalidate();
-      utils.dashboard.apiKeys.getUsage.invalidate();
       toast.success('API key revoked');
     },
     onError: (error) => {
@@ -136,18 +132,9 @@ export default function ApiKeysPage() {
       </Head>
       <DashboardLayout
         headerContent={
-          <nav className="flex items-center gap-2 text-sm flex-1">
-            <span className="font-medium">API Keys</span>
-          </nav>
-        }
-      >
-        <div className="container mx-auto py-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">API Keys</h1>
-              <p className="text-muted-foreground">
-                Manage API keys for programmatic access to VidTempla
-              </p>
+          <>
+            <div className="flex items-center gap-2 text-sm flex-1">
+              <span className="font-medium">API Keys</span>
             </div>
             <Dialog open={createDialogOpen} onOpenChange={(open) => {
               if (!open) handleCloseCreateDialog();
@@ -258,9 +245,11 @@ export default function ApiKeysPage() {
                         </>
                       )}
                     </DialogContent>
-                  </Dialog>
-          </div>
-
+              </Dialog>
+          </>
+        }
+      >
+        <div className="container mx-auto py-6 space-y-6">
           {keysLoading ? (
             <div className="flex items-center gap-2 p-2">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -339,22 +328,6 @@ export default function ApiKeysPage() {
             </div>
           )}
 
-          {/* Usage summary */}
-          {apiUsage && apiUsage.totals.requests > 0 && (
-            <div className="pt-4 border-t">
-              <h4 className="font-medium mb-2 text-sm">API Usage This Period</h4>
-              <div className="flex items-center gap-6 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Requests: </span>
-                  <span className="font-medium">{apiUsage.totals.requests.toLocaleString()}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">YouTube Quota Used: </span>
-                  <span className="font-medium">{apiUsage.totals.quotaUnits.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </DashboardLayout>
     </>
