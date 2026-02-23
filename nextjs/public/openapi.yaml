@@ -1,0 +1,2523 @@
+openapi: 3.1.0
+info:
+  title: VidTempla API
+  version: "1.0"
+  description: |
+    VidTempla is an API-first platform for managing YouTube video descriptions with templates, containers, and variables.
+    The REST API lets AI agents securely manage YouTube channels without handling OAuth directly.
+
+    ## Authentication
+    All requests require a Bearer token in the Authorization header:
+    ```
+    Authorization: Bearer vtk_your_key_here
+    ```
+    API keys have one of two permission levels:
+    - **read** — can only fetch data (GET requests and POST /analytics/query)
+    - **read-write** — can also create, update, and delete resources
+
+    Generate keys from the dashboard at Settings > API Keys.
+
+    ## Response Envelope
+    Every response uses a standard envelope:
+    ```json
+    { "data": { ... }, "error": null, "meta": { ... } }
+    ```
+
+    ## Pagination
+    All list endpoints use cursor-based pagination. Default limit is 50, max is 100.
+    ```
+    GET /videos?cursor=...&limit=50
+    ```
+  contact:
+    name: VidTempla
+    url: https://vidtempla.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://vidtempla.com/api/v1
+    description: Production
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Channels
+    description: Manage connected YouTube channels
+  - name: Videos
+    description: Manage synced YouTube videos
+  - name: Templates
+    description: CRUD operations for description templates
+  - name: Containers
+    description: CRUD operations for template containers
+  - name: YouTube Playlists
+    description: Proxy endpoints for YouTube playlist management
+  - name: YouTube Comments
+    description: Proxy endpoints for YouTube comment management
+  - name: YouTube Thumbnails
+    description: Proxy endpoint for thumbnail uploads
+  - name: YouTube Captions
+    description: Proxy endpoint for caption listing
+  - name: Analytics
+    description: Flexible YouTube Analytics queries
+  - name: Usage
+    description: API request tracking and quota monitoring
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: "API key starting with vtk_. Generate from Settings > API Keys."
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        data:
+          type: "null"
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+            message:
+              type: string
+              description: Human-readable error message
+            suggestion:
+              type: string
+              description: Actionable suggestion for agents to self-correct
+            status:
+              type: integer
+              description: HTTP status code
+          required: [code, message, status]
+      required: [data, error]
+
+    PaginationMeta:
+      type: object
+      properties:
+        cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page. Null on last page.
+        hasMore:
+          type: boolean
+          description: Whether more results exist beyond this page
+        total:
+          type: integer
+          description: Total count of matching records
+
+    SuccessMessage:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+        error:
+          type: "null"
+
+    Channel:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        channelId:
+          type: string
+          description: YouTube channel ID
+        title:
+          type: string
+          nullable: true
+        thumbnailUrl:
+          type: string
+          nullable: true
+        subscriberCount:
+          type: integer
+          nullable: true
+        syncStatus:
+          type: string
+          enum: [idle, syncing]
+        lastSyncedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    Video:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        channelId:
+          type: string
+          format: uuid
+        videoId:
+          type: string
+          description: YouTube video ID
+        title:
+          type: string
+          nullable: true
+        currentDescription:
+          type: string
+          nullable: true
+        containerId:
+          type: string
+          format: uuid
+          nullable: true
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        channel:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            channelId:
+              type: string
+            title:
+              type: string
+              nullable: true
+        container:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+
+    Template:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        content:
+          type: string
+        variables:
+          type: array
+          items:
+            type: string
+          description: Parsed variable names from template content
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Container:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        separator:
+          type: string
+        templateOrder:
+          type: array
+          nullable: true
+          items:
+            type: string
+            format: uuid
+        videoCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    VideoVariable:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        videoId:
+          type: string
+          format: uuid
+        templateId:
+          type: string
+          format: uuid
+        variableName:
+          type: string
+        variableValue:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        template:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+
+    RetentionPoint:
+      type: object
+      properties:
+        position:
+          type: number
+          description: Position in the video (0-100)
+        watchRatio:
+          type: number
+          description: Ratio of viewers still watching at this position
+        relativePerformance:
+          type: number
+          description: Performance relative to similar videos
+
+    UsageData:
+      type: object
+      properties:
+        daily:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              requestCount:
+                type: integer
+              quotaUnits:
+                type: integer
+        totals:
+          type: object
+          properties:
+            requests:
+              type: integer
+            quotaUnits:
+              type: integer
+        periodStart:
+          type: string
+          format: date-time
+        periodEnd:
+          type: string
+          format: date-time
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            data: null
+            error:
+              code: INVALID_API_KEY
+              message: API key not found or has been revoked
+              suggestion: Generate a new key from Settings > API Keys
+              status: 401
+
+    InsufficientPermissions:
+      description: API key lacks write permission
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            data: null
+            error:
+              code: INSUFFICIENT_PERMISSIONS
+              message: This API key has read-only access
+              suggestion: Create a new API key with read-write permission from Settings > API Keys
+              status: 403
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            data: null
+            error:
+              code: INTERNAL_ERROR
+              message: An unexpected error occurred
+              suggestion: Try again later
+              status: 500
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+paths:
+  # ─── Channels ───────────────────────────────────────────────
+
+  /channels:
+    get:
+      operationId: listChannels
+      summary: List connected YouTube channels
+      description: Returns all YouTube channels connected to your account. No YouTube API quota consumed.
+      tags: [Channels]
+      x-quota-cost: 0
+      responses:
+        "200":
+          description: List of channels
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Channel"
+                  error:
+                    type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /channels/{channelId}:
+    get:
+      operationId: getChannelDetails
+      summary: Get channel details from YouTube
+      description: Fetches real-time channel details (statistics, branding, etc.) directly from the YouTube Data API.
+      tags: [Channels]
+      x-quota-cost: 1
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube channel ID (e.g. UCxxxxxx)
+      responses:
+        "200":
+          description: Channel details from YouTube
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    description: YouTube channel resource (snippet, statistics, brandingSettings)
+                  error:
+                    type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /channels/{channelId}/overview:
+    get:
+      operationId: getChannelOverview
+      summary: Get channel overview with templates, containers, and video stats
+      description: |
+        Returns a comprehensive overview combining real-time YouTube data with VidTempla metadata:
+        channel details, template list, container list, and video assignment statistics.
+      tags: [Channels]
+      x-quota-cost: 3
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube channel ID
+      responses:
+        "200":
+          description: Channel overview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      channel:
+                        type: object
+                        description: YouTube channel resource
+                      templates:
+                        type: object
+                        properties:
+                          count:
+                            type: integer
+                          items:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                name:
+                                  type: string
+                                variableCount:
+                                  type: integer
+                      containers:
+                        type: object
+                        properties:
+                          count:
+                            type: integer
+                          items:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                name:
+                                  type: string
+                                videoCount:
+                                  type: integer
+                      videos:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                          assigned:
+                            type: integer
+                          unassigned:
+                            type: integer
+                      descriptionHealth:
+                        type: object
+                        properties:
+                          withContainer:
+                            type: integer
+                          withoutContainer:
+                            type: integer
+                          lastSyncedAt:
+                            type: string
+                            format: date-time
+                            nullable: true
+                          syncStatus:
+                            type: string
+                  error:
+                    type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /channels/{channelId}/sync:
+    post:
+      operationId: triggerChannelSync
+      summary: Trigger video sync for a channel
+      description: Starts a background job to sync all videos from the YouTube channel into VidTempla. Returns 202 if the sync was started, 409 if a sync is already in progress.
+      tags: [Channels]
+      x-quota-cost: 0
+      x-requires-write: true
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube channel ID
+      responses:
+        "202":
+          description: Sync started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Video sync started
+                      jobId:
+                        type: string
+                  error:
+                    type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Sync already in progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                data: null
+                error:
+                  code: SYNC_IN_PROGRESS
+                  message: A sync is already in progress for this channel
+                  suggestion: Wait for the current sync to complete before starting another
+                  status: 409
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /channels/{channelId}/analytics:
+    get:
+      operationId: getChannelAnalytics
+      summary: Get channel analytics
+      description: Fetches analytics data from the YouTube Analytics API for this channel. Defaults to last 28 days with daily views and watch time.
+      tags: [Channels]
+      x-quota-cost: 0
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube channel ID
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Start date (YYYY-MM-DD). Defaults to 28 days ago.
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: End date (YYYY-MM-DD). Defaults to today.
+        - name: metrics
+          in: query
+          schema:
+            type: string
+            default: "views,estimatedMinutesWatched"
+          description: Comma-separated YouTube Analytics metrics
+        - name: dimensions
+          in: query
+          schema:
+            type: string
+            default: day
+          description: YouTube Analytics dimension (e.g. day, month, country)
+      responses:
+        "200":
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    description: YouTube Analytics API response
+                  error:
+                    type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /channels/{channelId}/search:
+    get:
+      operationId: searchChannelVideos
+      summary: Search channel videos on YouTube
+      description: Searches the channel's videos using the YouTube search.list API. Costs 100 quota units per call.
+      tags: [Channels]
+      x-quota-cost: 100
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube channel ID
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: relevance
+            enum: [relevance, date, viewCount, rating]
+          description: Sort order
+        - name: maxResults
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 50
+          description: Maximum number of results (max 50)
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    description: YouTube search.list response
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaCost:
+                        type: integer
+                        example: 100
+                      note:
+                        type: string
+        "400":
+          description: Missing search query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ─── Videos ─────────────────────────────────────────────────
+
+  /videos:
+    get:
+      operationId: listVideos
+      summary: List videos with pagination
+      description: Returns synced YouTube videos with filtering, sorting, and cursor-based pagination.
+      tags: [Videos]
+      x-quota-cost: 0
+      parameters:
+        - name: channelId
+          in: query
+          schema:
+            type: string
+          description: Filter by YouTube channel ID
+        - name: containerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by container ID
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by video title (case-insensitive)
+        - name: unassigned
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+          description: Filter to only unassigned videos
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: "publishedAt:desc"
+          description: "Sort field and direction (e.g. publishedAt:desc, title:asc)"
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Pagination cursor (ISO 8601 timestamp from previous response)
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+          description: Number of results per page (max 100)
+      responses:
+        "200":
+          description: Paginated list of videos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Video"
+                  error:
+                    type: "null"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /videos/{id}:
+    get:
+      operationId: getVideoDetails
+      summary: Get video details
+      description: Returns VidTempla metadata for a video, enriched with real-time YouTube statistics when available.
+      tags: [Videos]
+      x-quota-cost: 0
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: VidTempla internal video UUID
+      responses:
+        "200":
+          description: Video details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/Video"
+                      - type: object
+                        properties:
+                          youtube:
+                            type: object
+                            nullable: true
+                            description: Real-time YouTube video resource (snippet, statistics, contentDetails)
+                  error:
+                    type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /videos/{id}/analytics:
+    get:
+      operationId: getVideoAnalytics
+      summary: Get video analytics
+      description: Fetches analytics data from the YouTube Analytics API for a specific video. Defaults to last 28 days.
+      tags: [Videos]
+      x-quota-cost: 0
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: VidTempla internal video UUID
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Start date (YYYY-MM-DD). Defaults to 28 days ago.
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: End date (YYYY-MM-DD). Defaults to today.
+        - name: metrics
+          in: query
+          schema:
+            type: string
+            default: "views,estimatedMinutesWatched,averageViewDuration"
+          description: Comma-separated YouTube Analytics metrics
+        - name: dimensions
+          in: query
+          schema:
+            type: string
+            default: day
+          description: YouTube Analytics dimension
+      responses:
+        "200":
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    description: YouTube Analytics API response
+                  error:
+                    type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /videos/{id}/retention:
+    get:
+      operationId: getVideoRetention
+      summary: Get audience retention data
+      description: Returns a 100-point retention curve showing viewer drop-off throughout the video.
+      tags: [Videos]
+      x-quota-cost: 0
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: VidTempla internal video UUID
+      responses:
+        "200":
+          description: Retention curve
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RetentionPoint"
+                  error:
+                    type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /videos/{id}/assign:
+    post:
+      operationId: assignVideoToContainer
+      summary: Assign video to a container
+      description: Assigns an unassigned video to a container and initializes template variables. Returns 400 if the video is already assigned.
+      tags: [Videos]
+      x-quota-cost: 0
+      x-requires-write: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: VidTempla internal video UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [containerId]
+              properties:
+                containerId:
+                  type: string
+                  format: uuid
+                  description: The container to assign the video to
+      responses:
+        "200":
+          description: Video assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessMessage"
+        "400":
+          description: Missing containerId or video already assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Insufficient permissions or video limit reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /videos/{id}/variables:
+    get:
+      operationId: listVideoVariables
+      summary: List video variables
+      description: Returns all template variables for a video, including which template each variable belongs to.
+      tags: [Videos]
+      x-quota-cost: 0
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: VidTempla internal video UUID
+      responses:
+        "200":
+          description: List of variables
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VideoVariable"
+                  error:
+                    type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    put:
+      operationId: updateVideoVariables
+      summary: Update video variables
+      description: Upserts template variables for a video and triggers a description rebuild job.
+      tags: [Videos]
+      x-quota-cost: 0
+      x-requires-write: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: VidTempla internal video UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [variables]
+              properties:
+                variables:
+                  type: array
+                  items:
+                    type: object
+                    required: [templateId, name, value]
+                    properties:
+                      templateId:
+                        type: string
+                        format: uuid
+                      name:
+                        type: string
+                        description: Variable name (without {{ }} braces)
+                      value:
+                        type: string
+                        description: Variable value
+      responses:
+        "200":
+          description: Variables updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessMessage"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ─── Templates ──────────────────────────────────────────────
+
+  /templates:
+    get:
+      operationId: listTemplates
+      summary: List templates
+      description: Returns description templates with parsed variable names and cursor-based pagination.
+      tags: [Templates]
+      x-quota-cost: 0
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Pagination cursor (ISO 8601 timestamp)
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+          description: Number of results per page (max 100)
+      responses:
+        "200":
+          description: Paginated list of templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Template"
+                  error:
+                    type: "null"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      operationId: createTemplate
+      summary: Create a template
+      description: Creates a new description template. Use {{variableName}} syntax for variables.
+      tags: [Templates]
+      x-quota-cost: 0
+      x-requires-write: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, content]
+              properties:
+                name:
+                  type: string
+                  description: Template name
+                content:
+                  type: string
+                  description: "Template content with {{variable}} placeholders"
+      responses:
+        "201":
+          description: Template created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Template"
+                  error:
+                    type: "null"
+        "400":
+          description: Missing or invalid name/content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /templates/{id}:
+    get:
+      operationId: getTemplate
+      summary: Get template details
+      description: Returns a single template with parsed variable names.
+      tags: [Templates]
+      x-quota-cost: 0
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Template UUID
+      responses:
+        "200":
+          description: Template details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Template"
+                  error:
+                    type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    patch:
+      operationId: updateTemplate
+      summary: Update a template
+      description: Updates a template's name and/or content. If content changes, triggers a description rebuild for all affected videos.
+      tags: [Templates]
+      x-quota-cost: 0
+      x-requires-write: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Template UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                content:
+                  type: string
+              description: At least one field (name or content) must be provided
+      responses:
+        "200":
+          description: Template updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Template"
+                  error:
+                    type: "null"
+        "400":
+          description: Empty update
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      operationId: deleteTemplate
+      summary: Delete a template
+      description: Permanently deletes a template. Associated video variables are cascade-deleted.
+      tags: [Templates]
+      x-quota-cost: 0
+      x-requires-write: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Template UUID
+      responses:
+        "200":
+          description: Template deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /templates/{id}/impact:
+    get:
+      operationId: getTemplateImpact
+      summary: Template impact analysis
+      description: Returns which containers use this template and which videos would be affected by changes to it.
+      tags: [Templates]
+      x-quota-cost: 0
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Template UUID
+      responses:
+        "200":
+          description: Impact analysis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      containers:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                            videoCount:
+                              type: integer
+                      videos:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            title:
+                              type: string
+                              nullable: true
+                            videoId:
+                              type: string
+                            containerId:
+                              type: string
+                              format: uuid
+                              nullable: true
+                      count:
+                        type: integer
+                        description: Total number of affected videos
+                  error:
+                    type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ─── Containers ─────────────────────────────────────────────
+
+  /containers:
+    get:
+      operationId: listContainers
+      summary: List containers
+      description: Returns containers with video counts and cursor-based pagination.
+      tags: [Containers]
+      x-quota-cost: 0
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Pagination cursor (ISO 8601 timestamp)
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+          description: Number of results per page (max 100)
+      responses:
+        "200":
+          description: Paginated list of containers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Container"
+                  error:
+                    type: "null"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      operationId: createContainer
+      summary: Create a container
+      description: Creates a new container that groups templates in a specific order with a separator.
+      tags: [Containers]
+      x-quota-cost: 0
+      x-requires-write: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, templateIds]
+              properties:
+                name:
+                  type: string
+                  description: Container name
+                templateIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Ordered list of template UUIDs
+                separator:
+                  type: string
+                  default: "\n\n"
+                  description: Text separator between templates
+      responses:
+        "201":
+          description: Container created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Container"
+                  error:
+                    type: "null"
+        "400":
+          description: Missing or invalid name/templateIds
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /containers/{id}:
+    get:
+      operationId: getContainer
+      summary: Get container details with templates
+      description: Returns a container with its ordered templates and video count.
+      tags: [Containers]
+      x-quota-cost: 0
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Container UUID
+      responses:
+        "200":
+          description: Container details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/Container"
+                      - type: object
+                        properties:
+                          templates:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                name:
+                                  type: string
+                                content:
+                                  type: string
+                  error:
+                    type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    patch:
+      operationId: updateContainer
+      summary: Update a container
+      description: Updates container name, template order, or separator. If templateIds or separator change, triggers a description rebuild for all assigned videos.
+      tags: [Containers]
+      x-quota-cost: 0
+      x-requires-write: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Container UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                templateIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                separator:
+                  type: string
+              description: At least one field must be provided
+      responses:
+        "200":
+          description: Container updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Container"
+                  error:
+                    type: "null"
+        "400":
+          description: Empty update
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      operationId: deleteContainer
+      summary: Delete a container
+      description: Permanently deletes a container. Videos assigned to this container become unassigned.
+      tags: [Containers]
+      x-quota-cost: 0
+      x-requires-write: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Container UUID
+      responses:
+        "200":
+          description: Container deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ─── YouTube Playlists ──────────────────────────────────────
+
+  /youtube/playlists:
+    get:
+      operationId: listPlaylists
+      summary: List YouTube playlists
+      description: Lists playlists for a channel via the YouTube Data API.
+      tags: [YouTube Playlists]
+      x-quota-cost: 1
+      parameters:
+        - name: channelId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: YouTube channel ID
+        - name: pageToken
+          in: query
+          schema:
+            type: string
+          description: YouTube pagination token
+        - name: maxResults
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 50
+          description: Max results per page (max 50)
+      responses:
+        "200":
+          description: List of playlists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      description: YouTube playlist resource
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaUnits:
+                        type: integer
+                        example: 1
+                      pageInfo:
+                        type: object
+                      nextPageToken:
+                        type: string
+                        nullable: true
+        "400":
+          description: Missing channelId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      operationId: createPlaylist
+      summary: Create a YouTube playlist
+      description: Creates a new playlist on YouTube.
+      tags: [YouTube Playlists]
+      x-quota-cost: 50
+      x-requires-write: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channelId, title]
+              properties:
+                channelId:
+                  type: string
+                  description: YouTube channel ID
+                title:
+                  type: string
+                  description: Playlist title
+                description:
+                  type: string
+                  description: Playlist description
+                privacyStatus:
+                  type: string
+                  enum: [public, private, unlisted]
+                  default: private
+                  description: Playlist privacy status
+      responses:
+        "200":
+          description: Playlist created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    description: YouTube playlist resource
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaUnits:
+                        type: integer
+                        example: 50
+        "400":
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /youtube/playlists/{id}:
+    get:
+      operationId: getPlaylist
+      summary: Get YouTube playlist details
+      description: Fetches details for a specific playlist from the YouTube Data API.
+      tags: [YouTube Playlists]
+      x-quota-cost: 1
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube playlist ID
+        - name: channelId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: YouTube channel ID (for auth)
+      responses:
+        "200":
+          description: Playlist details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    description: YouTube playlist resource
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaUnits:
+                        type: integer
+                        example: 1
+        "400":
+          description: Missing channelId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    patch:
+      operationId: updatePlaylist
+      summary: Update a YouTube playlist
+      description: Updates playlist title, description, or privacy status on YouTube.
+      tags: [YouTube Playlists]
+      x-quota-cost: 50
+      x-requires-write: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube playlist ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channelId]
+              properties:
+                channelId:
+                  type: string
+                  description: YouTube channel ID
+                title:
+                  type: string
+                description:
+                  type: string
+                privacyStatus:
+                  type: string
+                  enum: [public, private, unlisted]
+      responses:
+        "200":
+          description: Playlist updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    description: YouTube playlist resource
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaUnits:
+                        type: integer
+                        example: 50
+        "400":
+          description: Missing channelId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      operationId: deletePlaylist
+      summary: Delete a YouTube playlist
+      description: Permanently deletes a playlist from YouTube.
+      tags: [YouTube Playlists]
+      x-quota-cost: 50
+      x-requires-write: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube playlist ID
+        - name: channelId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: YouTube channel ID (for auth)
+      responses:
+        "200":
+          description: Playlist deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted:
+                        type: boolean
+                        example: true
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaUnits:
+                        type: integer
+                        example: 50
+        "400":
+          description: Missing channelId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /youtube/playlists/{id}/items:
+    get:
+      operationId: listPlaylistItems
+      summary: List playlist items
+      description: Lists videos in a YouTube playlist.
+      tags: [YouTube Playlists]
+      x-quota-cost: 1
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube playlist ID
+        - name: channelId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: YouTube channel ID (for auth)
+        - name: pageToken
+          in: query
+          schema:
+            type: string
+          description: YouTube pagination token
+        - name: maxResults
+          in: query
+          schema:
+            type: integer
+            default: 25
+            maximum: 50
+          description: Max results per page (max 50)
+      responses:
+        "200":
+          description: List of playlist items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      description: YouTube playlistItem resource
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaUnits:
+                        type: integer
+                        example: 1
+                      pageInfo:
+                        type: object
+                      nextPageToken:
+                        type: string
+                        nullable: true
+        "400":
+          description: Missing channelId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      operationId: addPlaylistItem
+      summary: Add video to a playlist
+      description: Adds a video to a YouTube playlist.
+      tags: [YouTube Playlists]
+      x-quota-cost: 50
+      x-requires-write: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube playlist ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channelId, videoId]
+              properties:
+                channelId:
+                  type: string
+                  description: YouTube channel ID
+                videoId:
+                  type: string
+                  description: YouTube video ID to add
+      responses:
+        "200":
+          description: Video added to playlist
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    description: YouTube playlistItem resource
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaUnits:
+                        type: integer
+                        example: 50
+        "400":
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /youtube/playlists/{id}/items/{itemId}:
+    delete:
+      operationId: removePlaylistItem
+      summary: Remove item from a playlist
+      description: Removes a specific item from a YouTube playlist.
+      tags: [YouTube Playlists]
+      x-quota-cost: 50
+      x-requires-write: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube playlist ID
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube playlistItem ID
+        - name: channelId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: YouTube channel ID (for auth)
+      responses:
+        "200":
+          description: Item removed from playlist
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted:
+                        type: boolean
+                        example: true
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaUnits:
+                        type: integer
+                        example: 50
+        "400":
+          description: Missing channelId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ─── YouTube Comments ───────────────────────────────────────
+
+  /youtube/comments/{videoId}:
+    get:
+      operationId: listComments
+      summary: List video comments
+      description: Lists comment threads for a YouTube video.
+      tags: [YouTube Comments]
+      x-quota-cost: 1
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube video ID
+        - name: channelId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: YouTube channel ID (for auth)
+        - name: maxResults
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+          description: Max results per page (max 100)
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [relevance, time]
+            default: relevance
+          description: Sort order (relevance for top comments, time for newest)
+        - name: pageToken
+          in: query
+          schema:
+            type: string
+          description: YouTube pagination token
+      responses:
+        "200":
+          description: List of comment threads
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      description: YouTube commentThread resource
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaUnits:
+                        type: integer
+                        example: 1
+                      pageInfo:
+                        type: object
+                      nextPageToken:
+                        type: string
+                        nullable: true
+        "400":
+          description: Missing channelId or invalid order parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /youtube/comments/reply:
+    post:
+      operationId: replyToComment
+      summary: Reply to a comment
+      description: Posts a reply to an existing YouTube comment.
+      tags: [YouTube Comments]
+      x-quota-cost: 50
+      x-requires-write: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channelId, parentId, text]
+              properties:
+                channelId:
+                  type: string
+                  description: YouTube channel ID
+                parentId:
+                  type: string
+                  description: The comment ID to reply to
+                text:
+                  type: string
+                  description: Reply text
+      responses:
+        "200":
+          description: Reply posted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    description: YouTube comment resource
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaUnits:
+                        type: integer
+                        example: 50
+        "400":
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /youtube/comments/{commentId}:
+    delete:
+      operationId: deleteComment
+      summary: Delete a comment
+      description: Deletes a YouTube comment.
+      tags: [YouTube Comments]
+      x-quota-cost: 50
+      x-requires-write: true
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube comment ID
+        - name: channelId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: YouTube channel ID (for auth)
+      responses:
+        "200":
+          description: Comment deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted:
+                        type: boolean
+                        example: true
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaUnits:
+                        type: integer
+                        example: 50
+        "400":
+          description: Missing channelId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ─── YouTube Thumbnails ─────────────────────────────────────
+
+  /youtube/thumbnails/{videoId}:
+    put:
+      operationId: uploadThumbnail
+      summary: Upload a custom thumbnail
+      description: |
+        Uploads a custom thumbnail for a YouTube video. Accepts either multipart/form-data
+        (with field name "thumbnail") or raw image binary (Content-Type: image/*). Max size 2 MB.
+      tags: [YouTube Thumbnails]
+      x-quota-cost: 50
+      x-requires-write: true
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube video ID
+        - name: channelId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: YouTube channel ID (for auth)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                thumbnail:
+                  type: string
+                  format: binary
+                  description: Image file (JPEG or PNG, max 2 MB)
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Thumbnail uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    description: YouTube thumbnail resource
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaUnits:
+                        type: integer
+                        example: 50
+        "400":
+          description: Missing channelId, invalid content type, or file too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ─── YouTube Captions ───────────────────────────────────────
+
+  /youtube/captions/{videoId}:
+    get:
+      operationId: listCaptions
+      summary: List video captions
+      description: Lists available caption tracks for a YouTube video.
+      tags: [YouTube Captions]
+      x-quota-cost: 50
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube video ID
+        - name: channelId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: YouTube channel ID (for auth)
+      responses:
+        "200":
+          description: List of caption tracks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      description: YouTube caption resource
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaUnits:
+                        type: integer
+                        example: 50
+        "400":
+          description: Missing channelId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ─── Analytics ──────────────────────────────────────────────
+
+  /analytics/query:
+    post:
+      operationId: queryAnalytics
+      summary: Flexible YouTube Analytics query
+      description: |
+        Raw pass-through to the YouTube Analytics API. Read-only despite using POST
+        (POST is used because the query parameters can be complex).
+        Analytics API uses a separate quota pool from the Data API.
+      tags: [Analytics]
+      x-quota-cost: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channelId, startDate, endDate, metrics]
+              properties:
+                channelId:
+                  type: string
+                  description: YouTube channel ID
+                startDate:
+                  type: string
+                  format: date
+                  description: Start date (YYYY-MM-DD)
+                endDate:
+                  type: string
+                  format: date
+                  description: End date (YYYY-MM-DD)
+                metrics:
+                  type: string
+                  description: "Comma-separated metrics (e.g. views,estimatedMinutesWatched,averageViewDuration)"
+                dimensions:
+                  type: string
+                  description: "Comma-separated dimensions (e.g. day, month, country, video)"
+                filters:
+                  type: string
+                  description: "YouTube Analytics filter expression (e.g. video==abc123)"
+                sort:
+                  type: string
+                  description: "Sort field (e.g. -views for descending)"
+                maxResults:
+                  type: integer
+                  description: Maximum number of result rows
+      responses:
+        "200":
+          description: Analytics query results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    description: YouTube Analytics API response (columnHeaders + rows)
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaUnits:
+                        type: integer
+                        example: 1
+                      note:
+                        type: string
+        "400":
+          description: Missing required fields or invalid date format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Analytics scope not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                data: null
+                error:
+                  code: MISSING_SCOPE
+                  message: Analytics scope not authorized for this channel
+                  suggestion: "Reconnect your channel from the dashboard to enable analytics (requires yt-analytics.readonly scope)"
+                  status: 403
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ─── Usage ──────────────────────────────────────────────────
+
+  /usage:
+    get:
+      operationId: getUsage
+      summary: Get API usage stats
+      description: Returns daily request counts and quota usage for the current billing period. Defaults to the current calendar month if no dates are specified.
+      tags: [Usage]
+      x-quota-cost: 0
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Start date (YYYY-MM-DD). Defaults to first day of current month.
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: End date (YYYY-MM-DD). Defaults to today.
+      responses:
+        "200":
+          description: Usage statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/UsageData"
+                  error:
+                    type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
