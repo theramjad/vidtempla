@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
-import { apiKeys, apiRequestLog, youtubeChannels } from "@/db/schema";
+import { apiKeys, apiRequestLog, youtubeChannels, youtubeVideos } from "@/db/schema";
 import { hashApiKey } from "@/lib/api-keys";
 import { decrypt } from "@/utils/encryption";
 import { refreshAccessToken } from "@/lib/clients/youtube";
@@ -284,4 +284,36 @@ export async function getChannelTokens(
   }
 
   return { accessToken, channelId: channel.channelId };
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Resolves a video by either VidTempla UUID or YouTube video ID.
+ * Returns the video row (with videoId and channel.channelId) or null if not found / not owned.
+ */
+export async function resolveVideo(
+  id: string,
+  userId: string
+) {
+  const isUUID = UUID_REGEX.test(id);
+
+  const [video] = await db
+    .select({
+      id: youtubeVideos.id,
+      videoId: youtubeVideos.videoId,
+      channelId: youtubeVideos.channelId,
+      containerId: youtubeVideos.containerId,
+      channelYoutubeId: youtubeChannels.channelId,
+    })
+    .from(youtubeVideos)
+    .innerJoin(youtubeChannels, eq(youtubeVideos.channelId, youtubeChannels.id))
+    .where(
+      and(
+        isUUID ? eq(youtubeVideos.id, id) : eq(youtubeVideos.videoId, id),
+        eq(youtubeChannels.userId, userId)
+      )
+    );
+
+  return video ?? null;
 }

@@ -5,6 +5,7 @@ import {
   apiError,
   logRequest,
   getChannelTokens,
+  resolveVideo,
 } from "@/lib/api-auth";
 import { db } from "@/db";
 import {
@@ -25,7 +26,17 @@ export async function GET(
   const { id } = await params;
 
   try {
-    // Get our DB data
+    // Resolve to internal ID (accepts both UUID and YouTube video ID)
+    const resolved = await resolveVideo(id, auth.userId);
+    if (!resolved) {
+      logRequest(auth, `/v1/videos/${id}`, "GET", 404, 0);
+      return NextResponse.json(
+        apiError("VIDEO_NOT_FOUND", "Video not found", "Pass a VidTempla UUID or YouTube video ID (e.g. dQw4w9WgXcQ)", 404),
+        { status: 404 }
+      );
+    }
+
+    // Get our DB data with full details
     const [video] = await db
       .select({
         ...getTableColumns(youtubeVideos),
@@ -43,14 +54,12 @@ export async function GET(
       .from(youtubeVideos)
       .innerJoin(youtubeChannels, eq(youtubeVideos.channelId, youtubeChannels.id))
       .leftJoin(containers, eq(youtubeVideos.containerId, containers.id))
-      .where(
-        and(eq(youtubeVideos.id, id), eq(youtubeChannels.userId, auth.userId))
-      );
+      .where(eq(youtubeVideos.id, resolved.id));
 
     if (!video) {
       logRequest(auth, `/v1/videos/${id}`, "GET", 404, 0);
       return NextResponse.json(
-        apiError("VIDEO_NOT_FOUND", "Video not found", "Check the video ID", 404),
+        apiError("VIDEO_NOT_FOUND", "Video not found", "Pass a VidTempla UUID or YouTube video ID (e.g. dQw4w9WgXcQ)", 404),
         { status: 404 }
       );
     }

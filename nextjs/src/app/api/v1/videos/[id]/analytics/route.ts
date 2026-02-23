@@ -5,10 +5,8 @@ import {
   apiError,
   logRequest,
   getChannelTokens,
+  resolveVideo,
 } from "@/lib/api-auth";
-import { db } from "@/db";
-import { youtubeVideos, youtubeChannels } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
 import { fetchVideoAnalytics } from "@/lib/clients/youtube";
 
 export async function GET(
@@ -21,22 +19,12 @@ export async function GET(
   const { id } = await params;
 
   try {
-    // Resolve internal video ID to YouTube video ID and channel
-    const [video] = await db
-      .select({
-        videoId: youtubeVideos.videoId,
-        channelId: youtubeChannels.channelId,
-      })
-      .from(youtubeVideos)
-      .innerJoin(youtubeChannels, eq(youtubeVideos.channelId, youtubeChannels.id))
-      .where(
-        and(eq(youtubeVideos.id, id), eq(youtubeChannels.userId, auth.userId))
-      );
+    const video = await resolveVideo(id, auth.userId);
 
     if (!video) {
       logRequest(auth, `/v1/videos/${id}/analytics`, "GET", 404, 0);
       return NextResponse.json(
-        apiError("VIDEO_NOT_FOUND", "Video not found", "Check the video ID", 404),
+        apiError("VIDEO_NOT_FOUND", "Video not found", "Pass a VidTempla UUID or YouTube video ID (e.g. dQw4w9WgXcQ)", 404),
         { status: 404 }
       );
     }
@@ -57,7 +45,7 @@ export async function GET(
       "views,estimatedMinutesWatched,averageViewDuration";
     const dimensions = url.searchParams.get("dimensions") ?? "day";
 
-    const tokens = await getChannelTokens(video.channelId, auth.userId);
+    const tokens = await getChannelTokens(video.channelYoutubeId, auth.userId);
     if ("error" in tokens) {
       logRequest(
         auth,

@@ -305,16 +305,24 @@ components:
 
     RetentionPoint:
       type: object
+      description: A single point on the 100-point audience retention curve from YouTube Analytics (elapsedVideoTimeRatio report).
       properties:
         position:
           type: number
-          description: Position in the video (0-100)
+          description: "Elapsed video time ratio (0.01 to 1.0 in 0.01 increments). Each step represents 1% of total video duration. For example, 0.50 = the halfway point of the video."
+          minimum: 0.01
+          maximum: 1.0
+          example: 0.50
         watchRatio:
           type: number
-          description: Ratio of viewers still watching at this position
+          description: "Absolute watch ratio — the fraction of viewers still watching at this position (0.0 to 1.0). A value of 0.75 means 75% of viewers who started the video are still watching at this point."
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.75
         relativePerformance:
           type: number
-          description: Performance relative to similar videos
+          description: "How this video's retention compares to YouTube videos of similar length. 1.0 = average, >1.0 = above average, <1.0 = below average."
+          example: 1.12
 
     UsageData:
       type: object
@@ -816,8 +824,14 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
-          description: VidTempla internal video UUID
+          description: VidTempla UUID or YouTube video ID (e.g. `dQw4w9WgXcQ`)
+          examples:
+            uuid:
+              summary: VidTempla internal UUID
+              value: "296bbf0c-2fc2-47bc-8ab9-a2072245528a"
+            youtubeId:
+              summary: YouTube video ID
+              value: "dQw4w9WgXcQ"
       responses:
         "200":
           description: Video details
@@ -857,8 +871,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
-          description: VidTempla internal video UUID
+          description: VidTempla UUID or YouTube video ID (e.g. `dQw4w9WgXcQ`)
         - name: startDate
           in: query
           schema:
@@ -907,7 +920,10 @@ paths:
     get:
       operationId: getVideoRetention
       summary: Get audience retention data
-      description: Returns a 100-point retention curve showing viewer drop-off throughout the video.
+      description: |
+        Returns a 100-point audience retention curve from the YouTube Analytics API.
+        Each point represents 1% of the video's duration (position 0.01 = 1%, position 1.0 = 100%).
+        Useful for understanding where viewers drop off and identifying engaging or weak segments.
       tags: [Videos]
       x-quota-cost: 0
       parameters:
@@ -916,8 +932,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
-          description: VidTempla internal video UUID
+          description: VidTempla UUID or YouTube video ID (e.g. `dQw4w9WgXcQ`)
       responses:
         "200":
           description: Retention curve
@@ -953,8 +968,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
-          description: VidTempla internal video UUID
+          description: VidTempla UUID or YouTube video ID (e.g. `dQw4w9WgXcQ`)
       requestBody:
         required: true
         content:
@@ -1008,8 +1022,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
-          description: VidTempla internal video UUID
+          description: VidTempla UUID or YouTube video ID (e.g. `dQw4w9WgXcQ`)
       responses:
         "200":
           description: List of variables
@@ -1044,8 +1057,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
-          description: VidTempla internal video UUID
+          description: VidTempla UUID or YouTube video ID (e.g. `dQw4w9WgXcQ`)
       requestBody:
         required: true
         content:
@@ -2113,20 +2125,20 @@ paths:
 
   # ─── YouTube Comments ───────────────────────────────────────
 
-  /youtube/comments/{videoId}:
+  /youtube/comments/{id}:
     get:
       operationId: listComments
       summary: List video comments
-      description: Lists comment threads for a YouTube video.
+      description: Lists comment threads for a YouTube video. The `{id}` is a YouTube video ID.
       tags: [YouTube Comments]
       x-quota-cost: 1
       parameters:
-        - name: videoId
+        - name: id
           in: path
           required: true
           schema:
             type: string
-          description: YouTube video ID
+          description: YouTube video ID (for listing comments) or YouTube comment ID (for deletion)
         - name: channelId
           in: query
           required: true
@@ -2189,6 +2201,61 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+    delete:
+      operationId: deleteComment
+      summary: Delete a comment
+      description: Deletes a YouTube comment. The `{id}` is a YouTube comment ID.
+      tags: [YouTube Comments]
+      x-quota-cost: 50
+      x-requires-write: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: YouTube comment ID
+        - name: channelId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: YouTube channel ID (for auth)
+      responses:
+        "200":
+          description: Comment deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted:
+                        type: boolean
+                        example: true
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaUnits:
+                        type: integer
+                        example: 50
+        "400":
+          description: Missing channelId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientPermissions"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /youtube/comments/reply:
     post:
       operationId: replyToComment
@@ -2239,62 +2306,6 @@ paths:
                         example: 50
         "400":
           description: Missing required fields
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/InsufficientPermissions"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /youtube/comments/{commentId}:
-    delete:
-      operationId: deleteComment
-      summary: Delete a comment
-      description: Deletes a YouTube comment.
-      tags: [YouTube Comments]
-      x-quota-cost: 50
-      x-requires-write: true
-      parameters:
-        - name: commentId
-          in: path
-          required: true
-          schema:
-            type: string
-          description: YouTube comment ID
-        - name: channelId
-          in: query
-          required: true
-          schema:
-            type: string
-          description: YouTube channel ID (for auth)
-      responses:
-        "200":
-          description: Comment deleted
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      deleted:
-                        type: boolean
-                        example: true
-                  error:
-                    type: "null"
-                  meta:
-                    type: object
-                    properties:
-                      quotaUnits:
-                        type: integer
-                        example: 50
-        "400":
-          description: Missing channelId
           content:
             application/json:
               schema:

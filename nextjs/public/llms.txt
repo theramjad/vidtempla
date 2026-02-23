@@ -71,10 +71,12 @@ Default limit is 50, max is 100.
 
 ### Videos
 
+All `/videos/{id}/*` endpoints accept either a VidTempla UUID or a YouTube video ID (e.g. `dQw4w9WgXcQ`).
+
 - `GET /videos` — List videos with pagination (quota: 0)
 - `GET /videos/{id}` — Video details (quota: 0)
 - `GET /videos/{id}/analytics` — Video analytics (quota: 0, YouTube Analytics quota)
-- `GET /videos/{id}/retention` — Audience retention data (quota: 0, YouTube Analytics quota)
+- `GET /videos/{id}/retention` — 100-point audience retention curve (quota: 0, YouTube Analytics quota)
 - `POST /videos/{id}/assign` — Assign video to container (write) (quota: 0)
 - `GET /videos/{id}/variables` — List video variables (quota: 0)
 - `PUT /videos/{id}/variables` — Update video variables (write) (quota: 0)
@@ -109,9 +111,9 @@ Default limit is 50, max is 100.
 - `DELETE /youtube/playlists/{id}/items/{itemId}?channelId=...` — Remove playlist item (write) (quota: 50)
 
 #### Comments
-- `GET /youtube/comments/{videoId}?channelId=...` — List video comments (quota: 1)
+- `GET /youtube/comments/{id}?channelId=...` — List video comments (id = YouTube video ID) (quota: 1)
 - `POST /youtube/comments/reply` — Reply to comment (write) (quota: 50)
-- `DELETE /youtube/comments/{commentId}?channelId=...` — Delete comment (write) (quota: 50)
+- `DELETE /youtube/comments/{id}?channelId=...` — Delete comment (id = YouTube comment ID) (write) (quota: 50)
 
 #### Thumbnails
 - `PUT /youtube/thumbnails/{videoId}?channelId=...` — Upload thumbnail (write) (quota: 50)

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withApiKey, requireWriteAccess, apiSuccess, apiError, logRequest } from "@/lib/api-auth";
+import { withApiKey, requireWriteAccess, apiSuccess, apiError, logRequest, resolveVideo } from "@/lib/api-auth";
 import { db } from "@/db";
 import {
   youtubeVideos,
@@ -40,23 +40,13 @@ export async function POST(
       );
     }
 
-    // Verify the video exists and belongs to the user
-    const [video] = await db
-      .select({
-        id: youtubeVideos.id,
-        containerId: youtubeVideos.containerId,
-        channelId: youtubeVideos.channelId,
-      })
-      .from(youtubeVideos)
-      .innerJoin(youtubeChannels, eq(youtubeVideos.channelId, youtubeChannels.id))
-      .where(
-        and(eq(youtubeVideos.id, id), eq(youtubeChannels.userId, auth.userId))
-      );
+    // Verify the video exists and belongs to the user (accepts UUID or YouTube video ID)
+    const video = await resolveVideo(id, auth.userId);
 
     if (!video) {
       logRequest(auth, `/v1/videos/${id}/assign`, "POST", 404, 0);
       return NextResponse.json(
-        apiError("VIDEO_NOT_FOUND", "Video not found", "Check the video ID", 404),
+        apiError("VIDEO_NOT_FOUND", "Video not found", "Pass a VidTempla UUID or YouTube video ID (e.g. dQw4w9WgXcQ)", 404),
         { status: 404 }
       );
     }
@@ -134,7 +124,7 @@ export async function POST(
     await db
       .update(youtubeVideos)
       .set({ containerId })
-      .where(eq(youtubeVideos.id, id));
+      .where(eq(youtubeVideos.id, video.id));
 
     // Initialize variables
     if (container.templateOrder && container.templateOrder.length > 0) {
@@ -154,7 +144,7 @@ export async function POST(
         const variables = parseUserVariables(template.content);
         for (const varName of variables) {
           variablesToCreate.push({
-            videoId: id,
+            videoId: video.id,
             templateId: template.id,
             variableName: varName,
             variableValue: "",

@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withApiKey, requireWriteAccess, apiSuccess, apiError, logRequest } from "@/lib/api-auth";
+import { withApiKey, requireWriteAccess, apiSuccess, apiError, logRequest, resolveVideo } from "@/lib/api-auth";
 import { db } from "@/db";
 import {
-  youtubeVideos,
-  youtubeChannels,
   videoVariables,
   templates,
-  containers,
 } from "@/db/schema";
-import { eq, and, getTableColumns } from "drizzle-orm";
+import { eq, getTableColumns } from "drizzle-orm";
 import { inngestClient } from "@/lib/clients/inngest";
 
 export async function GET(
@@ -21,19 +18,13 @@ export async function GET(
   const { id } = await params;
 
   try {
-    // Verify ownership
-    const [video] = await db
-      .select({ id: youtubeVideos.id })
-      .from(youtubeVideos)
-      .innerJoin(youtubeChannels, eq(youtubeVideos.channelId, youtubeChannels.id))
-      .where(
-        and(eq(youtubeVideos.id, id), eq(youtubeChannels.userId, auth.userId))
-      );
+    // Verify ownership (accepts UUID or YouTube video ID)
+    const video = await resolveVideo(id, auth.userId);
 
     if (!video) {
       logRequest(auth, `/v1/videos/${id}/variables`, "GET", 404, 0);
       return NextResponse.json(
-        apiError("VIDEO_NOT_FOUND", "Video not found", "Check the video ID", 404),
+        apiError("VIDEO_NOT_FOUND", "Video not found", "Pass a VidTempla UUID or YouTube video ID (e.g. dQw4w9WgXcQ)", 404),
         { status: 404 }
       );
     }
@@ -48,7 +39,7 @@ export async function GET(
       })
       .from(videoVariables)
       .leftJoin(templates, eq(videoVariables.templateId, templates.id))
-      .where(eq(videoVariables.videoId, id));
+      .where(eq(videoVariables.videoId, video.id));
 
     logRequest(auth, `/v1/videos/${id}/variables`, "GET", 200, 0);
     return NextResponse.json(apiSuccess(variables));
@@ -94,19 +85,13 @@ export async function PUT(
       );
     }
 
-    // Verify ownership
-    const [video] = await db
-      .select({ id: youtubeVideos.id })
-      .from(youtubeVideos)
-      .innerJoin(youtubeChannels, eq(youtubeVideos.channelId, youtubeChannels.id))
-      .where(
-        and(eq(youtubeVideos.id, id), eq(youtubeChannels.userId, auth.userId))
-      );
+    // Verify ownership (accepts UUID or YouTube video ID)
+    const video = await resolveVideo(id, auth.userId);
 
     if (!video) {
       logRequest(auth, `/v1/videos/${id}/variables`, "PUT", 404, 0);
       return NextResponse.json(
-        apiError("VIDEO_NOT_FOUND", "Video not found", "Check the video ID", 404),
+        apiError("VIDEO_NOT_FOUND", "Video not found", "Pass a VidTempla UUID or YouTube video ID (e.g. dQw4w9WgXcQ)", 404),
         { status: 404 }
       );
     }
@@ -116,7 +101,7 @@ export async function PUT(
       await db
         .insert(videoVariables)
         .values({
-          videoId: id,
+          videoId: video.id,
           templateId: variable.templateId,
           variableName: variable.name,
           variableValue: variable.value,
@@ -135,7 +120,7 @@ export async function PUT(
     await inngestClient.send({
       name: "youtube/videos.update",
       data: {
-        videoIds: [id],
+        videoIds: [video.id],
         userId: auth.userId,
       },
     });
