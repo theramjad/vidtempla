@@ -1,9 +1,4 @@
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -13,32 +8,45 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 import { appConfig } from "@/config/app";
 import { useUser } from "@/hooks/useUser";
-import { ChevronUp } from "lucide-react";
+import { api } from "@/utils/api";
+import { CreditCard, LogOut, Settings } from "lucide-react";
 import { useRouter } from "next/router";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-type NavItem = { readonly title: string; readonly url: string } | { readonly title: string; readonly subItems: readonly { readonly title: string; readonly url: string }[] };
+function getInitial(email: string) {
+  return email.charAt(0).toUpperCase();
+}
 
-const items = appConfig.dashboard.navigation as readonly NavItem[];
+function getDisplayName(email: string) {
+  return email.split("@")[0] ?? email;
+}
 
 export default function DashboardSidebar() {
   const { user, signOut } = useUser();
-
   const router = useRouter();
-  const truncate = (email: string) => {
-    return email.length > 20 ? email.substring(0, 20) + "..." : email;
-  };
+
+  const { data: plan } = api.dashboard.billing.getCurrentPlan.useQuery();
+  const isFreePlan = !plan || plan.planTier === "free";
+
+  const navItems = [
+    ...appConfig.dashboard.navigation,
+    ...(isFreePlan
+      ? [{ title: "Pricing", url: "/dashboard/pricing" }]
+      : []),
+  ];
+
+  const email = user?.email ?? "";
+  const displayName = getDisplayName(email);
+  const initial = getInitial(email);
 
   return (
     <Sidebar>
@@ -55,68 +63,72 @@ export default function DashboardSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
+
       {/* Content */}
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
+              {navItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  {'subItems' in item ? (
-                    <Collapsible
-                      defaultOpen
-                      className="group/collapsible w-full"
-                    >
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton className="px-4 py-3">
-                          <span>{item.title}</span>
-                          <ChevronUp className="ml-auto h-6 w-6 transition-transform group-data-[state=closed]/collapsible:rotate-180" />
-                        </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {'subItems' in item && item.subItems.map((subItem) => (
-                            <SidebarMenuSubItem key={subItem.title}>
-                              <SidebarMenuSubButton asChild>
-                                <a href={subItem.url} className="px-6 py-3">
-                                  {subItem.title}
-                                </a>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          ))}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  ) : 'url' in item ? (
-                    <SidebarMenuButton asChild>
-                      <a href={item.url} className="px-4 py-3">
-                        <span>{item.title}</span>
-                      </a>
-                    </SidebarMenuButton>
-                  ) : null}
+                  <SidebarMenuButton asChild>
+                    <a href={item.url} className="px-4 py-3">
+                      <span>{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
       {/* Footer */}
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton className="px-4 py-3">
-                  {user?.email ? truncate(user.email) : "Account"}
-                  <ChevronUp className="ml-auto h-6 w-6" />
+                <SidebarMenuButton className="h-auto px-2 py-2">
+                  <div className="flex w-full items-center gap-3">
+                    <div className="bg-primary text-primary-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-medium">
+                      {initial}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{displayName}</p>
+                      <p className="text-muted-foreground truncate text-xs">{email}</p>
+                    </div>
+                    <Settings className="text-muted-foreground h-4 w-4 shrink-0" />
+                  </div>
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 side="top"
                 className="w-[--radix-popper-anchor-width]"
               >
+                <div className="border-b px-3 py-2">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-primary text-primary-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-medium">
+                      {initial}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{displayName}</p>
+                      <p className="text-muted-foreground truncate text-xs">{email}</p>
+                    </div>
+                  </div>
+                </div>
+                <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/dashboard/pricing")}>
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  <span>Billing</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut}>
-                  <span>Sign out</span>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

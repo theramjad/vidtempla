@@ -33,12 +33,8 @@ export const appConfig = {
         url: "/dashboard/youtube",
       },
       {
-        title: "Pricing",
-        url: "/dashboard/pricing",
-      },
-      {
-        title: "Settings",
-        url: "/dashboard/settings",
+        title: "API Keys",
+        url: "/dashboard/api-keys",
       },
     ],
   },
