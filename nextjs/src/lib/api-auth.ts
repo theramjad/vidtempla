@@ -10,6 +10,7 @@ import { encrypt } from "@/utils/encryption";
 export interface ApiContext {
   userId: string;
   apiKeyId: string;
+  permission: "read" | "read-write";
 }
 
 /**
@@ -83,7 +84,7 @@ export async function withApiKey(
     .then(() => {})
     .catch(() => {});
 
-  return { userId: key.userId, apiKeyId: key.id };
+  return { userId: key.userId, apiKeyId: key.id, permission: key.permission as "read" | "read-write" };
 }
 
 /**
@@ -140,6 +141,22 @@ export function apiError(
       status,
     },
   };
+}
+
+/**
+ * Returns a 403 response if the API key lacks write permission, or null if allowed.
+ */
+export function requireWriteAccess(ctx: ApiContext): NextResponse | null {
+  if (ctx.permission === "read-write") return null;
+  return NextResponse.json(
+    apiError(
+      "INSUFFICIENT_PERMISSIONS",
+      "This API key has read-only access",
+      "Create a new API key with read-write permission from Settings > API Keys",
+      403
+    ),
+    { status: 403 }
+  );
 }
 
 /**

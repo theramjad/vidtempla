@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withApiKey, apiSuccess, apiError, logRequest } from "@/lib/api-auth";
+import { withApiKey, requireWriteAccess, apiSuccess, apiError, logRequest } from "@/lib/api-auth";
 import { db } from "@/db";
 import { containers, youtubeVideos } from "@/db/schema";
 import { eq, and, desc, lt, count, getTableColumns } from "drizzle-orm";
@@ -73,6 +73,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await withApiKey(request);
   if (auth instanceof NextResponse) return auth;
+  const writeCheck = requireWriteAccess(auth);
+  if (writeCheck) return writeCheck;
 
   try {
     const body = await request.json();

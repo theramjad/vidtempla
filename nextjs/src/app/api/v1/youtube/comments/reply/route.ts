@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   withApiKey,
+  requireWriteAccess,
   apiSuccess,
   apiError,
   getChannelTokens,
@@ -19,6 +20,8 @@ const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 export async function POST(request: NextRequest) {
   const ctx = await withApiKey(request);
   if (ctx instanceof NextResponse) return ctx;
+  const writeCheck = requireWriteAccess(ctx);
+  if (writeCheck) return writeCheck;
 
   let body: { channelId?: string; parentId?: string; text?: string };
   try {

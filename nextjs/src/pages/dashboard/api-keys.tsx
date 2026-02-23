@@ -82,6 +82,7 @@ export default function ApiKeysPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyExpiry, setNewKeyExpiry] = useState<string>('never');
+  const [newKeyPermission, setNewKeyPermission] = useState<'read' | 'read-write'>('read');
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -102,11 +103,13 @@ export default function ApiKeysPage() {
     const result = await createKeyMutation.mutateAsync({
       name: newKeyName.trim(),
       expiresInDays,
+      permission: newKeyPermission,
     });
 
     setCreatedKey(result.plaintext);
     setNewKeyName('');
     setNewKeyExpiry('never');
+    setNewKeyPermission('read');
   };
 
   const handleCopyKey = async () => {
@@ -123,6 +126,7 @@ export default function ApiKeysPage() {
     setCopied(false);
     setNewKeyName('');
     setNewKeyExpiry('never');
+    setNewKeyPermission('read');
   };
 
   return (
@@ -219,6 +223,21 @@ export default function ApiKeysPage() {
                                 </SelectContent>
                               </Select>
                             </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="key-permission">Permission</Label>
+                              <Select value={newKeyPermission} onValueChange={(v) => setNewKeyPermission(v as 'read' | 'read-write')}>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="read">Read only</SelectItem>
+                                  <SelectItem value="read-write">Read & Write</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground">
+                                Read-only keys can only fetch data. Read & Write keys can also create, update, and delete resources.
+                              </p>
+                            </div>
                           </div>
                           <DialogFooter>
                             <Button
@@ -261,6 +280,7 @@ export default function ApiKeysPage() {
                       <TableRow>
                         <TableHead>Name</TableHead>
                         <TableHead>Key</TableHead>
+                        <TableHead>Permission</TableHead>
                         <TableHead>Last Used</TableHead>
                         <TableHead>Expires</TableHead>
                         <TableHead className="w-[50px]"></TableHead>
@@ -274,6 +294,17 @@ export default function ApiKeysPage() {
                             <code className="text-sm bg-muted px-2 py-0.5 rounded">
                               {key.keyPrefix}...
                             </code>
+                          </TableCell>
+                          <TableCell>
+                            {key.permission === 'read-write' ? (
+                              <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                                Read & Write
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                                Read only
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {formatShortDate(key.lastUsedAt)}

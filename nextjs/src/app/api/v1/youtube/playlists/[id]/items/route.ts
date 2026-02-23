@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   withApiKey,
+  requireWriteAccess,
   apiSuccess,
   apiError,
   getChannelTokens,
@@ -101,6 +102,8 @@ export async function POST(
 ) {
   const ctx = await withApiKey(request);
   if (ctx instanceof NextResponse) return ctx;
+  const writeCheck = requireWriteAccess(ctx);
+  if (writeCheck) return writeCheck;
 
   const { id } = await params;
 

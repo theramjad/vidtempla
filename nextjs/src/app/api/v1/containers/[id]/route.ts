@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withApiKey, apiSuccess, apiError, logRequest } from "@/lib/api-auth";
+import { withApiKey, requireWriteAccess, apiSuccess, apiError, logRequest } from "@/lib/api-auth";
 import { db } from "@/db";
 import {
   containers,
@@ -94,6 +94,8 @@ export async function PATCH(
 ) {
   const auth = await withApiKey(request);
   if (auth instanceof NextResponse) return auth;
+  const writeCheck = requireWriteAccess(auth);
+  if (writeCheck) return writeCheck;
 
   const { id } = await params;
 
@@ -185,6 +187,8 @@ export async function DELETE(
 ) {
   const auth = await withApiKey(request);
   if (auth instanceof NextResponse) return auth;
+  const writeCheck = requireWriteAccess(auth);
+  if (writeCheck) return writeCheck;
 
   const { id } = await params;
 

@@ -17,6 +17,7 @@ export const apiKeysRouter = router({
         id: apiKeys.id,
         name: apiKeys.name,
         keyPrefix: apiKeys.keyPrefix,
+        permission: apiKeys.permission,
         lastUsedAt: apiKeys.lastUsedAt,
         expiresAt: apiKeys.expiresAt,
         createdAt: apiKeys.createdAt,
@@ -33,6 +34,7 @@ export const apiKeysRouter = router({
       z.object({
         name: z.string().min(1).max(100),
         expiresInDays: z.number().int().positive().optional(),
+        permission: z.enum(["read", "read-write"]).default("read"),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -49,12 +51,14 @@ export const apiKeysRouter = router({
           name: input.name,
           keyHash: hash,
           keyPrefix: prefix,
+          permission: input.permission,
           expiresAt,
         })
         .returning({
           id: apiKeys.id,
           name: apiKeys.name,
           keyPrefix: apiKeys.keyPrefix,
+          permission: apiKeys.permission,
           expiresAt: apiKeys.expiresAt,
           createdAt: apiKeys.createdAt,
         });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   withApiKey,
+  requireWriteAccess,
   apiSuccess,
   apiError,
   getChannelTokens,
@@ -21,6 +22,8 @@ export async function DELETE(
 ) {
   const ctx = await withApiKey(request);
   if (ctx instanceof NextResponse) return ctx;
+  const writeCheck = requireWriteAccess(ctx);
+  if (writeCheck) return writeCheck;
 
   const { id, itemId } = await params;
   const { searchParams } = new URL(request.url);

@@ -1,0 +1,136 @@
+# VidTempla API
+
+> VidTempla is an API-first platform for managing YouTube video descriptions with templates, containers, and variables. The REST API lets AI agents securely manage YouTube channels without handling OAuth directly.
+
+## Authentication
+
+All requests require a Bearer token:
+
+```
+Authorization: Bearer vtk_your_key_here
+```
+
+API keys have one of two permission levels:
+- **read** — can only fetch data (GET requests and POST /analytics/query)
+- **read-write** — can also create, update, and delete resources
+
+Generate keys from the dashboard at Settings > API Keys.
+
+## Base URL
+
+```
+https://vidtempla.com/api/v1
+```
+
+## Response Format
+
+Every response uses a standard envelope:
+
+```json
+{
+  "data": { ... },
+  "error": null,
+  "meta": { "cursor": "...", "hasMore": true, "total": 42 }
+}
+```
+
+Errors include a `suggestion` field so agents can self-correct:
+
+```json
+{
+  "data": null,
+  "error": {
+    "code": "INSUFFICIENT_PERMISSIONS",
+    "message": "This API key has read-only access",
+    "suggestion": "Create a new API key with read-write permission from Settings > API Keys",
+    "status": 403
+  }
+}
+```
+
+## Pagination
+
+All list endpoints use cursor-based pagination:
+
+```
+GET /api/v1/videos?cursor=...&limit=50
+```
+
+Default limit is 50, max is 100.
+
+## Endpoints
+
+### Channels
+
+- `GET /channels` — List connected YouTube channels (quota: 0)
+- `GET /channels/{channelId}` — Channel details with stats (quota: 0)
+- `GET /channels/{channelId}/overview` — Channel overview from YouTube (quota: 3)
+- `POST /channels/{channelId}/sync` — Trigger video sync (write) (quota: 0)
+- `GET /channels/{channelId}/analytics` — Channel analytics (quota: 0, YouTube Analytics quota)
+- `GET /channels/{channelId}/search?q=...` — Search channel videos on YouTube (quota: 100)
+
+### Videos
+
+- `GET /videos` — List videos with pagination (quota: 0)
+- `GET /videos/{id}` — Video details (quota: 0)
+- `GET /videos/{id}/analytics` — Video analytics (quota: 0, YouTube Analytics quota)
+- `GET /videos/{id}/retention` — Audience retention data (quota: 0, YouTube Analytics quota)
+- `POST /videos/{id}/assign` — Assign video to container (write) (quota: 0)
+- `GET /videos/{id}/variables` — List video variables (quota: 0)
+- `PUT /videos/{id}/variables` — Update video variables (write) (quota: 0)
+
+### Templates
+
+- `GET /templates` — List templates with pagination (quota: 0)
+- `GET /templates/{id}` — Template details (quota: 0)
+- `POST /templates` — Create template (write) (quota: 0)
+- `PATCH /templates/{id}` — Update template (write) (quota: 0)
+- `DELETE /templates/{id}` — Delete template (write) (quota: 0)
+- `GET /templates/{id}/impact` — Impact analysis for template (quota: 0)
+
+### Containers
+
+- `GET /containers` — List containers with pagination (quota: 0)
+- `GET /containers/{id}` — Container details with templates (quota: 0)
+- `POST /containers` — Create container (write) (quota: 0)
+- `PATCH /containers/{id}` — Update container (write) (quota: 0)
+- `DELETE /containers/{id}` — Delete container (write) (quota: 0)
+
+### YouTube Management (Proxy)
+
+#### Playlists
+- `GET /youtube/playlists?channelId=...` — List playlists (quota: 1)
+- `POST /youtube/playlists` — Create playlist (write) (quota: 50)
+- `GET /youtube/playlists/{id}?channelId=...` — Playlist details (quota: 1)
+- `PATCH /youtube/playlists/{id}` — Update playlist (write) (quota: 50)
+- `DELETE /youtube/playlists/{id}?channelId=...` — Delete playlist (write) (quota: 50)
+- `GET /youtube/playlists/{id}/items?channelId=...` — List playlist items (quota: 1)
+- `POST /youtube/playlists/{id}/items` — Add video to playlist (write) (quota: 50)
+- `DELETE /youtube/playlists/{id}/items/{itemId}?channelId=...` — Remove playlist item (write) (quota: 50)
+
+#### Comments
+- `GET /youtube/comments/{videoId}?channelId=...` — List video comments (quota: 1)
+- `POST /youtube/comments/reply` — Reply to comment (write) (quota: 50)
+- `DELETE /youtube/comments/{commentId}?channelId=...` — Delete comment (write) (quota: 50)
+
+#### Thumbnails
+- `PUT /youtube/thumbnails/{videoId}?channelId=...` — Upload thumbnail (write) (quota: 50)
+
+#### Captions
+- `GET /youtube/captions/{videoId}?channelId=...` — List captions (quota: 50)
+
+### Analytics
+
+- `POST /analytics/query` — Flexible YouTube Analytics query (read-only despite POST) (quota: YouTube Analytics quota)
+
+### Usage
+
+- `GET /usage` — API request usage stats (quota: 0)
+
+## Quota
+
+YouTube API quota costs are noted per endpoint above. VidTempla-native endpoints (templates, containers, usage) cost 0 quota units. Quota usage is tracked and queryable via `GET /usage`.
+
+## Full Documentation
+
+https://vidtempla.com/docs/api

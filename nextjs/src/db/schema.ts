@@ -264,6 +264,7 @@ export const apiKeys = pgTable("api_keys", {
   name: text("name").notNull(),
   keyHash: text("key_hash").notNull(),
   keyPrefix: text("key_prefix").notNull(),
+  permission: text("permission").notNull().default("read"),
   lastUsedAt: timestamp("last_used_at", {
     mode: "date",
     withTimezone: true,
