@@ -19,8 +19,8 @@ VidTempla is a YouTube description management tool built with Next.js 15, TypeSc
 3. Apply locally: `npx drizzle-kit push` (or `npx drizzle-kit migrate`)
 4. For custom SQL (triggers, functions): create manual SQL file in `nextjs/drizzle/`
 
-## Remote Server
-NEVER apply migrations to the remote server. Prompt the user to do this manually.
+## Deployment
+Vercel build (`vercel-build`) automatically runs migrations on deploy, so pushing to main applies schema changes to the remote database. No manual migration step needed for remote.
 
 # Authentication & Security
 - Better Auth handles auth via `nextjs/src/lib/auth.ts` (server) and `nextjs/src/lib/auth-client.ts` (client)
