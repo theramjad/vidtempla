@@ -5,15 +5,13 @@ import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/router";
 import { useEffect, useState, useRef } from "react";
 import { appConfig } from "@/config/app";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export default function Page() {
   const router = useRouter();
-  const { user, loading: userLoading, signOut } = useUser();
+  const { user, loading: userLoading } = useUser();
   const { toast } = useToast();
 
   const [email, setEmail] = useState("");
@@ -29,10 +27,7 @@ export default function Page() {
       if (returnTo && returnTo.startsWith('/')) {
         router.push(decodeURIComponent(returnTo));
       } else {
-        toast({
-          title: "Already signed in",
-          description: "You're already signed in!",
-        });
+        router.push('/dashboard');
       }
     }
   }, [user, userLoading]);
@@ -94,32 +89,10 @@ export default function Page() {
       </Head>
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         {user && !userLoading ? (
-          <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4">
-              <CheckCircle className="h-16 w-16 text-green-500" />
-            </div>
-            <CardTitle className="text-2xl">Already Signed In</CardTitle>
-            <CardDescription>
-              Welcome back! You're already signed in and can continue to your dashboard.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center space-y-3">
-            <Button
-              onClick={() => router.push("/dashboard")}
-              className="w-full"
-            >
-              Go to Dashboard
-            </Button>
-            <Button
-              onClick={signOut}
-              variant="outline"
-              className="w-full"
-            >
-              Sign Out
-            </Button>
-          </CardContent>
-        </Card>
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+            <p className="text-sm text-gray-500">Redirecting...</p>
+          </div>
         ) : (
           <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-6 shadow-md">
           <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
