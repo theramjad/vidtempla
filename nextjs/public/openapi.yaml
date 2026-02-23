@@ -126,21 +126,26 @@ components:
         id:
           type: string
           format: uuid
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
         channelId:
           type: string
           description: YouTube channel ID
+          example: "UCxxxxxxxxxxxxxxxxxxxxxx"
         title:
           type: string
           nullable: true
+          example: "My YouTube Channel"
         thumbnailUrl:
           type: string
           nullable: true
         subscriberCount:
           type: integer
           nullable: true
+          example: 15000
         syncStatus:
           type: string
           enum: [idle, syncing]
+          example: "idle"
         lastSyncedAt:
           type: string
           format: date-time
@@ -210,13 +215,16 @@ components:
           format: uuid
         name:
           type: string
+          example: "Video Links Section"
         content:
           type: string
+          example: "Check out my website: {{websiteUrl}}\nFollow me on Twitter: {{twitterHandle}}"
         variables:
           type: array
           items:
             type: string
-          description: Parsed variable names from template content
+          description: "Parsed variable names extracted from {{variableName}} placeholders in content"
+          example: ["websiteUrl", "twitterHandle"]
         createdAt:
           type: string
           format: date-time
@@ -235,16 +243,22 @@ components:
           format: uuid
         name:
           type: string
+          example: "Gaming Videos Layout"
         separator:
           type: string
+          description: "Text inserted between each template when building the final description"
+          example: "\n\n"
         templateOrder:
           type: array
           nullable: true
           items:
             type: string
             format: uuid
+          description: "Ordered list of template UUIDs that compose this container's description layout"
         videoCount:
           type: integer
+          description: "Number of videos currently assigned to this container"
+          example: 12
         createdAt:
           type: string
           format: date-time
@@ -266,9 +280,13 @@ components:
           format: uuid
         variableName:
           type: string
+          example: "websiteUrl"
+          description: "Variable name (without {{ }} braces) as defined in the template"
         variableValue:
           type: string
           nullable: true
+          example: "https://example.com"
+          description: "Current value for this variable on this specific video"
         createdAt:
           type: string
           format: date-time
@@ -949,6 +967,8 @@ paths:
                   type: string
                   format: uuid
                   description: The container to assign the video to
+            example:
+              containerId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
       responses:
         "200":
           description: Video assigned
@@ -1049,6 +1069,14 @@ paths:
                       value:
                         type: string
                         description: Variable value
+            example:
+              variables:
+                - templateId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                  name: "websiteUrl"
+                  value: "https://example.com"
+                - templateId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                  name: "twitterHandle"
+                  value: "@mychannel"
       responses:
         "200":
           description: Variables updated
@@ -1135,6 +1163,9 @@ paths:
                 content:
                   type: string
                   description: "Template content with {{variable}} placeholders"
+            example:
+              name: "Social Links"
+              content: "Follow me on Twitter: {{twitterHandle}}\nWebsite: {{websiteUrl}}"
       responses:
         "201":
           description: Template created
@@ -1417,6 +1448,10 @@ paths:
                   type: string
                   default: "\n\n"
                   description: Text separator between templates
+            example:
+              name: "Gaming Videos Layout"
+              templateIds: ["a1b2c3d4-e5f6-7890-abcd-ef1234567890", "b2c3d4e5-f6a7-8901-bcde-f12345678901"]
+              separator: "\n\n---\n\n"
       responses:
         "201":
           description: Container created
@@ -1675,6 +1710,11 @@ paths:
                   enum: [public, private, unlisted]
                   default: private
                   description: Playlist privacy status
+            example:
+              channelId: "UCxxxxxxxxxxxxxxxxxxxxxx"
+              title: "Best of 2025"
+              description: "A curated collection of our top videos from 2025"
+              privacyStatus: "private"
       responses:
         "200":
           description: Playlist created
@@ -2174,6 +2214,10 @@ paths:
                 text:
                   type: string
                   description: Reply text
+            example:
+              channelId: "UCxxxxxxxxxxxxxxxxxxxxxx"
+              parentId: "UgxAbCdEfGhIjKlMnOp"
+              text: "Thanks for watching! Glad you enjoyed it."
       responses:
         "200":
           description: Reply posted
@@ -2438,6 +2482,12 @@ paths:
                 maxResults:
                   type: integer
                   description: Maximum number of result rows
+            example:
+              channelId: "UCxxxxxxxxxxxxxxxxxxxxxx"
+              startDate: "2025-01-01"
+              endDate: "2025-01-31"
+              metrics: "views,estimatedMinutesWatched,averageViewDuration"
+              dimensions: "day"
       responses:
         "200":
           description: Analytics query results

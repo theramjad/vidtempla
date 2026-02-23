@@ -135,6 +135,7 @@ YouTube API quota costs are noted per endpoint above. VidTempla-native endpoints
 
 https://vidtempla.com/docs/api
 
-## OpenAPI Spec
+## Machine-Readable Specs
 
-Full OpenAPI 3.1.0 specification: https://vidtempla.com/openapi.yaml
+- OpenAPI 3.1.0 specification: https://vidtempla.com/openapi.yaml
+- Interactive API reference (Scalar): https://vidtempla.com/reference
