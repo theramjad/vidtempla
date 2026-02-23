@@ -159,7 +159,13 @@ export default function PricingPage() {
       <Head>
         <title>Pricing | VidTempla</title>
       </Head>
-      <DashboardLayout>
+      <DashboardLayout
+        headerContent={
+          <nav className="flex items-center gap-2 text-sm flex-1">
+            <span className="font-medium">Pricing</span>
+          </nav>
+        }
+      >
         <div className="container mx-auto py-6 space-y-6">
         <div className="text-center mb-12">
           <h1 className="text-3xl font-bold tracking-tight">Pricing Plans</h1>

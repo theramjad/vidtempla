@@ -88,7 +88,7 @@ export default function Page() {
         <title>Sign In | VidTempla</title>
       </Head>
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        {user && !userLoading ? (
+        {userLoading || user ? (
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
             <p className="text-sm text-gray-500">Redirecting...</p>
@@ -99,7 +99,7 @@ export default function Page() {
             Sign In
           </h2>
 
-          {!user && !userLoading && !magicLinkSent && (
+          {!magicLinkSent && (
               <form className="mt-8 space-y-6" onSubmit={handleSignIn}>
                 <div className="-space-y-px rounded-md shadow-sm">
                   <div>

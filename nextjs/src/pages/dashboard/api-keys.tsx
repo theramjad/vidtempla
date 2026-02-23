@@ -6,11 +6,10 @@
 import Head from 'next/head';
 import { useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus, Copy, Check, Trash2, Key } from 'lucide-react';
+import { Loader2, Plus, Copy, Check, Trash2 } from 'lucide-react';
 import { api } from '@/utils/api';
 import { toast } from 'sonner';
 import {
@@ -135,39 +134,32 @@ export default function ApiKeysPage() {
       <Head>
         <title>API Keys | VidTempla</title>
       </Head>
-      <DashboardLayout>
+      <DashboardLayout
+        headerContent={
+          <nav className="flex items-center gap-2 text-sm flex-1">
+            <span className="font-medium">API Keys</span>
+          </nav>
+        }
+      >
         <div className="container mx-auto py-6 space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">API Keys</h1>
-            <p className="text-muted-foreground">
-              Manage API keys for programmatic access to VidTempla
-            </p>
-          </div>
-
-          <div className="grid gap-6 max-w-2xl">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Key className="h-5 w-5" />
-                      API Keys
-                    </CardTitle>
-                    <CardDescription>
-                      Manage API keys for programmatic access to VidTempla
-                    </CardDescription>
-                  </div>
-                  <Dialog open={createDialogOpen} onOpenChange={(open) => {
-                    if (!open) handleCloseCreateDialog();
-                    else setCreateDialogOpen(true);
-                  }}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Create Key
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">API Keys</h1>
+              <p className="text-muted-foreground">
+                Manage API keys for programmatic access to VidTempla
+              </p>
+            </div>
+            <Dialog open={createDialogOpen} onOpenChange={(open) => {
+              if (!open) handleCloseCreateDialog();
+              else setCreateDialogOpen(true);
+            }}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Key
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
                       {createdKey ? (
                         <>
                           <DialogHeader>
@@ -267,16 +259,15 @@ export default function ApiKeysPage() {
                       )}
                     </DialogContent>
                   </Dialog>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {keysLoading ? (
-                  <div className="flex items-center gap-2 p-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm text-muted-foreground">Loading API keys...</span>
-                  </div>
-                ) : apiKeysList && apiKeysList.length > 0 ? (
-                  <Table>
+          </div>
+
+          {keysLoading ? (
+            <div className="flex items-center gap-2 p-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm text-muted-foreground">Loading API keys...</span>
+            </div>
+          ) : apiKeysList && apiKeysList.length > 0 ? (
+            <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
@@ -341,33 +332,29 @@ export default function ApiKeysPage() {
                       ))}
                     </TableBody>
                   </Table>
-                ) : (
-                  <div className="text-center py-6 text-muted-foreground">
-                    <Key className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No API keys yet</p>
-                    <p className="text-xs mt-1">Create an API key to get started with the REST API</p>
-                  </div>
-                )}
+          ) : (
+            <div className="text-center py-6 text-muted-foreground">
+              <p className="text-sm">No API keys yet</p>
+              <p className="text-xs mt-1">Create an API key to get started with the REST API</p>
+            </div>
+          )}
 
-                {/* Usage summary */}
-                {apiUsage && apiUsage.totals.requests > 0 && (
-                  <div className="pt-4 border-t">
-                    <h4 className="font-medium mb-2 text-sm">API Usage This Period</h4>
-                    <div className="flex items-center gap-6 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Requests: </span>
-                        <span className="font-medium">{apiUsage.totals.requests.toLocaleString()}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">YouTube Quota Used: </span>
-                        <span className="font-medium">{apiUsage.totals.quotaUnits.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          {/* Usage summary */}
+          {apiUsage && apiUsage.totals.requests > 0 && (
+            <div className="pt-4 border-t">
+              <h4 className="font-medium mb-2 text-sm">API Usage This Period</h4>
+              <div className="flex items-center gap-6 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Requests: </span>
+                  <span className="font-medium">{apiUsage.totals.requests.toLocaleString()}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">YouTube Quota Used: </span>
+                  <span className="font-medium">{apiUsage.totals.quotaUnits.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </DashboardLayout>
     </>

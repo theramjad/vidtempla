@@ -84,31 +84,32 @@ export default function DashboardSidebar() {
       </SidebarContent>
 
       {/* Footer */}
-      <SidebarFooter>
+      <SidebarFooter className="border-t">
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton className="h-auto px-2 py-2">
+                <SidebarMenuButton className="h-auto px-3 py-3">
                   <div className="flex w-full items-center gap-3">
-                    <div className="bg-primary text-primary-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-medium">
+                    <div className="bg-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium">
                       {initial}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{displayName}</p>
                       <p className="text-muted-foreground truncate text-xs">{email}</p>
                     </div>
-                    <Settings className="text-muted-foreground h-4 w-4 shrink-0" />
+                    <Settings className="text-muted-foreground h-5 w-5 shrink-0" />
                   </div>
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent
-                side="top"
-                className="w-[--radix-popper-anchor-width]"
+                side="right"
+                align="start"
+                className="w-64"
               >
-                <div className="border-b px-3 py-2">
+                <div className="border-b px-3 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="bg-primary text-primary-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-medium">
+                    <div className="bg-muted flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-medium">
                       {initial}
                     </div>
                     <div className="min-w-0">
@@ -117,19 +118,21 @@ export default function DashboardSidebar() {
                     </div>
                   </div>
                 </div>
-                <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push("/dashboard/pricing")}>
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  <span>Billing</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={signOut}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
+                <div className="py-1">
+                  <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
+                    <Settings className="mr-3 h-4 w-4" />
+                    <span>Settings</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push("/dashboard/pricing")}>
+                    <CreditCard className="mr-3 h-4 w-4" />
+                    <span>Billing</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={signOut}>
+                    <LogOut className="mr-3 h-4 w-4" />
+                    <span>Log out</span>
+                  </DropdownMenuItem>
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>

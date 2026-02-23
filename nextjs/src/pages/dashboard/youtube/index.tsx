@@ -48,7 +48,13 @@ export default function YouTubePage() {
       <Head>
         <title>YouTube Manager | VidTempla</title>
       </Head>
-      <DashboardLayout>
+      <DashboardLayout
+        headerContent={
+          <nav className="flex items-center gap-2 text-sm flex-1">
+            <span className="font-medium">Dashboard</span>
+          </nav>
+        }
+      >
         <div className="container mx-auto py-6 space-y-6">
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
