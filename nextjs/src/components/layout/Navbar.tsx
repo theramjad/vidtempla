@@ -18,8 +18,8 @@ export function Navbar() {
             <Link href="/#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Pricing
             </Link>
-            <Link href="/docs/api" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              API Docs
+            <Link href="/reference" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              API Reference
             </Link>
             <Link href="/#faq" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               FAQ

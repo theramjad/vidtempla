@@ -133,10 +133,6 @@ All `/videos/{id}/*` endpoints accept either a VidTempla UUID or a YouTube video
 
 YouTube API quota costs are noted per endpoint above. VidTempla-native endpoints (templates, containers, usage) cost 0 quota units. Quota usage is tracked and queryable via `GET /usage`.
 
-## Full Documentation
-
-https://vidtempla.com/docs/api
-
 ## Machine-Readable Specs
 
 - OpenAPI 3.1.0 specification: https://vidtempla.com/openapi.yaml

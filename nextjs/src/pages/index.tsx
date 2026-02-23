@@ -473,7 +473,7 @@ export default function LandingPage() {
                 The API covers templates, containers, videos, YouTube playlists, analytics, and more. All responses
                 use a consistent JSON envelope with error suggestions so AI agents can self-correct.
                 See the{" "}
-                <Link href="/docs/api" className="text-primary hover:underline">API documentation</Link>
+                <Link href="/reference" className="text-primary hover:underline">API reference</Link>
                 {" "}for details.
               </AccordionContent>
             </AccordionItem>
