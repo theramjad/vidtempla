@@ -9,7 +9,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
  * This should only be used in server-side contexts (API routes, tRPC procedures, etc.)
  */
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2026-01-28.clover",
+  apiVersion: "2026-02-25.clover",
   typescript: true,
   appInfo: {
     name: "VidTempla",
