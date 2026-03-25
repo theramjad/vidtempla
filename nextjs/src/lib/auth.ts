@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { magicLink } from "better-auth/plugins";
+import { magicLink, mcp } from "better-auth/plugins";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { Resend } from "resend";
@@ -8,6 +8,10 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const auth = betterAuth({
+  baseURL: process.env.BETTER_AUTH_URL,
+  trustedOrigins: [
+    process.env.BETTER_AUTH_URL!,
+  ].filter(Boolean),
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,
@@ -30,6 +34,14 @@ export const auth = betterAuth({
           subject: "Sign in to VidTempla",
           html: `<a href="${url}">Click here to sign in</a>`,
         });
+      },
+    }),
+    mcp({
+      loginPage: "/sign-in",
+      oidcConfig: {
+        loginPage: "/sign-in",
+        consentPage: "/auth/consent",
+        allowDynamicClientRegistration: true,
       },
     }),
   ],

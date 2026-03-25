@@ -254,6 +254,68 @@ export const webhookEvents = pgTable("webhook_events", {
     .defaultNow(),
 });
 
+// OAuth / MCP plugin tables
+
+export const oauthApplication = pgTable("oauth_application", {
+  id: text("id").primaryKey(),
+  name: text("name"),
+  icon: text("icon"),
+  metadata: text("metadata"),
+  clientId: text("client_id").notNull().unique(),
+  clientSecret: text("client_secret"),
+  redirectUrls: text("redirect_urls").notNull(),
+  type: text("type").notNull(),
+  disabled: boolean("disabled").default(false),
+  userId: uuid("user_id").references(() => user.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const oauthAccessToken = pgTable("oauth_access_token", {
+  id: text("id").primaryKey(),
+  accessToken: text("access_token").unique(),
+  refreshToken: text("refresh_token").unique(),
+  accessTokenExpiresAt: timestamp("access_token_expires_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => oauthApplication.clientId, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => user.id, { onDelete: "cascade" }),
+  scopes: text("scopes").notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const oauthConsent = pgTable("oauth_consent", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => oauthApplication.clientId, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => user.id, { onDelete: "cascade" }),
+  scopes: text("scopes").notNull(),
+  consentGiven: boolean("consent_given").notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 // API tables
 
 export const apiKeys = pgTable("api_keys", {
