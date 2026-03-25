@@ -68,3 +68,6 @@ VidTempla is an API-first platform where AI agents securely manage YouTube chann
 
 ## Adding New Endpoints
 Follow the `withApiKey` pattern in `nextjs/src/lib/api-auth.ts`. See `nextjs/src/app/api/v1/CLAUDE.md` for the full guide.
+
+# Vercel Deployment Verification
+After every commit pushed to main, check the Vercel deployment status using the Vercel MCP tools (`list_deployments` with projectId `prj_8JcHH2ynheBrW2pc2KTUMdTEbvNQ` and teamId `team_EnX8JK9URpU5sW8LFtwVLgoz`). Confirm the deployment reaches **READY** state before considering the task complete. If it shows **ERROR**, fetch the build logs and diagnose the failure.
