@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  withApiKey,
-  apiSuccess,
-  apiError,
-  logRequest,
-  getChannelTokens,
-} from "@/lib/api-auth";
-import { fetchChannelAnalytics } from "@/lib/clients/youtube";
+import { withApiKey, apiSuccess, apiError, logRequest } from "@/lib/api-auth";
+import { getChannelAnalytics } from "@/lib/services/analytics";
 
 export async function GET(
   request: NextRequest,
@@ -16,56 +10,20 @@ export async function GET(
   if (auth instanceof NextResponse) return auth;
 
   const { channelId } = await params;
+  const url = new URL(request.url);
 
-  try {
-    const url = new URL(request.url);
-    const now = new Date();
-    const twentyEightDaysAgo = new Date(
-      now.getTime() - 28 * 24 * 60 * 60 * 1000
-    );
+  const result = await getChannelAnalytics(channelId, auth.userId, {
+    startDate: url.searchParams.get("startDate") ?? undefined,
+    endDate: url.searchParams.get("endDate") ?? undefined,
+    metrics: url.searchParams.get("metrics") ?? undefined,
+    dimensions: url.searchParams.get("dimensions") ?? undefined,
+  });
 
-    const startDate =
-      url.searchParams.get("startDate") ??
-      twentyEightDaysAgo.toISOString().split("T")[0]!;
-    const endDate =
-      url.searchParams.get("endDate") ?? now.toISOString().split("T")[0]!;
-    const metrics =
-      url.searchParams.get("metrics") ?? "views,estimatedMinutesWatched";
-    const dimensions = url.searchParams.get("dimensions") ?? "day";
-
-    const tokens = await getChannelTokens(channelId, auth.userId);
-    if ("error" in tokens) {
-      logRequest(
-        auth,
-        `/v1/channels/${channelId}/analytics`,
-        "GET",
-        tokens.status,
-        0
-      );
-      return NextResponse.json(tokens.error, { status: tokens.status });
-    }
-
-    const data = await fetchChannelAnalytics(
-      tokens.accessToken,
-      tokens.channelId,
-      metrics,
-      dimensions,
-      startDate,
-      endDate
-    );
-
-    logRequest(auth, `/v1/channels/${channelId}/analytics`, "GET", 200, 0);
-    return NextResponse.json(apiSuccess(data));
-  } catch (error) {
-    logRequest(auth, `/v1/channels/${channelId}/analytics`, "GET", 500, 0);
-    return NextResponse.json(
-      apiError(
-        "ANALYTICS_ERROR",
-        "Failed to fetch channel analytics",
-        "Ensure your channel has analytics access. You may need to reconnect your channel from the dashboard.",
-        500
-      ),
-      { status: 500 }
-    );
+  if ("error" in result) {
+    logRequest(auth, `/v1/channels/${channelId}/analytics`, "GET", result.error.status, 0);
+    return NextResponse.json(apiError(result.error.code, result.error.message, result.error.suggestion, result.error.status), { status: result.error.status });
   }
+
+  logRequest(auth, `/v1/channels/${channelId}/analytics`, "GET", 200, 0);
+  return NextResponse.json(apiSuccess(result.data));
 }
