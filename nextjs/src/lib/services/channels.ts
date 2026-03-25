@@ -1,4 +1,4 @@
-import { eq, and, count, sql } from "drizzle-orm";
+import { eq, and, count, desc, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   youtubeChannels,
@@ -27,7 +27,8 @@ export async function listChannels(
         lastSyncedAt: youtubeChannels.lastSyncedAt,
       })
       .from(youtubeChannels)
-      .where(eq(youtubeChannels.userId, userId));
+      .where(eq(youtubeChannels.userId, userId))
+      .orderBy(desc(youtubeChannels.createdAt));
 
     return { data: channels };
   } catch {
