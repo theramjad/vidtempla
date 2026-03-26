@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
-const SERVER_URL = 'https://vidtempla.com/api/mcp';
+const SERVER_URL = 'https://www.vidtempla.com/api/mcp';
 const toolGroups = [
   {
     name: 'Channels',
