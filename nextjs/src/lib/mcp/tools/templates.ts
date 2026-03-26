@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError } from "../helpers";
+import { mcpJson, mcpError, getSessionUserId } from "../helpers";
 import {
   listTemplates,
   getTemplate,
@@ -15,7 +15,7 @@ function toMcp(result: { data: unknown } | { error: { code: string; message: str
   return mcpJson(result.data);
 }
 
-export function registerTemplateTools(server: McpServer, userId: string) {
+export function registerTemplateTools(server: McpServer) {
   server.tool(
     "list_templates",
     "List all templates with parsed variables",
@@ -23,14 +23,14 @@ export function registerTemplateTools(server: McpServer, userId: string) {
       cursor: z.string().optional().describe("Pagination cursor"),
       limit: z.number().optional().describe("Results per page (max 100, default 50)"),
     },
-    async (args) => toMcp(await listTemplates(userId, args))
+    async (args) => toMcp(await listTemplates(getSessionUserId(), args))
   );
 
   server.tool(
     "get_template",
     "Get a single template by ID with parsed variables",
     { id: z.string().describe("Template UUID") },
-    async ({ id }) => toMcp(await getTemplate(id, userId))
+    async ({ id }) => toMcp(await getTemplate(id, getSessionUserId()))
   );
 
   server.tool(
@@ -40,7 +40,7 @@ export function registerTemplateTools(server: McpServer, userId: string) {
       name: z.string().describe("Template name"),
       content: z.string().describe("Template content with {{variable}} placeholders"),
     },
-    async ({ name, content }) => toMcp(await createTemplate(userId, name, content))
+    async ({ name, content }) => toMcp(await createTemplate(getSessionUserId(), name, content))
   );
 
   server.tool(
@@ -51,20 +51,20 @@ export function registerTemplateTools(server: McpServer, userId: string) {
       name: z.string().optional().describe("New name"),
       content: z.string().optional().describe("New content"),
     },
-    async ({ id, name, content }) => toMcp(await updateTemplate(id, userId, { name, content }))
+    async ({ id, name, content }) => toMcp(await updateTemplate(id, getSessionUserId(), { name, content }))
   );
 
   server.tool(
     "delete_template",
     "Delete a template",
     { id: z.string().describe("Template UUID") },
-    async ({ id }) => toMcp(await deleteTemplate(id, userId))
+    async ({ id }) => toMcp(await deleteTemplate(id, getSessionUserId()))
   );
 
   server.tool(
     "get_template_impact",
     "Show which containers and videos would be affected by changing a template",
     { id: z.string().describe("Template UUID") },
-    async ({ id }) => toMcp(await getTemplateImpact(id, userId))
+    async ({ id }) => toMcp(await getTemplateImpact(id, getSessionUserId()))
   );
 }

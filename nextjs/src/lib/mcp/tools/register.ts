@@ -7,12 +7,12 @@ import { registerAnalyticsTools } from "./analytics";
 
 /**
  * Registers all MCP tools on the server.
- * userId comes from the Better Auth OAuth session.
+ * userId is resolved at call time via AsyncLocalStorage (see helpers.ts).
  */
-export function registerAllTools(server: McpServer, userId: string) {
-  registerChannelTools(server, userId);
-  registerVideoTools(server, userId);
-  registerTemplateTools(server, userId);
-  registerContainerTools(server, userId);
-  registerAnalyticsTools(server, userId);
+export function registerAllTools(server: McpServer) {
+  registerChannelTools(server);
+  registerVideoTools(server);
+  registerTemplateTools(server);
+  registerContainerTools(server);
+  registerAnalyticsTools(server);
 }

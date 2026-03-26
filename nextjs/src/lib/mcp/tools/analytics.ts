@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError } from "../helpers";
+import { mcpJson, mcpError, getSessionUserId } from "../helpers";
 import {
   getChannelAnalytics,
   queryAnalytics,
@@ -13,7 +13,7 @@ function toMcp(result: { data: unknown } | { error: { code: string; message: str
   return mcpJson(result.data);
 }
 
-export function registerAnalyticsTools(server: McpServer, userId: string) {
+export function registerAnalyticsTools(server: McpServer) {
   server.tool(
     "get_channel_analytics",
     "Get channel-level analytics over a date range",
@@ -24,7 +24,7 @@ export function registerAnalyticsTools(server: McpServer, userId: string) {
       metrics: z.string().optional().describe("Comma-separated metrics (default: views,estimatedMinutesWatched)"),
       dimensions: z.string().optional().describe("Dimensions (default: day)"),
     },
-    async ({ channelId, ...opts }) => toMcp(await getChannelAnalytics(channelId, userId, opts))
+    async ({ channelId, ...opts }) => toMcp(await getChannelAnalytics(channelId, getSessionUserId(), opts))
   );
 
   server.tool(
@@ -40,7 +40,7 @@ export function registerAnalyticsTools(server: McpServer, userId: string) {
       sort: z.string().optional().describe("Sort field (e.g. -views)"),
       maxResults: z.number().optional().describe("Max results"),
     },
-    async (args) => toMcp(await queryAnalytics(userId, args))
+    async (args) => toMcp(await queryAnalytics(getSessionUserId(), args))
   );
 
   server.tool(
@@ -52,13 +52,13 @@ export function registerAnalyticsTools(server: McpServer, userId: string) {
       sort: z.string().optional().describe("Sort order: relevance (default), date, viewCount, rating"),
       maxResults: z.number().optional().describe("Max results (default 25, max 50)"),
     },
-    async ({ channelId, ...opts }) => toMcp(await searchChannelVideos(channelId, userId, opts))
+    async ({ channelId, ...opts }) => toMcp(await searchChannelVideos(channelId, getSessionUserId(), opts))
   );
 
   server.tool(
     "sync_channel",
     "Trigger a video sync for a channel (imports new videos from YouTube)",
     { channelId: z.string().describe("YouTube channel ID") },
-    async ({ channelId }) => toMcp(await syncChannel(channelId, userId))
+    async ({ channelId }) => toMcp(await syncChannel(channelId, getSessionUserId()))
   );
 }

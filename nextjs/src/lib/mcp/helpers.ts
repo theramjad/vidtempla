@@ -1,3 +1,15 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
+const sessionStore = new AsyncLocalStorage<{ userId: string }>();
+
+export { sessionStore };
+
+export function getSessionUserId(): string {
+  const session = sessionStore.getStore();
+  if (!session) throw new Error("No MCP session available");
+  return session.userId;
+}
+
 /**
  * Wraps data as MCP tool result content.
  */

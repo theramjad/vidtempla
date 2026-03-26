@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError } from "../helpers";
+import { mcpJson, mcpError, getSessionUserId } from "../helpers";
 import {
   listChannels,
   getChannel,
@@ -12,25 +12,25 @@ function toMcp(result: { data: unknown } | { error: { code: string; message: str
   return mcpJson(result.data);
 }
 
-export function registerChannelTools(server: McpServer, userId: string) {
+export function registerChannelTools(server: McpServer) {
   server.tool(
     "list_channels",
     "List all connected YouTube channels",
     {},
-    async () => toMcp(await listChannels(userId))
+    async () => toMcp(await listChannels(getSessionUserId()))
   );
 
   server.tool(
     "get_channel",
     "Get real-time YouTube channel details (costs 1 YouTube API quota unit)",
     { channelId: z.string().describe("YouTube channel ID (e.g. UCxxxxxx)") },
-    async ({ channelId }) => toMcp(await getChannel(channelId, userId))
+    async ({ channelId }) => toMcp(await getChannel(channelId, getSessionUserId()))
   );
 
   server.tool(
     "get_channel_overview",
     "Get channel overview with templates, containers, video counts, and description health (costs 1 YouTube API quota unit)",
     { channelId: z.string().describe("YouTube channel ID") },
-    async ({ channelId }) => toMcp(await getChannelOverview(channelId, userId))
+    async ({ channelId }) => toMcp(await getChannelOverview(channelId, getSessionUserId()))
   );
 }

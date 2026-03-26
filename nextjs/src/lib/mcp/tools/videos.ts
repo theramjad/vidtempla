@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError } from "../helpers";
+import { mcpJson, mcpError, getSessionUserId } from "../helpers";
 import {
   listVideos,
   getVideo,
@@ -18,7 +18,7 @@ function toMcp(result: { data: unknown } | { error: { code: string; message: str
   return mcpJson(result.data);
 }
 
-export function registerVideoTools(server: McpServer, userId: string) {
+export function registerVideoTools(server: McpServer) {
   server.tool(
     "list_videos",
     "List videos with filtering, sorting, and cursor pagination",
@@ -31,14 +31,14 @@ export function registerVideoTools(server: McpServer, userId: string) {
       cursor: z.string().optional().describe("Pagination cursor from previous response"),
       limit: z.number().optional().describe("Results per page (max 100, default 50)"),
     },
-    async (args) => toMcp(await listVideos(userId, args))
+    async (args) => toMcp(await listVideos(getSessionUserId(), args))
   );
 
   server.tool(
     "get_video",
     "Get video details including live YouTube stats (accepts VidTempla UUID or YouTube video ID)",
     { id: z.string().describe("VidTempla UUID or YouTube video ID (e.g. dQw4w9WgXcQ)") },
-    async ({ id }) => toMcp(await getVideo(id, userId))
+    async ({ id }) => toMcp(await getVideo(id, getSessionUserId()))
   );
 
   server.tool(
@@ -51,21 +51,21 @@ export function registerVideoTools(server: McpServer, userId: string) {
       metrics: z.string().optional().describe("Comma-separated metrics (default: views,estimatedMinutesWatched,averageViewDuration)"),
       dimensions: z.string().optional().describe("Dimensions (default: day)"),
     },
-    async ({ id, ...opts }) => toMcp(await getVideoAnalytics(id, userId, opts))
+    async ({ id, ...opts }) => toMcp(await getVideoAnalytics(id, getSessionUserId(), opts))
   );
 
   server.tool(
     "get_video_retention",
     "Get audience retention curve (100 data points with position, watchRatio, relativePerformance)",
     { id: z.string().describe("VidTempla UUID or YouTube video ID") },
-    async ({ id }) => toMcp(await getVideoRetention(id, userId))
+    async ({ id }) => toMcp(await getVideoRetention(id, getSessionUserId()))
   );
 
   server.tool(
     "get_video_variables",
     "Get template variables for a video",
     { id: z.string().describe("VidTempla UUID or YouTube video ID") },
-    async ({ id }) => toMcp(await getVideoVariables(id, userId))
+    async ({ id }) => toMcp(await getVideoVariables(id, getSessionUserId()))
   );
 
   server.tool(
@@ -75,7 +75,7 @@ export function registerVideoTools(server: McpServer, userId: string) {
       id: z.string().describe("VidTempla UUID or YouTube video ID"),
       containerId: z.string().describe("Container UUID to assign the video to"),
     },
-    async ({ id, containerId }) => toMcp(await assignVideo(id, containerId, userId))
+    async ({ id, containerId }) => toMcp(await assignVideo(id, containerId, getSessionUserId()))
   );
 
   server.tool(
@@ -91,7 +91,7 @@ export function registerVideoTools(server: McpServer, userId: string) {
         })
       ).describe("Array of variables to update"),
     },
-    async ({ id, variables }) => toMcp(await updateVideoVariables(id, variables, userId))
+    async ({ id, variables }) => toMcp(await updateVideoVariables(id, variables, getSessionUserId()))
   );
 
   server.tool(
@@ -101,7 +101,7 @@ export function registerVideoTools(server: McpServer, userId: string) {
       id: z.string().describe("VidTempla UUID or YouTube video ID"),
       limit: z.number().optional().describe("Max entries to return (default 50, max 100)"),
     },
-    async ({ id, limit }) => toMcp(await getDescriptionHistory(id, userId, limit))
+    async ({ id, limit }) => toMcp(await getDescriptionHistory(id, getSessionUserId(), limit))
   );
 
   server.tool(
@@ -111,6 +111,6 @@ export function registerVideoTools(server: McpServer, userId: string) {
       id: z.string().describe("VidTempla UUID or YouTube video ID"),
       historyId: z.string().describe("History entry UUID (from get_description_history)"),
     },
-    async ({ id, historyId }) => toMcp(await revertDescription(id, historyId, userId))
+    async ({ id, historyId }) => toMcp(await revertDescription(id, historyId, getSessionUserId()))
   );
 }
