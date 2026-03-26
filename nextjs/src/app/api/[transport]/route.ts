@@ -53,7 +53,7 @@ async function handler(req: Request): Promise<Response> {
     // Also try getMcpSession
     try {
       const sessionCheck = await auth.api.getMcpSession({ headers: req.headers });
-      console.log("[MCP-DEBUG] getMcpSession result:", sessionCheck ? JSON.stringify({ userId: sessionCheck.userId, session: !!sessionCheck.session }) : "null");
+      console.log("[MCP-DEBUG] getMcpSession result:", sessionCheck ? JSON.stringify({ userId: sessionCheck.userId }) : "null");
     } catch (e) {
       console.error("[MCP-DEBUG] getMcpSession threw:", e instanceof Error ? e.message : e);
     }
