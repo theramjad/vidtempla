@@ -34,9 +34,8 @@ export const serverSchema = z.object({
   GOOGLE_CLIENT_ID: z.string(),
   GOOGLE_CLIENT_SECRET: z.string(),
 
-  // Inngest (only required in production)
-  INNGEST_EVENT_KEY: z.string().optional(),
-  INNGEST_SIGNING_KEY: z.string().optional(),
+  // Trigger.dev
+  TRIGGER_SECRET_KEY: z.string().optional(),
 
   // Stripe
   STRIPE_SECRET_KEY: z.string(),
@@ -82,9 +81,8 @@ export const serverEnv = {
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
 
-  // Inngest
-  INNGEST_EVENT_KEY: process.env.INNGEST_EVENT_KEY,
-  INNGEST_SIGNING_KEY: process.env.INNGEST_SIGNING_KEY,
+  // Trigger.dev
+  TRIGGER_SECRET_KEY: process.env.TRIGGER_SECRET_KEY,
 
   // Stripe
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,

@@ -12,7 +12,7 @@ import {
 } from '@/lib/clients/youtube';
 import { encrypt } from '@/utils/encryption';
 import { checkChannelLimit } from '@/lib/plan-limits';
-import { inngestClient } from '@/lib/clients/inngest';
+import { tasks } from '@trigger.dev/sdk/v3';
 import { db } from '@/db';
 import { youtubeChannels } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -89,12 +89,9 @@ export default async function handler(
         .where(eq(youtubeChannels.id, existingChannel.id));
 
       // Trigger automatic sync for reconnected channel
-      await inngestClient.send({
-        name: 'youtube/channel.sync',
-        data: {
-          channelId: existingChannel.id,
-          userId: session.user.id,
-        },
+      await tasks.trigger("youtube-sync-channel-videos", {
+        channelId: existingChannel.id,
+        userId: session.user.id,
       });
     } else {
       // Check channel limit before adding a new channel
@@ -125,12 +122,9 @@ export default async function handler(
 
       // Trigger automatic sync for newly connected channel
       if (newChannel) {
-        await inngestClient.send({
-          name: 'youtube/channel.sync',
-          data: {
-            channelId: newChannel.id,
-            userId: session.user.id,
-          },
+        await tasks.trigger("youtube-sync-channel-videos", {
+          channelId: newChannel.id,
+          userId: session.user.id,
         });
       }
     }

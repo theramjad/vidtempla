@@ -1,7 +1,7 @@
 import { eq, and, desc, lt, count, inArray, getTableColumns } from "drizzle-orm";
 import { db } from "@/db";
 import { containers, templates, youtubeVideos } from "@/db/schema";
-import { inngestClient } from "@/lib/clients/inngest";
+import { tasks } from "@trigger.dev/sdk/v3";
 import type { ServiceResult, PaginationOpts, PaginationMeta } from "./types";
 
 // ── list_containers ──────────────────────────────────────────
@@ -150,9 +150,9 @@ export async function updateContainer(
         .where(eq(youtubeVideos.containerId, id));
 
       if (videos.length > 0) {
-        await inngestClient.send({
-          name: "youtube/videos.update",
-          data: { videoIds: videos.map((v) => v.id), userId },
+        await tasks.trigger("youtube-update-video-descriptions", {
+          videoIds: videos.map((v) => v.id),
+          userId,
         });
       }
     }

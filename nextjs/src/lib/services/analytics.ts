@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { youtubeChannels } from "@/db/schema";
 import { getChannelTokens } from "@/lib/api-auth";
 import { fetchChannelAnalytics } from "@/lib/clients/youtube";
-import { inngestClient } from "@/lib/clients/inngest";
+import { tasks } from "@trigger.dev/sdk/v3";
 import axios from "axios";
 import type { ServiceResult } from "./types";
 
@@ -169,9 +169,9 @@ export async function syncChannel(
       return { error: { code: "SYNC_IN_PROGRESS", message: "A sync is already in progress", suggestion: "Wait for the current sync to complete", status: 409 } };
     }
 
-    await inngestClient.send({
-      name: "youtube/channel.sync",
-      data: { channelId: channel.id, userId },
+    await tasks.trigger("youtube-sync-channel-videos", {
+      channelId: channel.id,
+      userId,
     });
 
     return { data: { message: "Video sync started", jobId: `sync-${channel.id}-${Date.now()}` } };

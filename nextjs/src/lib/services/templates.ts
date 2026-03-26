@@ -2,7 +2,7 @@ import { eq, and, desc, lt, count, inArray, asc } from "drizzle-orm";
 import { db } from "@/db";
 import { templates, containers, youtubeVideos } from "@/db/schema";
 import { parseVariables } from "@/utils/templateParser";
-import { inngestClient } from "@/lib/clients/inngest";
+import { tasks } from "@trigger.dev/sdk/v3";
 import type { ServiceResult, PaginationOpts, PaginationMeta } from "./types";
 
 // ── list_templates ───────────────────────────────────────────
@@ -138,9 +138,9 @@ export async function updateTemplate(
           .where(inArray(youtubeVideos.containerId, containerIds));
 
         if (videos.length > 0) {
-          await inngestClient.send({
-            name: "youtube/videos.update",
-            data: { videoIds: videos.map((v) => v.id), userId },
+          await tasks.trigger("youtube-update-video-descriptions", {
+            videoIds: videos.map((v) => v.id),
+            userId,
           });
         }
       }

@@ -29,7 +29,7 @@ import {
 } from "@/lib/clients/youtube";
 import { parseUserVariables } from "@/utils/templateParser";
 import { checkVideoLimit } from "@/lib/plan-limits";
-import { inngestClient } from "@/lib/clients/inngest";
+import { tasks } from "@trigger.dev/sdk/v3";
 import type { ServiceResult, PaginationMeta } from "./types";
 
 // ── list_videos ──────────────────────────────────────────────
@@ -380,9 +380,9 @@ export async function updateVideoVariables(
         });
     }
 
-    await inngestClient.send({
-      name: "youtube/videos.update",
-      data: { videoIds: [video.id], userId },
+    await tasks.trigger("youtube-update-video-descriptions", {
+      videoIds: [video.id],
+      userId,
     });
 
     return { data: { success: true } };
@@ -482,10 +482,10 @@ export async function revertDescription(
       .set({ currentDescription: history.description })
       .where(eq(youtubeVideos.id, video.id));
 
-    // Trigger Inngest to push to YouTube
-    await inngestClient.send({
-      name: "youtube/videos.update",
-      data: { videoIds: [video.id], userId },
+    // Trigger task to push to YouTube
+    await tasks.trigger("youtube-update-video-descriptions", {
+      videoIds: [video.id],
+      userId,
     });
 
     return {

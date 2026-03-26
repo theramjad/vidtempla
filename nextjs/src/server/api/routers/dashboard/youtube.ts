@@ -15,7 +15,7 @@ import {
   buildDescription,
   findMissingVariables,
 } from '@/utils/templateParser';
-import { inngestClient } from '@/lib/clients/inngest';
+import { tasks } from '@trigger.dev/sdk/v3';
 import { db } from '@/db';
 import { youtubeChannels, containers, templates, youtubeVideos, videoVariables, descriptionHistory } from '@/db/schema';
 import { eq, and, desc, asc, sql, count, isNull, ilike, inArray, getTableColumns } from 'drizzle-orm';
@@ -58,13 +58,9 @@ export const youtubeRouter = router({
     syncVideos: protectedProcedure
       .input(z.object({ channelId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
-        // Trigger Inngest event to sync videos in background
-        await inngestClient.send({
-          name: 'youtube/channel.sync',
-          data: {
-            channelId: input.channelId,
-            userId: ctx.user.id,
-          },
+        await tasks.trigger("youtube-sync-channel-videos", {
+          channelId: input.channelId,
+          userId: ctx.user.id,
         });
 
         return { success: true, jobId: `sync-${input.channelId}-${Date.now()}` };
@@ -136,7 +132,7 @@ export const youtubeRouter = router({
           .where(and(eq(containers.id, input.id), eq(containers.userId, ctx.user.id)))
           .returning();
 
-        // Trigger Inngest event to update all videos in this container
+        // Trigger task to update all videos in this container
         // Only trigger if template_order or separator changed (affects description)
         if (input.templateIds !== undefined || input.separator !== undefined) {
           const videos = await db
@@ -145,12 +141,9 @@ export const youtubeRouter = router({
             .where(eq(youtubeVideos.containerId, input.id));
 
           if (videos && videos.length > 0) {
-            await inngestClient.send({
-              name: 'youtube/videos.update',
-              data: {
-                videoIds: videos.map((v) => v.id),
-                userId: ctx.user.id,
-              },
+            await tasks.trigger("youtube-update-video-descriptions", {
+              videoIds: videos.map((v) => v.id),
+              userId: ctx.user.id,
             });
           }
         }
@@ -247,7 +240,7 @@ export const youtubeRouter = router({
           .where(and(eq(templates.id, input.id), eq(templates.userId, ctx.user.id)))
           .returning();
 
-        // Trigger Inngest event to update all videos using this template
+        // Trigger task to update all videos using this template
         // Only trigger if content changed (affects description)
         if (input.content !== undefined) {
           // Find all containers that use this template
@@ -269,12 +262,9 @@ export const youtubeRouter = router({
               .where(inArray(youtubeVideos.containerId, containerIds));
 
             if (videos && videos.length > 0) {
-              await inngestClient.send({
-                name: 'youtube/videos.update',
-                data: {
-                  videoIds: videos.map((v) => v.id),
-                  userId: ctx.user.id,
-                },
+              await tasks.trigger("youtube-update-video-descriptions", {
+                videoIds: videos.map((v) => v.id),
+                userId: ctx.user.id,
               });
             }
           }
@@ -598,13 +588,9 @@ export const youtubeRouter = router({
             });
         }
 
-        // Trigger Inngest event to update this video's description
-        await inngestClient.send({
-          name: 'youtube/videos.update',
-          data: {
-            videoIds: [input.videoId],
-            userId: ctx.user.id,
-          },
+        await tasks.trigger("youtube-update-video-descriptions", {
+          videoIds: [input.videoId],
+          userId: ctx.user.id,
         });
 
         return { success: true };
@@ -683,14 +669,10 @@ export const youtubeRouter = router({
           .set({ currentDescription: history.description })
           .where(eq(youtubeVideos.id, input.videoId));
 
-        // Trigger Inngest event to update on YouTube
-        // The Inngest job will create the history entry after successful update
-        await inngestClient.send({
-          name: 'youtube/videos.update',
-          data: {
-            videoIds: [input.videoId],
-            userId: ctx.user.id,
-          },
+        // Trigger task to update on YouTube
+        await tasks.trigger("youtube-update-video-descriptions", {
+          videoIds: [input.videoId],
+          userId: ctx.user.id,
         });
 
         return {
@@ -707,13 +689,9 @@ export const youtubeRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        // Trigger Inngest event to update these videos
-        await inngestClient.send({
-          name: 'youtube/videos.update',
-          data: {
-            videoIds: input.videoIds,
-            userId: ctx.user.id,
-          },
+        await tasks.trigger("youtube-update-video-descriptions", {
+          videoIds: input.videoIds,
+          userId: ctx.user.id,
         });
 
         return { success: true };
