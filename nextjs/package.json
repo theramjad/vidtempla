@@ -62,7 +62,7 @@
     "mcp-handler": "^1.0.7",
     "micro": "^10.0.1",
     "nanoid": "^5.0.9",
-    "next": "15.5.10",
+    "next": "15.5.14",
     "postgres": "^3.4.8",
     "posthog-js": "^1.297.2",
     "posthog-node": "^5.13.2",
