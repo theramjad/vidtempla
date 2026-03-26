@@ -73,9 +73,10 @@ export async function listVideos(
         ? sortDir === "asc" ? asc(youtubeVideos.title) : desc(youtubeVideos.title)
         : sortDir === "asc" ? asc(youtubeVideos.publishedAt) : desc(youtubeVideos.publishedAt);
 
+    const { currentDescription: _, ...videoColumns } = getTableColumns(youtubeVideos);
     const results = await db
       .select({
-        ...getTableColumns(youtubeVideos),
+        ...videoColumns,
         channel: {
           id: youtubeChannels.id,
           channelId: youtubeChannels.channelId,
@@ -132,9 +133,10 @@ export async function getVideo(
       return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
     }
 
+    const { currentDescription: _cd, ...videoCols } = getTableColumns(youtubeVideos);
     const [video] = await db
       .select({
-        ...getTableColumns(youtubeVideos),
+        ...videoCols,
         channel: {
           id: youtubeChannels.id,
           channelId: youtubeChannels.channelId,
