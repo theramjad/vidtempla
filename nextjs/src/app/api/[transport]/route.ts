@@ -38,11 +38,12 @@ async function handler(req: Request): Promise<Response> {
     try {
       const dbToken = await db.select().from(oauthAccessToken).where(eq(oauthAccessToken.accessToken, bearerToken)).limit(1);
       console.log("[MCP-DEBUG] DB token lookup: found", dbToken.length, "rows");
-      if (dbToken.length > 0) {
-        console.log("[MCP-DEBUG] Token userId:", dbToken[0].userId, "clientId:", dbToken[0].clientId, "scopes:", dbToken[0].scopes);
-        console.log("[MCP-DEBUG] Token expiresAt:", dbToken[0].accessTokenExpiresAt);
+      const token = dbToken[0];
+      if (token) {
+        console.log("[MCP-DEBUG] Token userId:", token.userId, "clientId:", token.clientId, "scopes:", token.scopes);
+        console.log("[MCP-DEBUG] Token expiresAt:", token.accessTokenExpiresAt);
         const now = new Date();
-        const expired = dbToken[0].accessTokenExpiresAt && dbToken[0].accessTokenExpiresAt < now;
+        const expired = token.accessTokenExpiresAt && token.accessTokenExpiresAt < now;
         console.log("[MCP-DEBUG] Token expired?", expired, "(now:", now.toISOString(), ")");
       }
     } catch (e) {
