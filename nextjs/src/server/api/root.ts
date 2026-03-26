@@ -1,4 +1,5 @@
 import { dashboardRouter } from "./routers/dashboard";
+import { siteAdminRouter } from "./routers/admin";
 import { router } from "../trpc/init";
 
 /**
@@ -8,6 +9,7 @@ import { router } from "../trpc/init";
  */
 export const appRouter = router({
   dashboard: dashboardRouter,
+  admin: siteAdminRouter,
 });
 
 // export type definition of API

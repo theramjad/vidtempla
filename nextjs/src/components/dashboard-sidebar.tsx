@@ -22,7 +22,11 @@ import {
   Server,
   BarChart3,
   Tag,
+  Shield,
+  ChevronUp,
 } from "lucide-react";
+import { Progress } from "./ui/progress";
+import { isSuperAdmin } from "@/lib/admin";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { Button } from "./ui/button";
@@ -71,7 +75,7 @@ export default function DashboardSidebar() {
   const initial = getInitial(email);
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" className="border-r bg-background">
       {/* Header */}
       <SidebarHeader className="border-b h-16 flex items-center justify-center p-0">
         <SidebarMenu>
@@ -114,10 +118,31 @@ export default function DashboardSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {isSuperAdmin(user?.email) && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip="Admin"
+                    isActive={router.asPath.startsWith("/admin")}
+                  >
+                    <Link href="/admin">
+                      <Shield />
+                      <span>Admin</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       {/* Footer */}
-      <SidebarFooter className="border-t border-b p-4">
+      <SidebarFooter className="border-t p-4">
         <div className="space-y-4">
           {/* Credits display */}
           {open && credits && (
@@ -129,6 +154,14 @@ export default function DashboardSidebar() {
                   {credits.monthlyAllocation.toLocaleString()}
                 </span>
               </div>
+              <Progress
+                value={
+                  credits.monthlyAllocation > 0
+                    ? (credits.balance / credits.monthlyAllocation) * 100
+                    : 0
+                }
+                className="h-2"
+              />
             </div>
           )}
 
@@ -148,7 +181,7 @@ export default function DashboardSidebar() {
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton className="h-auto px-3 py-3">
+                <SidebarMenuButton size="lg" className="h-auto px-3 py-3">
                   <div className="flex w-full items-center gap-3">
                     <div className="bg-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium">
                       {initial}
@@ -164,7 +197,7 @@ export default function DashboardSidebar() {
                       </div>
                     )}
                     {open && (
-                      <Settings className="text-muted-foreground h-5 w-5 shrink-0" />
+                      <ChevronUp className="text-muted-foreground h-5 w-5 shrink-0" />
                     )}
                   </div>
                 </SidebarMenuButton>

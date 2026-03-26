@@ -25,6 +25,7 @@ const SEGMENT_NAMES: Record<string, string> = {
   usage: "Usage",
   settings: "Settings",
   pricing: "Pricing",
+  admin: "Admin",
 };
 
 function DashboardBreadcrumb({
