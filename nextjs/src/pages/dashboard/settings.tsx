@@ -79,7 +79,7 @@ export default function SettingsPage() {
         <title>Settings | VidTempla</title>
       </Head>
       <DashboardLayout>
-        <div className="grid gap-6 max-w-2xl">
+        <div className="grid gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Account Information</CardTitle>

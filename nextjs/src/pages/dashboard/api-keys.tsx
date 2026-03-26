@@ -144,135 +144,6 @@ export default function ApiKeysPage() {
       </Head>
       <DashboardLayout>
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">API Keys</h2>
-            <Dialog open={createDialogOpen} onOpenChange={(open) => {
-              if (!open) handleCloseCreateDialog();
-              else setCreateDialogOpen(true);
-            }}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Key
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                {createdKey ? (
-                  <>
-                    <DialogHeader>
-                      <DialogTitle>API Key Created</DialogTitle>
-                      <DialogDescription>
-                        Copy your API key now. It will not be shown again.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                        <p className="text-sm text-yellow-800 font-medium">
-                          Make sure to copy your API key. You will not be able to see it again.
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          value={createdKey}
-                          readOnly
-                          className="font-mono text-sm"
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={handleCopyKey}
-                        >
-                          {copied ? (
-                            <Check className="h-4 w-4 text-emerald-600" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button onClick={handleCloseCreateDialog}>
-                        Done
-                      </Button>
-                    </DialogFooter>
-                  </>
-                ) : (
-                  <>
-                    <DialogHeader>
-                      <DialogTitle>Create API Key</DialogTitle>
-                      <DialogDescription>
-                        Create a new API key for programmatic access.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="key-name">Name</Label>
-                        <Input
-                          id="key-name"
-                          placeholder="e.g., My Agent, Production Bot"
-                          value={newKeyName}
-                          onChange={(e) => setNewKeyName(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="key-expiry">Expiration</Label>
-                        <Select value={newKeyExpiry} onValueChange={setNewKeyExpiry}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="never">Never</SelectItem>
-                            <SelectItem value="30">30 days</SelectItem>
-                            <SelectItem value="60">60 days</SelectItem>
-                            <SelectItem value="90">90 days</SelectItem>
-                            <SelectItem value="365">1 year</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="key-permission">Permission</Label>
-                        <Select value={newKeyPermission} onValueChange={(v) => setNewKeyPermission(v as 'read' | 'read-write')}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="read">Read only</SelectItem>
-                            <SelectItem value="read-write">Read & Write</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">
-                          Read-only keys can only fetch data. Read & Write keys can also create, update, and delete resources.
-                        </p>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={handleCloseCreateDialog}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleCreateKey}
-                        disabled={!newKeyName.trim() || createKeyMutation.isPending}
-                        className="bg-emerald-600 hover:bg-emerald-500"
-                      >
-                        {createKeyMutation.isPending ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Creating...
-                          </>
-                        ) : (
-                          'Create Key'
-                        )}
-                      </Button>
-                    </DialogFooter>
-                  </>
-                )}
-              </DialogContent>
-            </Dialog>
-          </div>
-
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -294,8 +165,133 @@ export default function ApiKeysPage() {
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-lg">Your Keys</CardTitle>
+              <Dialog open={createDialogOpen} onOpenChange={(open) => {
+                if (!open) handleCloseCreateDialog();
+                else setCreateDialogOpen(true);
+              }}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Key
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  {createdKey ? (
+                    <>
+                      <DialogHeader>
+                        <DialogTitle>API Key Created</DialogTitle>
+                        <DialogDescription>
+                          Copy your API key now. It will not be shown again.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                          <p className="text-sm text-yellow-800 font-medium">
+                            Make sure to copy your API key. You will not be able to see it again.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={createdKey}
+                            readOnly
+                            className="font-mono text-sm"
+                          />
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={handleCopyKey}
+                          >
+                            {copied ? (
+                              <Check className="h-4 w-4 text-emerald-600" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button onClick={handleCloseCreateDialog}>
+                          Done
+                        </Button>
+                      </DialogFooter>
+                    </>
+                  ) : (
+                    <>
+                      <DialogHeader>
+                        <DialogTitle>Create API Key</DialogTitle>
+                        <DialogDescription>
+                          Create a new API key for programmatic access.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="key-name">Name</Label>
+                          <Input
+                            id="key-name"
+                            placeholder="e.g., My Agent, Production Bot"
+                            value={newKeyName}
+                            onChange={(e) => setNewKeyName(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="key-expiry">Expiration</Label>
+                          <Select value={newKeyExpiry} onValueChange={setNewKeyExpiry}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="never">Never</SelectItem>
+                              <SelectItem value="30">30 days</SelectItem>
+                              <SelectItem value="60">60 days</SelectItem>
+                              <SelectItem value="90">90 days</SelectItem>
+                              <SelectItem value="365">1 year</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="key-permission">Permission</Label>
+                          <Select value={newKeyPermission} onValueChange={(v) => setNewKeyPermission(v as 'read' | 'read-write')}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="read">Read only</SelectItem>
+                              <SelectItem value="read-write">Read & Write</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Read-only keys can only fetch data. Read & Write keys can also create, update, and delete resources.
+                          </p>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={handleCloseCreateDialog}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleCreateKey}
+                          disabled={!newKeyName.trim() || createKeyMutation.isPending}
+                          className="bg-emerald-600 hover:bg-emerald-500"
+                        >
+                          {createKeyMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Creating...
+                            </>
+                          ) : (
+                            'Create Key'
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </>
+                  )}
+                </DialogContent>
+              </Dialog>
             </CardHeader>
             <CardContent className="p-0">
               {keysLoading ? (

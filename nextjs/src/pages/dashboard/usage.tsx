@@ -101,23 +101,20 @@ export default function UsagePage() {
           ) : usage ? (
             <>
               {/* Summary cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>
                   <CardContent className="pt-6">
                     <p className="text-sm text-muted-foreground">Total Requests</p>
                     <p className="text-2xl font-bold">{usage.totals.requests.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formatPeriod(usage.periodStart, usage.periodEnd)}
+                    </p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-6">
                     <p className="text-sm text-muted-foreground">YouTube Quota Used</p>
                     <p className="text-2xl font-bold">{usage.totals.quotaUnits.toLocaleString()}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6">
-                    <p className="text-sm text-muted-foreground">Period</p>
-                    <p className="text-2xl font-bold">{formatPeriod(usage.periodStart, usage.periodEnd)}</p>
                   </CardContent>
                 </Card>
                 {credits && (

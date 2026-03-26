@@ -117,7 +117,7 @@ export default function DashboardSidebar() {
       </SidebarContent>
 
       {/* Footer */}
-      <SidebarFooter className="border-t p-4">
+      <SidebarFooter className="border-t border-b p-4">
         <div className="space-y-4">
           {/* Credits display */}
           {open && credits && (
