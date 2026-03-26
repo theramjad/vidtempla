@@ -64,7 +64,8 @@ const toolGroups = [
     tools: [
       'get_channel_analytics',
       'query_analytics',
-      'search_channel_videos',
+      'search_my_videos',
+      'search_youtube',
       'sync_channel',
     ],
   },
