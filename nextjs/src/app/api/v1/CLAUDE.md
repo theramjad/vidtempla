@@ -87,7 +87,9 @@ Every proxy endpoint documents its YouTube API quota cost. Costs are tracked in 
 | YouTube Data API reads (videos.list, channels.list) | 1 |
 | YouTube search.list | 100 |
 | YouTube write operations (playlists, comments, thumbnails) | 50 |
-| Captions | 50-450 |
+| Captions list | 50 |
+| Captions transcript (with captionId) | 200 |
+| Captions transcript (auto-select) | 250 |
 | VidTempla-native endpoints (templates, containers, usage) | 0 |
 | Analytics API queries | Separate quota pool |
 

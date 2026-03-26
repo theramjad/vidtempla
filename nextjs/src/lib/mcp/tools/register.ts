@@ -4,6 +4,7 @@ import { registerVideoTools } from "./videos";
 import { registerTemplateTools } from "./templates";
 import { registerContainerTools } from "./containers";
 import { registerAnalyticsTools } from "./analytics";
+import { registerCaptionTools } from "./captions";
 
 /**
  * Registers all MCP tools on the server.
@@ -15,4 +16,5 @@ export function registerAllTools(server: McpServer) {
   registerTemplateTools(server);
   registerContainerTools(server);
   registerAnalyticsTools(server);
+  registerCaptionTools(server);
 }

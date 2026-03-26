@@ -421,6 +421,70 @@ export async function batchUpdateDescriptions(
   return { successful, failed };
 }
 
+// ─── YouTube Captions API functions ───────────────────────────────────
+
+export interface YouTubeCaptionTrack {
+  id: string;
+  snippet: {
+    videoId: string;
+    lastUpdated: string;
+    trackKind: string;
+    language: string;
+    name: string;
+    audioTrackType: string;
+    isCC: boolean;
+    isLarge: boolean;
+    isEasyReader: boolean;
+    isDraft: boolean;
+    isAutoSynced: boolean;
+    status: string;
+  };
+}
+
+/**
+ * Lists available caption tracks for a video.
+ * Quota cost: 50 units
+ */
+export async function listCaptionTracks(
+  accessToken: string,
+  videoId: string
+): Promise<YouTubeCaptionTrack[]> {
+  const response = await axios.get<{ items: YouTubeCaptionTrack[] }>(
+    `${YOUTUBE_API_BASE}/captions`,
+    {
+      params: {
+        part: 'snippet',
+        videoId,
+      },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  return response.data.items || [];
+}
+
+/**
+ * Downloads a caption track's content.
+ * Quota cost: 200 units
+ * @param tfmt - Format: 'srt' (default), 'vtt', or 'sbv'
+ */
+export async function downloadCaptionTrack(
+  accessToken: string,
+  captionId: string,
+  tfmt: string = 'srt'
+): Promise<string> {
+  const response = await axios.get<string>(
+    `${YOUTUBE_API_BASE}/captions/${captionId}`,
+    {
+      params: { tfmt },
+      headers: { Authorization: `Bearer ${accessToken}` },
+      responseType: 'text',
+    }
+  );
+
+  return response.data;
+}
+
 // ─── YouTube Analytics API functions ──────────────────────────────────
 
 export interface AnalyticsReportResponse {
