@@ -1,6 +1,6 @@
 # VidTempla
 
-A powerful admin dashboard for managing YouTube video descriptions at scale using dynamic templates and variables.
+A powerful dashboard and API platform for managing YouTube video descriptions at scale using dynamic templates and variables.
 
 ## Features
 
@@ -13,12 +13,14 @@ A powerful admin dashboard for managing YouTube video descriptions at scale usin
 - **Batch Updates**: Update multiple video descriptions simultaneously
 
 ### Key Features
-- 🔐 Secure OAuth authentication with YouTube
+- 🔐 Secure authentication with magic link and Google OAuth
 - 📝 Powerful template editor with variable auto-detection
 - 🎯 Immutable video-to-container assignment for data integrity
-- 📊 Clean, intuitive admin dashboard
-- 🔄 Background job processing with Inngest
-- 🛡️ Row-level security with Supabase
+- 📊 Clean, intuitive dashboard
+- 🔄 Background job processing with Trigger.dev (scheduled channel syncs every 6 hours)
+- 💳 Stripe-powered subscription billing (Pro + Business plans)
+- 🤖 MCP server with OAuth for AI agent access
+- 🌐 REST API for programmatic channel management
 - 📱 Fully responsive UI
 
 ## Tech Stack
@@ -26,18 +28,44 @@ A powerful admin dashboard for managing YouTube video descriptions at scale usin
 - **Frontend**: Next.js 15, React 18, TypeScript, Tailwind CSS
 - **UI Components**: Radix UI
 - **Backend**: tRPC for type-safe APIs
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth + YouTube OAuth
-- **Background Jobs**: Inngest
+- **Database**: PlanetScale Postgres with Drizzle ORM
+- **Authentication**: Better Auth (magic link via Resend + Google OAuth)
+- **Background Jobs**: Trigger.dev
+- **Email**: Resend
+- **Payments**: Stripe
 - **API Integration**: YouTube Data API v3
+- **Analytics**: PostHog (optional)
+
+## REST API (`/api/v1/`)
+
+VidTempla exposes a REST API for programmatic access, usable by AI agents or external tools. Authenticate with an API key generated in the dashboard.
+
+| Group | Endpoints |
+|-------|-----------|
+| **Channels** | List, get, overview, analytics, sync, search |
+| **Videos** | List, get, analytics, retention, assign, variables, description history & revert |
+| **Templates** | CRUD, impact analysis |
+| **Containers** | CRUD |
+| **YouTube Proxy** | Playlists, comments, thumbnails, captions & transcripts |
+| **Analytics** | Flexible YouTube Analytics API queries |
+| **Usage** | API request tracking and quota monitoring |
+
+Interactive API reference available at `/reference`.
+
+## MCP Server
+
+VidTempla includes a built-in MCP (Model Context Protocol) server accessible at `/api/[transport]`. It uses Better Auth's OIDC plugin for dynamic client registration, allowing AI assistants to connect and manage your YouTube channels on your behalf.
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+ and npm
-- Supabase account
-- Google Cloud account (for YouTube API)
+- [PlanetScale](https://planetscale.com/) account (or compatible Postgres)
+- [Google Cloud](https://console.cloud.google.com/) account (YouTube Data API v3 + OAuth)
+- [Trigger.dev](https://trigger.dev/) account (background jobs)
+- [Resend](https://resend.com/) account (magic link emails)
+- [Stripe](https://stripe.com/) account (payments)
 
 ### 1. Clone the Repository
 
@@ -46,30 +74,16 @@ git clone https://github.com/theramjad/vidtempla.git
 cd vidtempla
 ```
 
-### 2. Set Up Supabase
-
-```bash
-# Install Supabase CLI if you haven't
-npm install -g supabase
-
-# Start local Supabase instance
-cd supabase
-supabase start
-```
-
-The migration files have already been created and will be applied automatically when you run `supabase start`.
-
-### 3. Set Up Google Cloud & YouTube API
+### 2. Set Up Google Cloud & YouTube API
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing one
+2. Create a new project or select an existing one
 3. Enable the **YouTube Data API v3**
-4. Create OAuth 2.0 credentials:
-   - Application type: Web application
-   - Authorized redirect URIs: `http://localhost:3000/api/auth/youtube/callback`
-   - Note your Client ID and Client Secret
+4. Create **two** OAuth 2.0 credentials:
+   - **Google Sign-In** (for dashboard auth): redirect URI `http://localhost:3000/api/auth/callback`
+   - **YouTube OAuth** (for channel access): redirect URI `http://localhost:3000/api/auth/youtube/callback`
 
-### 4. Configure Environment Variables
+### 3. Configure Environment Variables
 
 ```bash
 cd nextjs
@@ -79,39 +93,81 @@ cp .env.example .env.local
 Edit `.env.local` with your credentials:
 
 ```env
-# YouTube OAuth (from Google Cloud Console)
-YOUTUBE_CLIENT_ID=your_google_oauth_client_id
-YOUTUBE_CLIENT_SECRET=your_google_oauth_client_secret
+# Database (PlanetScale Postgres)
+DATABASE_URL=
+
+# Better Auth
+BETTER_AUTH_SECRET=                   # Random secret string
+BETTER_AUTH_URL=http://localhost:3000
+
+# Resend (for magic link emails)
+RESEND_API_KEY=
+
+# Google Sign-In OAuth
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# YouTube OAuth (channel access)
+YOUTUBE_CLIENT_ID=
+YOUTUBE_CLIENT_SECRET=
 YOUTUBE_REDIRECT_URI=http://localhost:3000/api/auth/youtube/callback
 
 # Encryption key (generate a random 32+ character string)
-ENCRYPTION_KEY=your_random_32_character_encryption_key_here
+ENCRYPTION_KEY=
 
-# Supabase (from `supabase status` command)
-NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+# Trigger.dev (background jobs)
+TRIGGER_SECRET_KEY=tr_dev_YOUR_KEY_HERE
 
-# Inngest (for local development, use these defaults)
-INNGEST_EVENT_KEY=local
-INNGEST_SIGNING_KEY=local
+# Stripe (payments)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRO_PRICE_ID=price_...
+STRIPE_BUSINESS_PRICE_ID=price_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+
+# App URL
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# PostHog (optional analytics)
+NEXT_PUBLIC_POSTHOG_KEY=
 ```
 
-### 5. Install Dependencies and Run
+### 4. Install Dependencies and Run
 
 ```bash
-# Install dependencies
 cd nextjs
 npm install
 
-# Generate database types
-npx supabase gen types typescript --local > ../shared-types/database.types.ts
+# Run database migrations
+npx drizzle-kit migrate
 
-# Start development server
+# Start the development server
 npm run dev
 ```
 
 The app will be available at [http://localhost:3000](http://localhost:3000)
+
+### 5. Start Trigger.dev (Background Jobs)
+
+In a separate terminal:
+
+```bash
+cd nextjs
+npm run dev:trigger
+```
+
+### Database Migrations
+
+Schema changes use Drizzle ORM. To apply changes:
+
+```bash
+# After editing nextjs/src/db/schema.ts, generate a migration:
+npx drizzle-kit generate
+
+# Then commit the generated SQL file — Vercel runs migrations on deploy automatically
+```
+
+**Never run `drizzle-kit push`** — it prompts interactively and silently fails in CI.
 
 ## Contributing
 
