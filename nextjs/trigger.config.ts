@@ -16,6 +16,7 @@ export default defineConfig({
       randomize: true,
     },
   },
+  machine: "micro",
   dirs: ["./src/trigger"],
   build: {
     extensions: [
