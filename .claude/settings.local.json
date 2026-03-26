@@ -19,7 +19,14 @@
       "mcp__exa__web_search_exa",
       "WebFetch(domain:www.better-auth.com)",
       "WebFetch(domain:planetscale.com)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "WebFetch(domain:composio.dev)",
+      "WebFetch(domain:www.grizzlypeaksoftware.com)",
+      "WebFetch(domain:medium.com)",
+      "mcp__exa__get_code_context_exa",
+      "Bash(cd /Users/ray/Desktop/vidtempla/nextjs && npx drizzle-kit generate 2>&1)",
+      "Bash(cd:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

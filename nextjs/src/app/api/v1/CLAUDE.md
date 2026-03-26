@@ -85,7 +85,7 @@ Every proxy endpoint documents its YouTube API quota cost. Costs are tracked in 
 | Operation | Quota Units |
 |-----------|-------------|
 | YouTube Data API reads (videos.list, channels.list) | 1 |
-| YouTube search.list | 100 |
+| YouTube search.list (channel-scoped or public) | 100 |
 | YouTube write operations (playlists, comments, thumbnails) | 50 |
 | Captions list | 50 |
 | Captions transcript (with captionId) | 200 |

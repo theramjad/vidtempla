@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VidTempla: Inngest to Trigger.dev Migration</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0f0f0f;
+            color: #e0e0e0;
+        }
+        h1 { color: #fff; text-align: center; margin-bottom: 8px; }
+        .subtitle { color: #888; text-align: center; margin-bottom: 30px; font-size: 14px; }
+        h2 { color: #fff; margin-top: 0; }
+        h3 { color: #ccc; }
+        .diagram-container {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            margin-bottom: 24px;
+            overflow-x: auto;
+        }
+        .diagram-container h2 { margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .key-points {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 24px;
+            margin-top: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+        .card {
+            background: #222;
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 4px solid #666;
+        }
+        .card.before { border-left-color: #e74c3c; }
+        .card.after { border-left-color: #2ecc71; }
+        .card h3 { margin-top: 0; }
+        code {
+            background: #333;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #7dd3fc;
+        }
+        ul { padding-left: 20px; }
+        li { margin-bottom: 6px; line-height: 1.5; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #333; font-size: 14px; }
+        th { color: #aaa; font-weight: 600; }
+        td code { font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>VidTempla: Inngest to Trigger.dev Migration</h1>
+    <p class="subtitle">Background job architecture before and after migration</p>
+
+    <div class="diagram-container">
+        <h2>Before: Inngest Architecture</h2>
+        <div class="mermaid">
+sequenceDiagram
+    participant UI as Dashboard / API
+    participant Router as tRPC Router<br/>youtube.ts
+    participant Inngest as Inngest Client<br/>inngestClient.send()
+    participant API as /pages/api/inngest.ts<br/>serve() endpoint
+    participant Cloud as Inngest Cloud
+    participant Fn as Inngest Functions<br/>/inngest/youtube/*.ts
+
+    Note over UI, Fn: Event-driven: call sites fire named events, Inngest routes them
+
+    UI->>Router: User action (sync, update, etc.)
+    Router->>Inngest: inngestClient.send({ name, data })
+    Inngest->>Cloud: POST event to Inngest Cloud
+    Cloud->>API: Webhook callback to /api/inngest
+    API->>Fn: Route to matching function
+    Fn->>Fn: Execute steps (step.run)
+
+    Note over Cloud, API: Inngest Cloud manages<br/>scheduling, retries, cron
+        </div>
+    </div>
+
+    <div class="diagram-container">
+        <h2>After: Trigger.dev Architecture</h2>
+        <div class="mermaid">
+sequenceDiagram
+    participant UI as Dashboard / API
+    participant Router as tRPC Router<br/>youtube.ts
+    participant SDK as Trigger.dev SDK<br/>tasks.trigger()
+    participant Cloud as Trigger.dev Cloud
+    participant Task as Trigger.dev Tasks<br/>/src/trigger/*.ts
+
+    Note over UI, Task: Direct task triggering: call sites invoke tasks by ID
+
+    UI->>Router: User action (sync, update, etc.)
+    Router->>SDK: tasks.trigger("task-id", payload)
+    SDK->>Cloud: Trigger task via API
+    Cloud->>Task: Execute task in managed worker
+    Task->>Task: Run task logic directly
+
+    Note over Cloud, Task: Trigger.dev Cloud manages<br/>scheduling, retries, cron, concurrency
+        </div>
+    </div>
+
+    <div class="diagram-container">
+        <h2>Task Mapping</h2>
+        <div class="mermaid">
+flowchart LR
+    subgraph Before["Inngest Functions"]
+        direction TB
+        I1["scheduledSync<br/><i>cron: 0 */6 * * *</i>"]
+        I2["syncChannelVideos<br/><i>event: youtube/channel.sync</i>"]
+        I3["updateVideoDescriptions<br/><i>event: youtube/videos.update</i>"]
+    end
+
+    subgraph After["Trigger.dev Tasks"]
+        direction TB
+        T1["scheduledSync<br/><i>schedules.task + cron</i>"]
+        T2["syncChannelVideos<br/><i>task: youtube-sync-channel-videos</i>"]
+        T3["updateVideoDescriptions<br/><i>task: youtube-update-video-descriptions</i>"]
+    end
+
+    I1 -->|"1:1 port"| T1
+    I2 -->|"1:1 port"| T2
+    I3 -->|"1:1 port"| T3
+
+    style Before fill:#2d1a1a,stroke:#e74c3c,color:#fff
+    style After fill:#1a2d1a,stroke:#2ecc71,color:#fff
+        </div>
+    </div>
+
+    <div class="diagram-container">
+        <h2>Call Site Migration (13 sites)</h2>
+        <div class="mermaid">
+flowchart TD
+    subgraph CallSites["All Call Sites"]
+        direction TB
+        Y["youtube.ts tRPC router<br/><b>6 calls</b>"]
+        C["containers.ts service<br/><b>1 call</b>"]
+        T["templates.ts service<br/><b>1 call</b>"]
+        A["analytics.ts service<br/><b>1 call</b>"]
+        V["videos.ts service<br/><b>2 calls</b>"]
+        CB["youtube/callback.ts<br/><b>2 calls</b>"]
+    end
+
+    subgraph Old["Before"]
+        OC["inngestClient.send({<br/>name: 'youtube/...',<br/>data: { ... }<br/>})"]
+    end
+
+    subgraph New["After"]
+        NC["tasks.trigger(<br/>'youtube-task-id',<br/>{ ... }<br/>)"]
+    end
+
+    Y --> OC
+    C --> OC
+    T --> OC
+    A --> OC
+    V --> OC
+    CB --> OC
+
+    OC -->|"replaced with"| NC
+
+    style Old fill:#2d1a1a,stroke:#e74c3c,color:#fff
+    style New fill:#1a2d1a,stroke:#2ecc71,color:#fff
+    style CallSites fill:#1a1a2d,stroke:#3498db,color:#fff
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card before">
+            <h3>Removed (Inngest)</h3>
+            <ul>
+                <li><code>src/lib/clients/inngest.ts</code> - Client + event types</li>
+                <li><code>src/pages/api/inngest.ts</code> - Webhook serve endpoint</li>
+                <li><code>src/inngest/youtube/scheduledSync.ts</code></li>
+                <li><code>src/inngest/youtube/syncChannelVideos.ts</code></li>
+                <li><code>src/inngest/youtube/updateVideoDescriptions.ts</code></li>
+                <li><code>inngest</code> npm package</li>
+                <li><code>INNGEST_EVENT_KEY</code> env var</li>
+                <li><code>INNGEST_SIGNING_KEY</code> env var</li>
+            </ul>
+        </div>
+        <div class="card after">
+            <h3>Added (Trigger.dev)</h3>
+            <ul>
+                <li><code>trigger.config.ts</code> - Project config + Vercel env sync</li>
+                <li><code>src/trigger/scheduledSync.ts</code></li>
+                <li><code>src/trigger/syncChannelVideos.ts</code></li>
+                <li><code>src/trigger/updateVideoDescriptions.ts</code></li>
+                <li><code>@trigger.dev/sdk</code> npm package</li>
+                <li><code>@trigger.dev/build</code> dev dependency</li>
+                <li><code>TRIGGER_SECRET_KEY</code> env var</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="key-points">
+        <h2>Key Concept Mapping</h2>
+        <table>
+            <thead>
+                <tr><th>Inngest Concept</th><th>Trigger.dev Equivalent</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>inngestClient.send({ name, data })</code></td>
+                    <td><code>tasks.trigger("task-id", payload)</code></td>
+                    <td>Direct task invocation replaces named events</td>
+                </tr>
+                <tr>
+                    <td><code>inngestClient.createFunction()</code></td>
+                    <td><code>task({ id, run })</code></td>
+                    <td>Simpler API, no step.run() wrappers needed</td>
+                </tr>
+                <tr>
+                    <td><code>{ cron: '...' }</code> trigger</td>
+                    <td><code>schedules.task({ cron: '...' })</code></td>
+                    <td>Dedicated scheduled task type</td>
+                </tr>
+                <tr>
+                    <td><code>NonRetriableError</code></td>
+                    <td><code>AbortTaskRunError</code></td>
+                    <td>Same purpose: skip retries for known-bad state</td>
+                </tr>
+                <tr>
+                    <td><code>concurrency: { limit: 5 }</code></td>
+                    <td><code>queue: { concurrencyLimit: 5 }</code></td>
+                    <td>Queue-based concurrency control</td>
+                </tr>
+                <tr>
+                    <td><code>onFailure</code> callback</td>
+                    <td><code>onFailure</code> callback</td>
+                    <td>Same pattern, slightly different payload shape</td>
+                </tr>
+                <tr>
+                    <td><code>serve()</code> API route</td>
+                    <td>No API route needed</td>
+                    <td>Trigger.dev uses its own managed worker</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            sequence: {
+                diagramMarginX: 50,
+                diagramMarginY: 10,
+                actorMargin: 80,
+                width: 200,
+                height: 65,
+                messageMargin: 35,
+                mirrorActors: true,
+                useMaxWidth: true
+            },
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>

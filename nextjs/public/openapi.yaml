@@ -676,9 +676,9 @@ paths:
 
   /channels/{channelId}/search:
     get:
-      operationId: searchChannelVideos
-      summary: Search channel videos on YouTube
-      description: Searches the channel's videos using the YouTube search.list API. Costs 100 quota units per call.
+      operationId: searchMyVideos
+      summary: Search your own channel's videos on YouTube
+      description: Searches the channel's own videos (forMine=true) using the YouTube search.list API. Costs 100 quota units per call.
       tags: [Channels]
       x-quota-cost: 100
       parameters:
@@ -1625,6 +1625,91 @@ paths:
           $ref: "#/components/responses/InsufficientPermissions"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ─── YouTube Search (Public) ────────────────────────────────
+
+  /youtube/search:
+    get:
+      operationId: searchYouTube
+      summary: Search all of YouTube
+      description: Public YouTube search (not channel-scoped). Requires a channelId for OAuth authentication. Costs 100 quota units per call.
+      tags: [YouTube Management]
+      x-quota-cost: 100
+      parameters:
+        - name: channelId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Your YouTube channel ID (used for OAuth authentication)
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: type
+          in: query
+          schema:
+            type: string
+            default: video
+            enum: [video, channel, playlist]
+          description: Resource type to search for
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: relevance
+            enum: [relevance, date, viewCount, rating]
+          description: Sort order
+        - name: maxResults
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+          description: Maximum number of results (max 50)
+        - name: pageToken
+          in: query
+          schema:
+            type: string
+          description: Page token for pagination
+        - name: filterChannelId
+          in: query
+          schema:
+            type: string
+          description: Filter results to a specific channel ID
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    description: YouTube search.list response
+                  error:
+                    type: "null"
+                  meta:
+                    type: object
+                    properties:
+                      quotaCost:
+                        type: integer
+                        example: 100
+                      note:
+                        type: string
+        "400":
+          description: Missing required parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/InternalError"
 

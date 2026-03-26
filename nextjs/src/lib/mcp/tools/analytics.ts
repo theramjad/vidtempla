@@ -5,7 +5,8 @@ import { consumeCredits } from "@/lib/plan-limits";
 import {
   getChannelAnalytics,
   queryAnalytics,
-  searchChannelVideos,
+  searchMyVideos,
+  searchYouTube,
   syncChannel,
 } from "@/lib/services/analytics";
 
@@ -52,8 +53,8 @@ export function registerAnalyticsTools(server: McpServer) {
   );
 
   server.tool(
-    "search_channel_videos",
-    "Search a channel's videos on YouTube (costs 100 YouTube API quota units)",
+    "search_my_videos",
+    "Search your own channel's videos (forMine=true). Costs 100 YouTube API quota units.",
     {
       channelId: z.string().describe("YouTube channel ID"),
       q: z.string().describe("Search query"),
@@ -64,9 +65,32 @@ export function registerAnalyticsTools(server: McpServer) {
     async ({ channelId, ...opts }) => {
       const userId = getSessionUserId();
       const credits = await consumeCredits(userId, 100);
-      if (!credits.success) return mcpQuotaExceeded(userId, "search_channel_videos");
-      const result = await searchChannelVideos(channelId, userId, opts);
-      logMcpRequest(userId, "search_channel_videos", 100, "error" in result ? 400 : 200);
+      if (!credits.success) return mcpQuotaExceeded(userId, "search_my_videos");
+      const result = await searchMyVideos(channelId, userId, opts);
+      logMcpRequest(userId, "search_my_videos", 100, "error" in result ? 400 : 200);
+      return toMcp(result);
+    }
+  );
+
+  server.tool(
+    "search_youtube",
+    "Search all of YouTube (not just your channel). Costs 100 YouTube API quota units.",
+    {
+      channelId: z.string().describe("Your YouTube channel ID (used for OAuth authentication)"),
+      q: z.string().describe("Search query"),
+      type: z.string().optional().describe("Resource type: video (default), channel, playlist"),
+      sort: z.string().optional().describe("Sort order: relevance (default), date, viewCount, rating"),
+      maxResults: z.number().optional().describe("Max results (default 10, max 50)"),
+      pageToken: z.string().optional().describe("Page token for pagination"),
+      filterChannelId: z.string().optional().describe("Filter results to a specific channel ID"),
+    },
+    READ,
+    async ({ channelId, ...opts }) => {
+      const userId = getSessionUserId();
+      const credits = await consumeCredits(userId, 100);
+      if (!credits.success) return mcpQuotaExceeded(userId, "search_youtube");
+      const result = await searchYouTube(channelId, userId, opts);
+      logMcpRequest(userId, "search_youtube", 100, "error" in result ? 400 : 200);
       return toMcp(result);
     }
   );

@@ -110,7 +110,7 @@ export async function queryAnalytics(
   }
 }
 
-// ── search_channel_videos ────────────────────────────────────
+// ── search_my_videos (channel-scoped) ────────────────────────
 
 export interface SearchChannelVideosOpts {
   q: string;
@@ -118,7 +118,10 @@ export interface SearchChannelVideosOpts {
   maxResults?: number;
 }
 
-export async function searchChannelVideos(
+/** @deprecated Use searchMyVideos instead */
+export const searchChannelVideos = searchMyVideos;
+
+export async function searchMyVideos(
   channelId: string,
   userId: string,
   opts: SearchChannelVideosOpts
@@ -146,6 +149,51 @@ export async function searchChannelVideos(
     return { data: response.data };
   } catch {
     return { error: { code: "YOUTUBE_API_ERROR", message: "Failed to search channel videos", suggestion: "Try again later", status: 500 } };
+  }
+}
+
+// ── search_youtube (all of YouTube) ──────────────────────────
+
+export interface SearchYouTubeOpts {
+  q: string;
+  type?: string;
+  sort?: string;
+  maxResults?: number;
+  pageToken?: string;
+  filterChannelId?: string;
+}
+
+export async function searchYouTube(
+  authChannelId: string,
+  userId: string,
+  opts: SearchYouTubeOpts
+): Promise<ServiceResult<unknown>> {
+  try {
+    const maxResults = Math.min(opts.maxResults ?? 10, 50);
+
+    const tokens = await getChannelTokens(authChannelId, userId);
+    if ("error" in tokens) {
+      return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
+    }
+
+    const params: Record<string, string | number | boolean> = {
+      part: "snippet",
+      type: opts.type ?? "video",
+      q: opts.q,
+      order: opts.sort ?? "relevance",
+      maxResults,
+    };
+    if (opts.pageToken) params.pageToken = opts.pageToken;
+    if (opts.filterChannelId) params.channelId = opts.filterChannelId;
+
+    const response = await axios.get(`${YOUTUBE_API_BASE}/search`, {
+      params,
+      headers: { Authorization: `Bearer ${tokens.accessToken}` },
+    });
+
+    return { data: response.data };
+  } catch {
+    return { error: { code: "YOUTUBE_API_ERROR", message: "Failed to search YouTube", suggestion: "Try again later or refine your query", status: 500 } };
   }
 }
 
