@@ -139,7 +139,7 @@ export async function GET(
     const message = axios.isAxiosError(error)
       ? error.response?.data?.error?.message || error.message
       : "Unknown error";
-    logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", status, 200);
+    logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", status, quotaUnits);
     return NextResponse.json(
       apiError(
         "YOUTUBE_API_ERROR",
