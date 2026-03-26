@@ -7,7 +7,7 @@ import Head from 'next/head';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Loader2 } from 'lucide-react';
 import { api } from '@/utils/api';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -79,8 +79,11 @@ export default function UsagePage() {
               </div>
 
               {/* Daily breakdown */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium">Daily Breakdown</h3>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Daily Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent>
                 {usage.daily.length > 0 ? (
                   <Table>
                     <TableHeader>
@@ -103,12 +106,16 @@ export default function UsagePage() {
                 ) : (
                   <p className="text-sm text-muted-foreground py-4 text-center">No requests this period</p>
                 )}
-              </div>
+                </CardContent>
+              </Card>
 
               {/* Per-endpoint breakdown */}
               {usage.byEndpoint.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">By Endpoint</h3>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">By Endpoint</CardTitle>
+                  </CardHeader>
+                  <CardContent>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -127,13 +134,17 @@ export default function UsagePage() {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Per-key breakdown */}
               {usage.byKey.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">By API Key</h3>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">By API Key</CardTitle>
+                  </CardHeader>
+                  <CardContent>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -152,7 +163,8 @@ export default function UsagePage() {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
+                  </CardContent>
+                </Card>
               )}
             </>
           ) : (

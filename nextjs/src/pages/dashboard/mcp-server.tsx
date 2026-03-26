@@ -18,10 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
-const SERVER_URL = 'https://vidtempla.com/api/mcp/mcp';
-const OAUTH_DISCOVERY_URL =
-  'https://vidtempla.com/.well-known/oauth-authorization-server';
-
+const SERVER_URL = 'https://vidtempla.com/api/mcp';
 const toolGroups = [
   {
     name: 'Channels',
@@ -73,17 +70,7 @@ const toolGroups = [
   },
 ];
 
-const quickStartConfig = JSON.stringify(
-  {
-    mcpServers: {
-      vidtempla: {
-        url: SERVER_URL,
-      },
-    },
-  },
-  null,
-  2
-);
+const MCP_COMMAND = `claude mcp add --transport http vidtempla ${SERVER_URL} -s user`;
 
 export default function McpServerPage() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -162,49 +149,6 @@ export default function McpServerPage() {
               </CardContent>
             </Card>
 
-            {/* Authentication */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Authentication</CardTitle>
-                <CardDescription>
-                  OAuth-based authentication via OIDC
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Auth Method</span>
-                  <Badge variant="secondary">OAuth (OIDC)</Badge>
-                </div>
-                <div className="space-y-1.5">
-                  <span className="text-sm font-medium">Discovery URL</span>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 text-sm bg-muted px-3 py-2 rounded-md break-all">
-                      {OAUTH_DISCOVERY_URL}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="shrink-0"
-                      onClick={() =>
-                        copyToClipboard(OAUTH_DISCOVERY_URL, 'oauth')
-                      }
-                    >
-                      {copiedField === 'oauth' ? (
-                        <Check className="h-4 w-4 text-emerald-600" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  MCP clients handle OAuth automatically. When you first
-                  connect, you&apos;ll be prompted to sign in and authorize
-                  access.
-                </p>
-              </CardContent>
-            </Card>
-
             {/* Available Tools */}
             <Card>
               <CardHeader>
@@ -233,32 +177,36 @@ export default function McpServerPage() {
               </CardContent>
             </Card>
 
-            {/* Quick Start */}
+            {/* Setup */}
             <Card>
               <CardHeader>
-                <CardTitle>Quick Start</CardTitle>
+                <CardTitle>Setup</CardTitle>
                 <CardDescription>
-                  Add this to your MCP client configuration
+                  Run this command in your terminal to connect Claude Code
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 <div className="relative">
-                  <pre className="text-sm bg-muted px-4 py-3 rounded-md overflow-x-auto">
-                    {quickStartConfig}
+                  <pre className="text-sm bg-muted px-4 py-3 pr-12 rounded-md overflow-x-auto">
+                    {MCP_COMMAND}
                   </pre>
                   <Button
                     variant="outline"
                     size="icon"
                     className="absolute top-2 right-2 h-7 w-7"
-                    onClick={() => copyToClipboard(quickStartConfig, 'config')}
+                    onClick={() => copyToClipboard(MCP_COMMAND, 'command')}
                   >
-                    {copiedField === 'config' ? (
+                    {copiedField === 'command' ? (
                       <Check className="h-3.5 w-3.5 text-emerald-600" />
                     ) : (
                       <Copy className="h-3.5 w-3.5" />
                     )}
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  The first time you use it, Claude Code will open your browser
+                  to sign in. After that, it works automatically.
+                </p>
               </CardContent>
             </Card>
           </div>

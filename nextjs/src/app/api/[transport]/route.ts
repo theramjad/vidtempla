@@ -9,7 +9,7 @@ const mcpHandler = withMcpAuth(auth, async (req, session) => {
       registerAllTools(server, session.userId);
     },
     { serverInfo: { name: "VidTempla", version: "1.0.0" } },
-    { basePath: "/api/mcp", maxDuration: 60, disableSse: true }
+    { basePath: "/api", maxDuration: 60, disableSse: true }
   )(req);
 });
 

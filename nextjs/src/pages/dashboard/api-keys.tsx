@@ -297,6 +297,8 @@ export default function ApiKeysPage() {
             </CardContent>
           </Card>
 
+          <Card>
+            <CardContent className="pt-6">
           {keysLoading ? (
             <div className="flex items-center gap-2 p-2">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -386,6 +388,8 @@ export default function ApiKeysPage() {
               <p className="text-xs mt-1">Create an API key to get started with the REST API</p>
             </div>
           )}
+            </CardContent>
+          </Card>
 
         </div>
       </DashboardLayout>
