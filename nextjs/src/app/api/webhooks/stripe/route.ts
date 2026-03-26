@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "@/lib/stripe-server";
 import { db } from "@/db";
-import { webhookEvents, subscriptions, userCredits } from "@/db/schema";
+import { webhookEvents, subscriptions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { PlanTier, SubscriptionStatus } from "@/lib/stripe";
 import { mapPriceIdToPlanTier, PLAN_CONFIG } from "@/lib/stripe";
+import { upsertCredits } from "@/lib/plan-limits";
 import Stripe from "stripe";
 
 /**
@@ -213,22 +214,7 @@ async function handleSubscriptionUpdate(subscription: StripeSubscriptionWithPeri
   const periodStart = updateData.currentPeriodStart ?? new Date();
   const periodEnd = updateData.currentPeriodEnd ?? new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
 
-  await db.insert(userCredits).values({
-    userId: existingSubscription.userId,
-    balance: allocation,
-    monthlyAllocation: allocation,
-    periodStart,
-    periodEnd,
-  }).onConflictDoUpdate({
-    target: userCredits.userId,
-    set: {
-      balance: allocation,
-      monthlyAllocation: allocation,
-      periodStart,
-      periodEnd,
-      updatedAt: new Date(),
-    },
-  });
+  await upsertCredits(existingSubscription.userId, allocation, periodStart, periodEnd);
 
   console.log(`Updated subscription ${existingSubscription.id} to ${planTier} (${status})`);
 }
@@ -255,22 +241,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     const freeAllocation = PLAN_CONFIG.free.monthlyCredits;
     const now = new Date();
     const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    await db.insert(userCredits).values({
-      userId: sub.userId,
-      balance: freeAllocation,
-      monthlyAllocation: freeAllocation,
-      periodStart: now,
-      periodEnd,
-    }).onConflictDoUpdate({
-      target: userCredits.userId,
-      set: {
-        balance: freeAllocation,
-        monthlyAllocation: freeAllocation,
-        periodStart: now,
-        periodEnd,
-        updatedAt: now,
-      },
-    });
+    await upsertCredits(sub.userId, freeAllocation, now, periodEnd);
   }
 
   console.log(`Subscription ${subscription.id} deleted and reverted to free`);

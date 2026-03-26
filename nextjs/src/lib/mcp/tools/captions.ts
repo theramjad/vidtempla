@@ -1,13 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError, getSessionUserId, logMcpRequest, READ } from "../helpers";
+import { toMcp, mcpQuotaExceeded, getSessionUserId, logMcpRequest, READ } from "../helpers";
 import { consumeCredits } from "@/lib/plan-limits";
 import { listVideoCaptions, getVideoTranscript } from "@/lib/services/captions";
-
-function toMcp(result: { data: unknown } | { error: { code: string; message: string; suggestion: string } }) {
-  if ("error" in result) return mcpError(result.error.code, result.error.message, result.error.suggestion);
-  return mcpJson(result.data);
-}
 
 export function registerCaptionTools(server: McpServer) {
   server.tool(
@@ -18,10 +13,7 @@ export function registerCaptionTools(server: McpServer) {
     async ({ videoId }) => {
       const userId = getSessionUserId();
       const credits = await consumeCredits(userId, 50);
-      if (!credits.success) {
-        logMcpRequest(userId, "list_video_captions", 0, 429);
-        return mcpError("QUOTA_EXCEEDED", "Insufficient credits", "Upgrade your plan or wait for the next billing cycle");
-      }
+      if (!credits.success) return mcpQuotaExceeded(userId, "list_video_captions");
       const result = await listVideoCaptions(videoId, userId);
       logMcpRequest(userId, "list_video_captions", 50, "error" in result ? 400 : 200);
       return toMcp(result);
@@ -42,10 +34,7 @@ export function registerCaptionTools(server: McpServer) {
       const userId = getSessionUserId();
       const quotaUnits = captionId ? 200 : 250;
       const credits = await consumeCredits(userId, quotaUnits);
-      if (!credits.success) {
-        logMcpRequest(userId, "get_video_transcript", 0, 429);
-        return mcpError("QUOTA_EXCEEDED", "Insufficient credits", "Upgrade your plan or wait for the next billing cycle");
-      }
+      if (!credits.success) return mcpQuotaExceeded(userId, "get_video_transcript");
       const result = await getVideoTranscript(videoId, userId, { captionId, language, format });
       logMcpRequest(userId, "get_video_transcript", quotaUnits, "error" in result ? 400 : 200);
       return toMcp(result);

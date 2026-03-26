@@ -6,9 +6,10 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "@/server/trpc/init";
 import { db } from "@/db";
-import { apiKeys, apiRequestLog, userCredits } from "@/db/schema";
-import { eq, and, desc, sql, gte, lte, count, like, lt } from "drizzle-orm";
+import { apiKeys, apiRequestLog } from "@/db/schema";
+import { eq, and, desc, sql, gte, lte, count, like, lt, or } from "drizzle-orm";
 import { generateApiKey } from "@/lib/api-keys";
+import { getCredits } from "@/lib/plan-limits";
 
 export const apiKeysRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -159,65 +160,67 @@ export const apiKeysRouter = router({
         lte(apiRequestLog.createdAt, end),
       ];
 
-      // Per-day counts
-      const daily = await db
-        .select({
-          date: sql<string>`DATE(${apiRequestLog.createdAt})`.as("date"),
-          requestCount: count().as("request_count"),
-          quotaUnits:
-            sql<number>`COALESCE(SUM(${apiRequestLog.quotaUnits}), 0)`.as(
-              "quota_units"
-            ),
-        })
-        .from(apiRequestLog)
-        .where(and(...filters))
-        .groupBy(sql`DATE(${apiRequestLog.createdAt})`)
-        .orderBy(desc(sql`DATE(${apiRequestLog.createdAt})`));
+      const [daily, [totals], byEndpoint, byKey] = await Promise.all([
+        // Per-day counts
+        db
+          .select({
+            date: sql<string>`DATE(${apiRequestLog.createdAt})`.as("date"),
+            requestCount: count().as("request_count"),
+            quotaUnits:
+              sql<number>`COALESCE(SUM(${apiRequestLog.quotaUnits}), 0)`.as(
+                "quota_units"
+              ),
+          })
+          .from(apiRequestLog)
+          .where(and(...filters))
+          .groupBy(sql`DATE(${apiRequestLog.createdAt})`)
+          .orderBy(desc(sql`DATE(${apiRequestLog.createdAt})`)),
 
-      // Totals
-      const [totals] = await db
-        .select({
-          requests: count().as("requests"),
-          quotaUnits:
-            sql<number>`COALESCE(SUM(${apiRequestLog.quotaUnits}), 0)`.as(
-              "quota_units"
-            ),
-        })
-        .from(apiRequestLog)
-        .where(and(...filters));
+        // Totals
+        db
+          .select({
+            requests: count().as("requests"),
+            quotaUnits:
+              sql<number>`COALESCE(SUM(${apiRequestLog.quotaUnits}), 0)`.as(
+                "quota_units"
+              ),
+          })
+          .from(apiRequestLog)
+          .where(and(...filters)),
 
-      // Per-endpoint breakdown
-      const byEndpoint = await db
-        .select({
-          endpoint: apiRequestLog.endpoint,
-          requests: count().as("requests"),
-          quotaUnits:
-            sql<number>`COALESCE(SUM(${apiRequestLog.quotaUnits}), 0)`.as(
-              "quota_units"
-            ),
-        })
-        .from(apiRequestLog)
-        .where(and(...filters))
-        .groupBy(apiRequestLog.endpoint)
-        .orderBy(desc(count()));
+        // Per-endpoint breakdown
+        db
+          .select({
+            endpoint: apiRequestLog.endpoint,
+            requests: count().as("requests"),
+            quotaUnits:
+              sql<number>`COALESCE(SUM(${apiRequestLog.quotaUnits}), 0)`.as(
+                "quota_units"
+              ),
+          })
+          .from(apiRequestLog)
+          .where(and(...filters))
+          .groupBy(apiRequestLog.endpoint)
+          .orderBy(desc(count())),
 
-      // Per-key/source breakdown (LEFT JOIN since MCP rows have null apiKeyId)
-      const byKey = await db
-        .select({
-          apiKeyId: apiRequestLog.apiKeyId,
-          source: apiRequestLog.source,
-          keyName: sql<string>`COALESCE(${apiKeys.name}, 'MCP')`.as("key_name"),
-          requests: count().as("requests"),
-          quotaUnits:
-            sql<number>`COALESCE(SUM(${apiRequestLog.quotaUnits}), 0)`.as(
-              "quota_units"
-            ),
-        })
-        .from(apiRequestLog)
-        .leftJoin(apiKeys, eq(apiRequestLog.apiKeyId, apiKeys.id))
-        .where(and(...filters))
-        .groupBy(apiRequestLog.apiKeyId, apiRequestLog.source, apiKeys.name)
-        .orderBy(desc(count()));
+        // Per-key/source breakdown (LEFT JOIN since MCP rows have null apiKeyId)
+        db
+          .select({
+            apiKeyId: apiRequestLog.apiKeyId,
+            source: apiRequestLog.source,
+            keyName: sql<string>`COALESCE(${apiKeys.name}, 'MCP')`.as("key_name"),
+            requests: count().as("requests"),
+            quotaUnits:
+              sql<number>`COALESCE(SUM(${apiRequestLog.quotaUnits}), 0)`.as(
+                "quota_units"
+              ),
+          })
+          .from(apiRequestLog)
+          .leftJoin(apiKeys, eq(apiRequestLog.apiKeyId, apiKeys.id))
+          .where(and(...filters))
+          .groupBy(apiRequestLog.apiKeyId, apiRequestLog.source, apiKeys.name)
+          .orderBy(desc(count())),
+      ]);
 
       return {
         daily,
@@ -263,7 +266,13 @@ export const apiKeysRouter = router({
         filters.push(like(apiRequestLog.endpoint, `%${input.endpointSearch}%`));
       }
       if (input.cursor) {
-        filters.push(lt(apiRequestLog.createdAt, new Date(input.cursor)));
+        const [cursorDate, cursorId] = input.cursor.split("|");
+        filters.push(
+          or(
+            lt(apiRequestLog.createdAt, new Date(cursorDate!)),
+            and(eq(apiRequestLog.createdAt, new Date(cursorDate!)), lt(apiRequestLog.id, cursorId!))
+          )!
+        );
       }
 
       const rows = await db
@@ -280,29 +289,25 @@ export const apiKeysRouter = router({
         .from(apiRequestLog)
         .leftJoin(apiKeys, eq(apiRequestLog.apiKeyId, apiKeys.id))
         .where(and(...filters))
-        .orderBy(desc(apiRequestLog.createdAt))
+        .orderBy(desc(apiRequestLog.createdAt), desc(apiRequestLog.id))
         .limit(input.limit + 1);
 
       const hasMore = rows.length > input.limit;
       const items = hasMore ? rows.slice(0, input.limit) : rows;
-      const nextCursor = hasMore ? items[items.length - 1]!.createdAt.toISOString() : null;
+      const last = items[items.length - 1];
+      const nextCursor = hasMore && last ? `${last.createdAt.toISOString()}|${last.id}` : null;
 
       return { items, cursor: nextCursor, hasMore };
     }),
 
   getCreditBalance: protectedProcedure.query(async ({ ctx }) => {
-    const [row] = await db
-      .select()
-      .from(userCredits)
-      .where(eq(userCredits.userId, ctx.user.id));
-
-    if (!row) return null;
-
+    const credits = await getCredits(ctx.user.id);
+    if (!credits) return null;
     return {
-      balance: row.balance,
-      monthlyAllocation: row.monthlyAllocation,
-      periodStart: row.periodStart.toISOString(),
-      periodEnd: row.periodEnd.toISOString(),
+      balance: credits.balance,
+      monthlyAllocation: credits.monthlyAllocation,
+      periodStart: credits.periodStart.toISOString(),
+      periodEnd: credits.periodEnd.toISOString(),
     };
   }),
 });

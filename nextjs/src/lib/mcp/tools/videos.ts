@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError, getSessionUserId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
+import { toMcp, mcpQuotaExceeded, getSessionUserId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
 import { consumeCredits } from "@/lib/plan-limits";
 import {
   listVideos,
@@ -13,11 +13,6 @@ import {
   getDescriptionHistory,
   revertDescription,
 } from "@/lib/services/videos";
-
-function toMcp(result: { data: unknown } | { error: { code: string; message: string; suggestion: string } }) {
-  if ("error" in result) return mcpError(result.error.code, result.error.message, result.error.suggestion);
-  return mcpJson(result.data);
-}
 
 export function registerVideoTools(server: McpServer) {
   server.tool(
@@ -49,10 +44,7 @@ export function registerVideoTools(server: McpServer) {
     async ({ id }) => {
       const userId = getSessionUserId();
       const credits = await consumeCredits(userId, 1);
-      if (!credits.success) {
-        logMcpRequest(userId, "get_video", 0, 429);
-        return mcpError("QUOTA_EXCEEDED", "Insufficient credits", "Upgrade your plan or wait for the next billing cycle");
-      }
+      if (!credits.success) return mcpQuotaExceeded(userId, "get_video");
       const result = await getVideo(id, userId);
       logMcpRequest(userId, "get_video", 1, "error" in result ? 400 : 200);
       return toMcp(result);

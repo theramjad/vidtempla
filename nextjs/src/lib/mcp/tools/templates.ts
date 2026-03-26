@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError, getSessionUserId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
+import { toMcp, getSessionUserId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
 import {
   listTemplates,
   getTemplate,
@@ -9,11 +9,6 @@ import {
   deleteTemplate,
   getTemplateImpact,
 } from "@/lib/services/templates";
-
-function toMcp(result: { data: unknown } | { error: { code: string; message: string; suggestion: string } }) {
-  if ("error" in result) return mcpError(result.error.code, result.error.message, result.error.suggestion);
-  return mcpJson(result.data);
-}
 
 export function registerTemplateTools(server: McpServer) {
   server.tool(

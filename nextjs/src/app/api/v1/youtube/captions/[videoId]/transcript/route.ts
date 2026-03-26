@@ -64,11 +64,12 @@ export async function GET(
     return NextResponse.json(tokens.error, { status: tokens.status });
   }
 
+  let quotaUnits = 200;
+
   try {
     let captionId = captionIdParam;
     let language = "";
     let trackKind = "";
-    let quotaUnits = 200;
 
     if (!captionId) {
       // Auto-select: list tracks first (adds 50 quota units)

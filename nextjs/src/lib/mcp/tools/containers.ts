@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError, getSessionUserId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
+import { toMcp, getSessionUserId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
 import {
   listContainers,
   getContainer,
@@ -8,11 +8,6 @@ import {
   updateContainer,
   deleteContainer,
 } from "@/lib/services/containers";
-
-function toMcp(result: { data: unknown } | { error: { code: string; message: string; suggestion: string } }) {
-  if ("error" in result) return mcpError(result.error.code, result.error.message, result.error.suggestion);
-  return mcpJson(result.data);
-}
 
 export function registerContainerTools(server: McpServer) {
   server.tool(

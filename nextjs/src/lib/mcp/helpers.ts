@@ -29,9 +29,6 @@ export const WRITE = { readOnlyHint: false, destructiveHint: false } as const;
 export const DESTRUCTIVE = { readOnlyHint: false, destructiveHint: true } as const;
 
 /**
- * Returns an MCP error result matching the REST API error shape.
- */
-/**
  * Logs an MCP tool request to the apiRequestLog table (fire-and-forget).
  */
 export function logMcpRequest(
@@ -52,6 +49,22 @@ export function logMcpRequest(
     })
     .then(() => {})
     .catch((err) => console.error("Failed to log MCP request:", err));
+}
+
+/**
+ * Converts a service result (data or error) to MCP tool result format.
+ */
+export function toMcp(result: { data: unknown } | { error: { code: string; message: string; suggestion: string } }) {
+  if ("error" in result) return mcpError(result.error.code, result.error.message, result.error.suggestion);
+  return mcpJson(result.data);
+}
+
+/**
+ * Standard quota-exceeded response for MCP tools.
+ */
+export function mcpQuotaExceeded(userId: string, toolName: string) {
+  logMcpRequest(userId, toolName, 0, 429);
+  return mcpError("QUOTA_EXCEEDED", "Insufficient credits", "Upgrade your plan or wait for the next billing cycle");
 }
 
 export function mcpError(code: string, message: string, suggestion?: string) {

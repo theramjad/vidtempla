@@ -181,7 +181,7 @@ export async function consumeCredits(
   userId: string,
   quotaUnits: number
 ): Promise<{ success: boolean; remaining: number }> {
-  if (quotaUnits <= 0) return { success: true, remaining: -1 };
+  if (quotaUnits <= 0) return { success: true, remaining: Infinity };
 
   // Try atomic decrement
   const rows = await defaultDb.execute<{ balance: number }>(
@@ -205,13 +205,7 @@ export async function consumeCredits(
     const now = new Date();
     const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    await defaultDb.insert(userCredits).values({
-      userId,
-      balance: allocation,
-      monthlyAllocation: allocation,
-      periodStart: now,
-      periodEnd,
-    }).onConflictDoNothing();
+    await upsertCredits(userId, allocation, now, periodEnd);
 
     // Retry the decrement
     const retryRows = await defaultDb.execute<{ balance: number }>(
@@ -251,4 +245,16 @@ export async function getCredits(
     periodStart: row.periodStart,
     periodEnd: row.periodEnd,
   };
+}
+
+/**
+ * Insert or update a user's credit allocation.
+ */
+export async function upsertCredits(userId: string, allocation: number, periodStart: Date, periodEnd: Date) {
+  await defaultDb.insert(userCredits).values({
+    userId, balance: allocation, monthlyAllocation: allocation, periodStart, periodEnd,
+  }).onConflictDoUpdate({
+    target: userCredits.userId,
+    set: { balance: allocation, monthlyAllocation: allocation, periodStart, periodEnd, updatedAt: new Date() },
+  });
 }

@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError, getSessionUserId, logMcpRequest, READ, WRITE } from "../helpers";
+import { toMcp, mcpQuotaExceeded, getSessionUserId, logMcpRequest, READ, WRITE } from "../helpers";
 import { consumeCredits } from "@/lib/plan-limits";
 import {
   getChannelAnalytics,
@@ -8,11 +8,6 @@ import {
   searchChannelVideos,
   syncChannel,
 } from "@/lib/services/analytics";
-
-function toMcp(result: { data: unknown } | { error: { code: string; message: string; suggestion: string } }) {
-  if ("error" in result) return mcpError(result.error.code, result.error.message, result.error.suggestion);
-  return mcpJson(result.data);
-}
 
 export function registerAnalyticsTools(server: McpServer) {
   server.tool(
@@ -69,10 +64,7 @@ export function registerAnalyticsTools(server: McpServer) {
     async ({ channelId, ...opts }) => {
       const userId = getSessionUserId();
       const credits = await consumeCredits(userId, 100);
-      if (!credits.success) {
-        logMcpRequest(userId, "search_channel_videos", 0, 429);
-        return mcpError("QUOTA_EXCEEDED", "Insufficient credits", "Upgrade your plan or wait for the next billing cycle");
-      }
+      if (!credits.success) return mcpQuotaExceeded(userId, "search_channel_videos");
       const result = await searchChannelVideos(channelId, userId, opts);
       logMcpRequest(userId, "search_channel_videos", 100, "error" in result ? 400 : 200);
       return toMcp(result);
