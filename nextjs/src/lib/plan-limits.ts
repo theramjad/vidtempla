@@ -6,8 +6,9 @@
 import { TRPCError } from "@trpc/server";
 import { PLAN_CONFIG, type PlanTier } from "./stripe";
 import type { Database } from "@/db";
-import { subscriptions, youtubeChannels, youtubeVideos } from "@/db/schema";
-import { eq, count, inArray } from "drizzle-orm";
+import { db as defaultDb } from "@/db";
+import { subscriptions, youtubeChannels, youtubeVideos, userCredits } from "@/db/schema";
+import { eq, count, inArray, sql } from "drizzle-orm";
 
 /**
  * Get the user's current plan tier
@@ -170,4 +171,84 @@ export async function hasTeamFeaturesAccess(
   const planTier = await getUserPlanTier(userId, db);
   const features = getPlanFeatures(planTier);
   return 'teamFeatures' in features ? features.teamFeatures : false;
+}
+
+/**
+ * Consume credits atomically. Returns { success, remaining }.
+ * If no userCredits row exists (transition period), lazily provisions free-tier credits.
+ */
+export async function consumeCredits(
+  userId: string,
+  quotaUnits: number
+): Promise<{ success: boolean; remaining: number }> {
+  if (quotaUnits <= 0) return { success: true, remaining: -1 };
+
+  // Try atomic decrement
+  const rows = await defaultDb.execute<{ balance: number }>(
+    sql`UPDATE user_credits SET balance = balance - ${quotaUnits}, updated_at = NOW() WHERE user_id = ${userId} AND balance >= ${quotaUnits} RETURNING balance`
+  );
+
+  if (rows.length > 0) {
+    return { success: true, remaining: rows[0]!.balance };
+  }
+
+  // No row matched — check if row exists at all
+  const [existing] = await defaultDb
+    .select({ id: userCredits.id })
+    .from(userCredits)
+    .where(eq(userCredits.userId, userId));
+
+  if (!existing) {
+    // Lazy provision: determine plan tier and create credits row
+    const planTier = await getUserPlanTier(userId, defaultDb);
+    const allocation = PLAN_CONFIG[planTier].monthlyCredits;
+    const now = new Date();
+    const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    await defaultDb.insert(userCredits).values({
+      userId,
+      balance: allocation,
+      monthlyAllocation: allocation,
+      periodStart: now,
+      periodEnd,
+    }).onConflictDoNothing();
+
+    // Retry the decrement
+    const retryRows = await defaultDb.execute<{ balance: number }>(
+      sql`UPDATE user_credits SET balance = balance - ${quotaUnits}, updated_at = NOW() WHERE user_id = ${userId} AND balance >= ${quotaUnits} RETURNING balance`
+    );
+    if (retryRows.length > 0) {
+      return { success: true, remaining: retryRows[0]!.balance };
+    }
+    return { success: false, remaining: 0 };
+  }
+
+  // Row exists but insufficient balance
+  return { success: false, remaining: 0 };
+}
+
+/**
+ * Get current credit balance and period info for a user.
+ */
+export async function getCredits(
+  userId: string
+): Promise<{
+  balance: number;
+  monthlyAllocation: number;
+  periodStart: Date;
+  periodEnd: Date;
+} | null> {
+  const [row] = await defaultDb
+    .select()
+    .from(userCredits)
+    .where(eq(userCredits.userId, userId));
+
+  if (!row) return null;
+
+  return {
+    balance: row.balance,
+    monthlyAllocation: row.monthlyAllocation,
+    periodStart: row.periodStart,
+    periodEnd: row.periodEnd,
+  };
 }

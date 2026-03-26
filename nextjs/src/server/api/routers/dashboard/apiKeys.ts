@@ -6,8 +6,8 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "@/server/trpc/init";
 import { db } from "@/db";
-import { apiKeys, apiRequestLog } from "@/db/schema";
-import { eq, and, desc, sql, gte, lte, count } from "drizzle-orm";
+import { apiKeys, apiRequestLog, userCredits } from "@/db/schema";
+import { eq, and, desc, sql, gte, lte, count, like, lt } from "drizzle-orm";
 import { generateApiKey } from "@/lib/api-keys";
 
 export const apiKeysRouter = router({
@@ -201,11 +201,12 @@ export const apiKeysRouter = router({
         .groupBy(apiRequestLog.endpoint)
         .orderBy(desc(count()));
 
-      // Per-key breakdown
+      // Per-key/source breakdown (LEFT JOIN since MCP rows have null apiKeyId)
       const byKey = await db
         .select({
           apiKeyId: apiRequestLog.apiKeyId,
-          keyName: apiKeys.name,
+          source: apiRequestLog.source,
+          keyName: sql<string>`COALESCE(${apiKeys.name}, 'MCP')`.as("key_name"),
           requests: count().as("requests"),
           quotaUnits:
             sql<number>`COALESCE(SUM(${apiRequestLog.quotaUnits}), 0)`.as(
@@ -213,9 +214,9 @@ export const apiKeysRouter = router({
             ),
         })
         .from(apiRequestLog)
-        .innerJoin(apiKeys, eq(apiRequestLog.apiKeyId, apiKeys.id))
+        .leftJoin(apiKeys, eq(apiRequestLog.apiKeyId, apiKeys.id))
         .where(and(...filters))
-        .groupBy(apiRequestLog.apiKeyId, apiKeys.name)
+        .groupBy(apiRequestLog.apiKeyId, apiRequestLog.source, apiKeys.name)
         .orderBy(desc(count()));
 
       return {
@@ -230,4 +231,78 @@ export const apiKeysRouter = router({
         periodEnd: end.toISOString(),
       };
     }),
+
+  getRequestHistory: protectedProcedure
+    .input(
+      z.object({
+        cursor: z.string().optional(),
+        limit: z.number().min(1).max(100).default(50),
+        source: z.enum(["rest", "mcp", "all"]).default("all"),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        endpointSearch: z.string().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const now = new Date();
+      const start = input.startDate
+        ? new Date(input.startDate)
+        : new Date(now.getFullYear(), now.getMonth(), 1);
+      const end = input.endDate ? new Date(input.endDate) : now;
+
+      const filters = [
+        eq(apiRequestLog.userId, ctx.user.id),
+        gte(apiRequestLog.createdAt, start),
+        lte(apiRequestLog.createdAt, end),
+      ];
+
+      if (input.source !== "all") {
+        filters.push(eq(apiRequestLog.source, input.source));
+      }
+      if (input.endpointSearch) {
+        filters.push(like(apiRequestLog.endpoint, `%${input.endpointSearch}%`));
+      }
+      if (input.cursor) {
+        filters.push(lt(apiRequestLog.createdAt, new Date(input.cursor)));
+      }
+
+      const rows = await db
+        .select({
+          id: apiRequestLog.id,
+          createdAt: apiRequestLog.createdAt,
+          source: apiRequestLog.source,
+          endpoint: apiRequestLog.endpoint,
+          method: apiRequestLog.method,
+          statusCode: apiRequestLog.statusCode,
+          quotaUnits: apiRequestLog.quotaUnits,
+          keyName: sql<string | null>`${apiKeys.name}`.as("key_name"),
+        })
+        .from(apiRequestLog)
+        .leftJoin(apiKeys, eq(apiRequestLog.apiKeyId, apiKeys.id))
+        .where(and(...filters))
+        .orderBy(desc(apiRequestLog.createdAt))
+        .limit(input.limit + 1);
+
+      const hasMore = rows.length > input.limit;
+      const items = hasMore ? rows.slice(0, input.limit) : rows;
+      const nextCursor = hasMore ? items[items.length - 1]!.createdAt.toISOString() : null;
+
+      return { items, cursor: nextCursor, hasMore };
+    }),
+
+  getCreditBalance: protectedProcedure.query(async ({ ctx }) => {
+    const [row] = await db
+      .select()
+      .from(userCredits)
+      .where(eq(userCredits.userId, ctx.user.id));
+
+    if (!row) return null;
+
+    return {
+      balance: row.balance,
+      monthlyAllocation: row.monthlyAllocation,
+      periodStart: row.periodStart.toISOString(),
+      periodEnd: row.periodEnd.toISOString(),
+    };
+  }),
 });

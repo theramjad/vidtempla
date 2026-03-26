@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError, getSessionUserId, READ, WRITE, DESTRUCTIVE } from "../helpers";
+import { mcpJson, mcpError, getSessionUserId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
 import {
   listTemplates,
   getTemplate,
@@ -24,7 +24,12 @@ export function registerTemplateTools(server: McpServer) {
       limit: z.number().optional().describe("Results per page (max 100, default 50)"),
     },
     READ,
-    async (args) => toMcp(await listTemplates(getSessionUserId(), args))
+    async (args) => {
+      const userId = getSessionUserId();
+      const result = await listTemplates(userId, args);
+      logMcpRequest(userId, "list_templates", 0, "error" in result ? 400 : 200);
+      return toMcp(result);
+    }
   );
 
   server.tool(
@@ -32,7 +37,12 @@ export function registerTemplateTools(server: McpServer) {
     "Get a single template by ID with parsed variables",
     { id: z.string().describe("Template UUID") },
     READ,
-    async ({ id }) => toMcp(await getTemplate(id, getSessionUserId()))
+    async ({ id }) => {
+      const userId = getSessionUserId();
+      const result = await getTemplate(id, userId);
+      logMcpRequest(userId, "get_template", 0, "error" in result ? 400 : 200);
+      return toMcp(result);
+    }
   );
 
   server.tool(
@@ -43,7 +53,12 @@ export function registerTemplateTools(server: McpServer) {
       content: z.string().describe("Template content with {{variable}} placeholders"),
     },
     WRITE,
-    async ({ name, content }) => toMcp(await createTemplate(getSessionUserId(), name, content))
+    async ({ name, content }) => {
+      const userId = getSessionUserId();
+      const result = await createTemplate(userId, name, content);
+      logMcpRequest(userId, "create_template", 0, "error" in result ? 400 : 200);
+      return toMcp(result);
+    }
   );
 
   server.tool(
@@ -55,7 +70,12 @@ export function registerTemplateTools(server: McpServer) {
       content: z.string().optional().describe("New content"),
     },
     WRITE,
-    async ({ id, name, content }) => toMcp(await updateTemplate(id, getSessionUserId(), { name, content }))
+    async ({ id, name, content }) => {
+      const userId = getSessionUserId();
+      const result = await updateTemplate(id, userId, { name, content });
+      logMcpRequest(userId, "update_template", 0, "error" in result ? 400 : 200);
+      return toMcp(result);
+    }
   );
 
   server.tool(
@@ -63,7 +83,12 @@ export function registerTemplateTools(server: McpServer) {
     "Delete a template",
     { id: z.string().describe("Template UUID") },
     DESTRUCTIVE,
-    async ({ id }) => toMcp(await deleteTemplate(id, getSessionUserId()))
+    async ({ id }) => {
+      const userId = getSessionUserId();
+      const result = await deleteTemplate(id, userId);
+      logMcpRequest(userId, "delete_template", 0, "error" in result ? 400 : 200);
+      return toMcp(result);
+    }
   );
 
   server.tool(
@@ -71,6 +96,11 @@ export function registerTemplateTools(server: McpServer) {
     "Show which containers and videos would be affected by changing a template",
     { id: z.string().describe("Template UUID") },
     READ,
-    async ({ id }) => toMcp(await getTemplateImpact(id, getSessionUserId()))
+    async ({ id }) => {
+      const userId = getSessionUserId();
+      const result = await getTemplateImpact(id, userId);
+      logMcpRequest(userId, "get_template_impact", 0, "error" in result ? 400 : 200);
+      return toMcp(result);
+    }
   );
 }

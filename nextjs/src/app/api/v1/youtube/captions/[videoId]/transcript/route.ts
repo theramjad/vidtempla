@@ -33,7 +33,7 @@ export async function GET(
   const formatParam = searchParams.get("format") ?? "text";
 
   if (!channelId) {
-    logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", 0, 400);
+    logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", 400, 0);
     return NextResponse.json(
       apiError(
         "MISSING_PARAMETER",
@@ -46,7 +46,7 @@ export async function GET(
   }
 
   if (!["text", "srt", "vtt"].includes(formatParam)) {
-    logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", 0, 400);
+    logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", 400, 0);
     return NextResponse.json(
       apiError(
         "INVALID_PARAMETER",
@@ -60,7 +60,7 @@ export async function GET(
 
   const tokens = await getChannelTokens(channelId, ctx.userId);
   if ("error" in tokens) {
-    logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", 0, tokens.status);
+    logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
   }
 
@@ -76,7 +76,7 @@ export async function GET(
       quotaUnits = 250;
 
       if (tracks.length === 0) {
-        logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", 50, 404);
+        logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", 404, 50);
         return NextResponse.json(
           apiError(
             "NO_CAPTIONS",
@@ -93,7 +93,7 @@ export async function GET(
       if (languageParam) {
         selected = tracks.filter((t) => t.snippet.language === languageParam);
         if (selected.length === 0) {
-          logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", 50, 404);
+          logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", 404, 50);
           return NextResponse.json(
             apiError(
               "LANGUAGE_NOT_FOUND",
@@ -125,7 +125,7 @@ export async function GET(
 
     const transcript = formatParam === "text" ? srtToPlainText(raw) : raw;
 
-    logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", quotaUnits, 200);
+    logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", 200, quotaUnits);
     return NextResponse.json(
       apiSuccess(
         { transcript, captionId, language, trackKind, format: formatParam },
@@ -139,7 +139,7 @@ export async function GET(
     const message = axios.isAxiosError(error)
       ? error.response?.data?.error?.message || error.message
       : "Unknown error";
-    logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", 200, status);
+    logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", status, 200);
     return NextResponse.json(
       apiError(
         "YOUTUBE_API_ERROR",

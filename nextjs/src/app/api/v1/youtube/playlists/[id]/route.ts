@@ -28,7 +28,7 @@ export async function GET(
   const channelId = searchParams.get("channelId");
 
   if (!channelId) {
-    await logRequest(ctx, `/youtube/playlists/${id}`, "GET", 0, 400);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "GET", 400, 0);
     return NextResponse.json(
       apiError(
         "MISSING_PARAMETER",
@@ -42,7 +42,7 @@ export async function GET(
 
   const tokens = await getChannelTokens(channelId, ctx.userId);
   if ("error" in tokens) {
-    await logRequest(ctx, `/youtube/playlists/${id}`, "GET", 0, tokens.status);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "GET", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
   }
 
@@ -57,7 +57,7 @@ export async function GET(
 
     const playlist = response.data.items?.[0];
     if (!playlist) {
-      await logRequest(ctx, `/youtube/playlists/${id}`, "GET", 1, 404);
+      await logRequest(ctx, `/youtube/playlists/${id}`, "GET", 404, 1);
       return NextResponse.json(
         apiError(
           "NOT_FOUND",
@@ -69,7 +69,7 @@ export async function GET(
       );
     }
 
-    await logRequest(ctx, `/youtube/playlists/${id}`, "GET", 1, 200);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "GET", 200, 1);
     return NextResponse.json(apiSuccess(playlist, { quotaUnits: 1 }));
   } catch (error) {
     const status = axios.isAxiosError(error)
@@ -78,7 +78,7 @@ export async function GET(
     const message = axios.isAxiosError(error)
       ? error.response?.data?.error?.message || error.message
       : "Unknown error";
-    await logRequest(ctx, `/youtube/playlists/${id}`, "GET", 1, status);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "GET", status, 1);
     return NextResponse.json(
       apiError("YOUTUBE_API_ERROR", message, "Check the playlist ID", status),
       { status }
@@ -112,7 +112,7 @@ export async function PATCH(
   try {
     body = await request.json();
   } catch {
-    await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 0, 400);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 400, 0);
     return NextResponse.json(
       apiError(
         "INVALID_BODY",
@@ -127,7 +127,7 @@ export async function PATCH(
   const { channelId, title, description, privacyStatus } = body;
 
   if (!channelId) {
-    await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 0, 400);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 400, 0);
     return NextResponse.json(
       apiError(
         "MISSING_PARAMETER",
@@ -141,7 +141,7 @@ export async function PATCH(
 
   const tokens = await getChannelTokens(channelId, ctx.userId);
   if ("error" in tokens) {
-    await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 0, tokens.status);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
   }
 
@@ -154,7 +154,7 @@ export async function PATCH(
 
     const existing = current.data.items?.[0];
     if (!existing) {
-      await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 1, 404);
+      await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 404, 1);
       return NextResponse.json(
         apiError(
           "NOT_FOUND",
@@ -190,7 +190,7 @@ export async function PATCH(
       }
     );
 
-    await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 50, 200);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 200, 50);
     return NextResponse.json(apiSuccess(response.data, { quotaUnits: 50 }));
   } catch (error) {
     const status = axios.isAxiosError(error)
@@ -199,7 +199,7 @@ export async function PATCH(
     const message = axios.isAxiosError(error)
       ? error.response?.data?.error?.message || error.message
       : "Unknown error";
-    await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 50, status);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", status, 50);
     return NextResponse.json(
       apiError("YOUTUBE_API_ERROR", message, "Check your input values", status),
       { status }
@@ -226,7 +226,7 @@ export async function DELETE(
   const channelId = searchParams.get("channelId");
 
   if (!channelId) {
-    await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", 0, 400);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", 400, 0);
     return NextResponse.json(
       apiError(
         "MISSING_PARAMETER",
@@ -240,7 +240,7 @@ export async function DELETE(
 
   const tokens = await getChannelTokens(channelId, ctx.userId);
   if ("error" in tokens) {
-    await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", 0, tokens.status);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
   }
 
@@ -250,7 +250,7 @@ export async function DELETE(
       headers: { Authorization: `Bearer ${tokens.accessToken}` },
     });
 
-    await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", 50, 200);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", 200, 50);
     return NextResponse.json(apiSuccess({ deleted: true }, { quotaUnits: 50 }));
   } catch (error) {
     const status = axios.isAxiosError(error)
@@ -259,7 +259,7 @@ export async function DELETE(
     const message = axios.isAxiosError(error)
       ? error.response?.data?.error?.message || error.message
       : "Unknown error";
-    await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", 50, status);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", status, 50);
     return NextResponse.json(
       apiError(
         "YOUTUBE_API_ERROR",

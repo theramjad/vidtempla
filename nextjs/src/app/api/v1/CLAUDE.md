@@ -129,7 +129,7 @@ This applies to both VidTempla-native and proxy endpoints (proxy endpoints verif
 2. Import and call `withApiKey(request)` as the first line — this handles auth, returns `ApiContext`
 3. Use `apiSuccess(data, meta?)` and `apiError(code, message, suggestion, status)` response helpers
 4. For proxy endpoints, call `getChannelTokens()` to get the OAuth access token
-5. Call `logRequest(ctx, endpoint, method, quotaUnits, statusCode)` before returning
+5. Call `logRequest(ctx, endpoint, method, statusCode, quotaUnits)` before returning
 6. Document the quota cost in this file
 
 Example route structure:
@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
 
   // ... endpoint logic ...
 
-  await logRequest(ctx, "/api/v1/your-endpoint", "GET", 0, 200);
+  await logRequest(ctx, "/api/v1/your-endpoint", "GET", 200, 0);
   return apiSuccess(data);
 }
 ```

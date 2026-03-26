@@ -24,6 +24,7 @@ export const PLAN_CONFIG = {
     name: "Free",
     priceId: null, // Free tier doesn't have a Stripe price
     priceMonthly: 0,
+    monthlyCredits: 10_000,
     features: {
       videoLimit: 5,
       channelLimit: 1,
@@ -34,6 +35,7 @@ export const PLAN_CONFIG = {
     name: "Pro",
     priceId: process.env.STRIPE_PRO_PRICE_ID || null,
     priceMonthly: 2000, // $20.00 in cents
+    monthlyCredits: 100_000,
     features: {
       videoLimit: Infinity,
       channelLimit: 1,
@@ -44,6 +46,7 @@ export const PLAN_CONFIG = {
     name: "Business",
     priceId: process.env.STRIPE_BUSINESS_PRICE_ID || null,
     priceMonthly: 10000, // $100.00 in cents
+    monthlyCredits: 500_000,
     features: {
       videoLimit: Infinity,
       channelLimit: Infinity,

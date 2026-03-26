@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError, getSessionUserId, READ, WRITE } from "../helpers";
+import { mcpJson, mcpError, getSessionUserId, logMcpRequest, READ, WRITE } from "../helpers";
+import { consumeCredits } from "@/lib/plan-limits";
 import {
   getChannelAnalytics,
   queryAnalytics,
@@ -25,7 +26,12 @@ export function registerAnalyticsTools(server: McpServer) {
       dimensions: z.string().optional().describe("Dimensions (default: day)"),
     },
     READ,
-    async ({ channelId, ...opts }) => toMcp(await getChannelAnalytics(channelId, getSessionUserId(), opts))
+    async ({ channelId, ...opts }) => {
+      const userId = getSessionUserId();
+      const result = await getChannelAnalytics(channelId, userId, opts);
+      logMcpRequest(userId, "get_channel_analytics", 0, "error" in result ? 400 : 200);
+      return toMcp(result);
+    }
   );
 
   server.tool(
@@ -42,7 +48,12 @@ export function registerAnalyticsTools(server: McpServer) {
       maxResults: z.number().optional().describe("Max results"),
     },
     READ,
-    async (args) => toMcp(await queryAnalytics(getSessionUserId(), args))
+    async (args) => {
+      const userId = getSessionUserId();
+      const result = await queryAnalytics(userId, args);
+      logMcpRequest(userId, "query_analytics", 0, "error" in result ? 400 : 200);
+      return toMcp(result);
+    }
   );
 
   server.tool(
@@ -55,7 +66,17 @@ export function registerAnalyticsTools(server: McpServer) {
       maxResults: z.number().optional().describe("Max results (default 25, max 50)"),
     },
     READ,
-    async ({ channelId, ...opts }) => toMcp(await searchChannelVideos(channelId, getSessionUserId(), opts))
+    async ({ channelId, ...opts }) => {
+      const userId = getSessionUserId();
+      const credits = await consumeCredits(userId, 100);
+      if (!credits.success) {
+        logMcpRequest(userId, "search_channel_videos", 0, 429);
+        return mcpError("QUOTA_EXCEEDED", "Insufficient credits", "Upgrade your plan or wait for the next billing cycle");
+      }
+      const result = await searchChannelVideos(channelId, userId, opts);
+      logMcpRequest(userId, "search_channel_videos", 100, "error" in result ? 400 : 200);
+      return toMcp(result);
+    }
   );
 
   server.tool(
@@ -63,6 +84,11 @@ export function registerAnalyticsTools(server: McpServer) {
     "Trigger a video sync for a channel (imports new videos from YouTube)",
     { channelId: z.string().describe("YouTube channel ID") },
     WRITE,
-    async ({ channelId }) => toMcp(await syncChannel(channelId, getSessionUserId()))
+    async ({ channelId }) => {
+      const userId = getSessionUserId();
+      const result = await syncChannel(channelId, userId);
+      logMcpRequest(userId, "sync_channel", 0, "error" in result ? 400 : 200);
+      return toMcp(result);
+    }
   );
 }

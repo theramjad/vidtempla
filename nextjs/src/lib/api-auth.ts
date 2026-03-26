@@ -105,6 +105,7 @@ export function logRequest(
       method,
       statusCode,
       quotaUnits,
+      source: "rest",
     })
     .then(() => {})
     .catch((err) => {

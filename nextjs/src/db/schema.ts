@@ -345,8 +345,7 @@ export const apiRequestLog = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     apiKeyId: uuid("api_key_id")
-      .notNull()
-      .references(() => apiKeys.id, { onDelete: "cascade" }),
+      .references(() => apiKeys.id, { onDelete: "set null" }),
     userId: uuid("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -354,6 +353,7 @@ export const apiRequestLog = pgTable(
     method: text("method").notNull(),
     statusCode: integer("status_code").notNull(),
     quotaUnits: integer("quota_units").notNull().default(0),
+    source: text("source").notNull().default("rest"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -365,3 +365,18 @@ export const apiRequestLog = pgTable(
     ),
   })
 );
+
+export const userCredits = pgTable("user_credits", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: "cascade" }),
+  balance: integer("balance").notNull().default(0),
+  monthlyAllocation: integer("monthly_allocation").notNull(),
+  periodStart: timestamp("period_start", { mode: "date", withTimezone: true }).notNull(),
+  periodEnd: timestamp("period_end", { mode: "date", withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});

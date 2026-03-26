@@ -27,7 +27,7 @@ export async function GET(
   const channelId = searchParams.get("channelId");
 
   if (!channelId) {
-    await logRequest(ctx, `/youtube/captions/${videoId}`, "GET", 0, 400);
+    await logRequest(ctx, `/youtube/captions/${videoId}`, "GET", 400, 0);
     return NextResponse.json(
       apiError(
         "MISSING_PARAMETER",
@@ -41,7 +41,7 @@ export async function GET(
 
   const tokens = await getChannelTokens(channelId, ctx.userId);
   if ("error" in tokens) {
-    await logRequest(ctx, `/youtube/captions/${videoId}`, "GET", 0, tokens.status);
+    await logRequest(ctx, `/youtube/captions/${videoId}`, "GET", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
   }
 
@@ -54,7 +54,7 @@ export async function GET(
       headers: { Authorization: `Bearer ${tokens.accessToken}` },
     });
 
-    await logRequest(ctx, `/youtube/captions/${videoId}`, "GET", 50, 200);
+    await logRequest(ctx, `/youtube/captions/${videoId}`, "GET", 200, 50);
     return NextResponse.json(apiSuccess(response.data.items || [], { quotaUnits: 50 }));
   } catch (error) {
     const status = axios.isAxiosError(error)
@@ -63,7 +63,7 @@ export async function GET(
     const message = axios.isAxiosError(error)
       ? error.response?.data?.error?.message || error.message
       : "Unknown error";
-    await logRequest(ctx, `/youtube/captions/${videoId}`, "GET", 50, status);
+    await logRequest(ctx, `/youtube/captions/${videoId}`, "GET", status, 50);
     return NextResponse.json(
       apiError(
         "YOUTUBE_API_ERROR",

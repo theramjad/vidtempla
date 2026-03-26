@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError, getSessionUserId, READ } from "../helpers";
+import { mcpJson, mcpError, getSessionUserId, logMcpRequest, READ } from "../helpers";
+import { consumeCredits } from "@/lib/plan-limits";
 import { listVideoCaptions, getVideoTranscript } from "@/lib/services/captions";
 
 function toMcp(result: { data: unknown } | { error: { code: string; message: string; suggestion: string } }) {
@@ -14,7 +15,17 @@ export function registerCaptionTools(server: McpServer) {
     "List available caption/subtitle tracks for a video (language, trackKind, auto-synced status)",
     { videoId: z.string().describe("VidTempla UUID or YouTube video ID") },
     READ,
-    async ({ videoId }) => toMcp(await listVideoCaptions(videoId, getSessionUserId()))
+    async ({ videoId }) => {
+      const userId = getSessionUserId();
+      const credits = await consumeCredits(userId, 50);
+      if (!credits.success) {
+        logMcpRequest(userId, "list_video_captions", 0, 429);
+        return mcpError("QUOTA_EXCEEDED", "Insufficient credits", "Upgrade your plan or wait for the next billing cycle");
+      }
+      const result = await listVideoCaptions(videoId, userId);
+      logMcpRequest(userId, "list_video_captions", 50, "error" in result ? 400 : 200);
+      return toMcp(result);
+    }
   );
 
   server.tool(
@@ -27,7 +38,17 @@ export function registerCaptionTools(server: McpServer) {
       format: z.enum(["text", "srt", "vtt"]).optional().describe("Output format: 'text' (plain text, default), 'srt', or 'vtt'"),
     },
     READ,
-    async ({ videoId, captionId, language, format }) =>
-      toMcp(await getVideoTranscript(videoId, getSessionUserId(), { captionId, language, format }))
+    async ({ videoId, captionId, language, format }) => {
+      const userId = getSessionUserId();
+      const quotaUnits = captionId ? 200 : 250;
+      const credits = await consumeCredits(userId, quotaUnits);
+      if (!credits.success) {
+        logMcpRequest(userId, "get_video_transcript", 0, 429);
+        return mcpError("QUOTA_EXCEEDED", "Insufficient credits", "Upgrade your plan or wait for the next billing cycle");
+      }
+      const result = await getVideoTranscript(videoId, userId, { captionId, language, format });
+      logMcpRequest(userId, "get_video_transcript", quotaUnits, "error" in result ? 400 : 200);
+      return toMcp(result);
+    }
   );
 }

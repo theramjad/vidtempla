@@ -34,8 +34,8 @@ export async function DELETE(
       ctx,
       `/youtube/playlists/${id}/items/${itemId}`,
       "DELETE",
-      0,
-      400
+      400,
+      0
     );
     return NextResponse.json(
       apiError(
@@ -54,8 +54,8 @@ export async function DELETE(
       ctx,
       `/youtube/playlists/${id}/items/${itemId}`,
       "DELETE",
-      0,
-      tokens.status
+      tokens.status,
+      0
     );
     return NextResponse.json(tokens.error, { status: tokens.status });
   }
@@ -70,8 +70,8 @@ export async function DELETE(
       ctx,
       `/youtube/playlists/${id}/items/${itemId}`,
       "DELETE",
-      50,
-      200
+      200,
+      50
     );
     return NextResponse.json(apiSuccess({ deleted: true }, { quotaUnits: 50 }));
   } catch (error) {
@@ -85,8 +85,8 @@ export async function DELETE(
       ctx,
       `/youtube/playlists/${id}/items/${itemId}`,
       "DELETE",
-      50,
-      status
+      status,
+      50
     );
     return NextResponse.json(
       apiError(

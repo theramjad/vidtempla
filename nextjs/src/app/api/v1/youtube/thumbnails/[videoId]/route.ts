@@ -29,7 +29,7 @@ export async function PUT(
   const channelId = searchParams.get("channelId");
 
   if (!channelId) {
-    await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 0, 400);
+    await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 400, 0);
     return NextResponse.json(
       apiError(
         "MISSING_PARAMETER",
@@ -43,7 +43,7 @@ export async function PUT(
 
   const tokens = await getChannelTokens(channelId, ctx.userId);
   if ("error" in tokens) {
-    await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 0, tokens.status);
+    await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
   }
 
@@ -61,8 +61,8 @@ export async function PUT(
           ctx,
           `/youtube/thumbnails/${videoId}`,
           "PUT",
-          0,
-          400
+          400,
+          0
         );
         return NextResponse.json(
           apiError(
@@ -82,7 +82,7 @@ export async function PUT(
       imageBuffer = Buffer.from(arrayBuffer);
       imageContentType = contentType;
     } else {
-      await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 0, 400);
+      await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 400, 0);
       return NextResponse.json(
         apiError(
           "INVALID_CONTENT_TYPE",
@@ -96,7 +96,7 @@ export async function PUT(
 
     // Validate image size (YouTube limit: 2 MB)
     if (imageBuffer.length > 2 * 1024 * 1024) {
-      await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 0, 400);
+      await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 400, 0);
       return NextResponse.json(
         apiError(
           "FILE_TOO_LARGE",
@@ -121,7 +121,7 @@ export async function PUT(
       }
     );
 
-    await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 50, 200);
+    await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 200, 50);
     return NextResponse.json(apiSuccess(response.data, { quotaUnits: 50 }));
   } catch (error) {
     const status = axios.isAxiosError(error)
@@ -130,7 +130,7 @@ export async function PUT(
     const message = axios.isAxiosError(error)
       ? error.response?.data?.error?.message || error.message
       : "Unknown error";
-    await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", 50, status);
+    await logRequest(ctx, `/youtube/thumbnails/${videoId}`, "PUT", status, 50);
     return NextResponse.json(
       apiError(
         "YOUTUBE_API_ERROR",

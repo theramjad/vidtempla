@@ -34,7 +34,7 @@ export async function GET(
   const order = searchParams.get("order") || "relevance";
 
   if (!channelId) {
-    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", 0, 400);
+    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", 400, 0);
     return NextResponse.json(
       apiError(
         "MISSING_PARAMETER",
@@ -47,7 +47,7 @@ export async function GET(
   }
 
   if (!["relevance", "time"].includes(order)) {
-    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", 0, 400);
+    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", 400, 0);
     return NextResponse.json(
       apiError(
         "INVALID_PARAMETER",
@@ -61,7 +61,7 @@ export async function GET(
 
   const tokens = await getChannelTokens(channelId, ctx.userId);
   if ("error" in tokens) {
-    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", 0, tokens.status);
+    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
   }
 
@@ -77,7 +77,7 @@ export async function GET(
       headers: { Authorization: `Bearer ${tokens.accessToken}` },
     });
 
-    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", 1, 200);
+    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", 200, 1);
     return NextResponse.json(
       apiSuccess(response.data.items || [], {
         quotaUnits: 1,
@@ -92,7 +92,7 @@ export async function GET(
     const message = axios.isAxiosError(error)
       ? error.response?.data?.error?.message || error.message
       : "Unknown error";
-    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", 1, status);
+    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", status, 1);
     return NextResponse.json(
       apiError(
         "YOUTUBE_API_ERROR",
@@ -124,7 +124,7 @@ export async function DELETE(
   const channelId = searchParams.get("channelId");
 
   if (!channelId) {
-    await logRequest(ctx, `/youtube/comments/${commentId}`, "DELETE", 0, 400);
+    await logRequest(ctx, `/youtube/comments/${commentId}`, "DELETE", 400, 0);
     return NextResponse.json(
       apiError(
         "MISSING_PARAMETER",
@@ -138,7 +138,7 @@ export async function DELETE(
 
   const tokens = await getChannelTokens(channelId, ctx.userId);
   if ("error" in tokens) {
-    await logRequest(ctx, `/youtube/comments/${commentId}`, "DELETE", 0, tokens.status);
+    await logRequest(ctx, `/youtube/comments/${commentId}`, "DELETE", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
   }
 
@@ -148,7 +148,7 @@ export async function DELETE(
       headers: { Authorization: `Bearer ${tokens.accessToken}` },
     });
 
-    await logRequest(ctx, `/youtube/comments/${commentId}`, "DELETE", 50, 200);
+    await logRequest(ctx, `/youtube/comments/${commentId}`, "DELETE", 200, 50);
     return NextResponse.json(apiSuccess({ deleted: true }, { quotaUnits: 50 }));
   } catch (error) {
     const status = axios.isAxiosError(error)
@@ -161,8 +161,8 @@ export async function DELETE(
       ctx,
       `/youtube/comments/${commentId}`,
       "DELETE",
-      50,
-      status
+      status,
+      50
     );
     return NextResponse.json(
       apiError(
