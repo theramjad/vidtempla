@@ -78,21 +78,7 @@ export default function SettingsPage() {
       <Head>
         <title>Settings | VidTempla</title>
       </Head>
-      <DashboardLayout
-        headerContent={
-          <nav className="flex items-center gap-2 text-sm flex-1">
-            <span className="font-medium">Settings</span>
-          </nav>
-        }
-      >
-        <div className="container mx-auto py-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-          <p className="text-muted-foreground">
-            Manage your account settings and preferences
-          </p>
-        </div>
-
+      <DashboardLayout>
         <div className="grid gap-6 max-w-2xl">
           <Card>
             <CardHeader>
@@ -184,13 +170,13 @@ export default function SettingsPage() {
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-muted-foreground">Videos</span>
                           <span>
-                            {usageStats.videos.current} / {usageStats.videos.limit === Infinity ? '∞' : usageStats.videos.limit}
+                            {usageStats.videos.current} / {usageStats.videos.limit === Infinity ? '\u221E' : usageStats.videos.limit}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-muted-foreground">Channels</span>
                           <span>
-                            {usageStats.channels.current} / {usageStats.channels.limit === Infinity ? '∞' : usageStats.channels.limit}
+                            {usageStats.channels.current} / {usageStats.channels.limit === Infinity ? '\u221E' : usageStats.channels.limit}
                           </span>
                         </div>
                       </div>
@@ -226,10 +212,8 @@ export default function SettingsPage() {
               )}
             </CardFooter>
           </Card>
-
         </div>
-      </div>
-    </DashboardLayout>
+      </DashboardLayout>
     </>
   );
 }

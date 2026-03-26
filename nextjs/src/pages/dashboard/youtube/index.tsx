@@ -8,7 +8,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card } from '@/components/ui/card';
 import ChannelsTab from '@/components/youtube/ChannelsTab';
 import TemplatesTab from '@/components/youtube/TemplatesTab';
 import ContainersTab from '@/components/youtube/ContainersTab';
@@ -48,15 +47,7 @@ export default function YouTubePage() {
       <Head>
         <title>YouTube Manager | VidTempla</title>
       </Head>
-      <DashboardLayout
-        headerContent={
-          <nav className="flex items-center gap-2 text-sm flex-1">
-            <span className="font-medium">Dashboard</span>
-          </nav>
-        }
-      >
-        <div className="container mx-auto py-6 space-y-6">
-
+      <DashboardLayout>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="channels">Channels</TabsTrigger>
@@ -81,8 +72,7 @@ export default function YouTubePage() {
             <TemplatesTab />
           </TabsContent>
         </Tabs>
-      </div>
-    </DashboardLayout>
+      </DashboardLayout>
     </>
   );
 }

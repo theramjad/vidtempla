@@ -87,129 +87,114 @@ export default function McpServerPage() {
       <Head>
         <title>MCP Server | VidTempla</title>
       </Head>
-      <DashboardLayout
-        headerContent={
-          <nav className="flex items-center gap-2 text-sm flex-1">
-            <span className="font-medium">MCP Server</span>
-          </nav>
-        }
-      >
-        <div className="container mx-auto py-6 space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">MCP Server</h1>
-            <p className="text-muted-foreground">
-              Connect AI agents to VidTempla using the Model Context Protocol
-            </p>
-          </div>
-
-          <div className="grid gap-6 max-w-2xl">
-            {/* Server Connection */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Server Connection</CardTitle>
-                <CardDescription>
-                  Connection details for the VidTempla MCP server
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Server Name</span>
-                  <span className="text-sm text-muted-foreground">
-                    VidTempla
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Version</span>
-                  <span className="text-sm text-muted-foreground">1.0.0</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Transport</span>
-                  <Badge variant="secondary">Streamable HTTP</Badge>
-                </div>
-                <div className="space-y-1.5">
-                  <span className="text-sm font-medium">Server URL</span>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 text-sm bg-muted px-3 py-2 rounded-md break-all">
-                      {SERVER_URL}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="shrink-0"
-                      onClick={() => copyToClipboard(SERVER_URL, 'url')}
-                    >
-                      {copiedField === 'url' ? (
-                        <Check className="h-4 w-4 text-emerald-600" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Available Tools */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Available Tools</CardTitle>
-                <CardDescription>
-                  {toolGroups.reduce((sum, g) => sum + g.tools.length, 0)} tools
-                  across {toolGroups.length} categories
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {toolGroups.map((group) => (
-                  <div key={group.name} className="space-y-1.5">
-                    <span className="text-sm font-medium">{group.name}</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {group.tools.map((tool) => (
-                        <code
-                          key={tool}
-                          className="text-xs bg-muted px-2 py-0.5 rounded"
-                        >
-                          {tool}
-                        </code>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Setup */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Setup</CardTitle>
-                <CardDescription>
-                  Run this command in your terminal to connect Claude Code
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="relative">
-                  <pre className="text-sm bg-muted px-4 py-3 pr-12 rounded-md overflow-x-auto">
-                    {MCP_COMMAND}
-                  </pre>
+      <DashboardLayout>
+        <div className="grid gap-6">
+          {/* Server Connection */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Server Connection</CardTitle>
+              <CardDescription>
+                Connection details for the VidTempla MCP server
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Server Name</span>
+                <span className="text-sm text-muted-foreground">
+                  VidTempla
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Version</span>
+                <span className="text-sm text-muted-foreground">1.0.0</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Transport</span>
+                <Badge variant="secondary">Streamable HTTP</Badge>
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-sm font-medium">Server URL</span>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-sm bg-muted px-3 py-2 rounded-md break-all">
+                    {SERVER_URL}
+                  </code>
                   <Button
                     variant="outline"
                     size="icon"
-                    className="absolute top-2 right-2 h-7 w-7"
-                    onClick={() => copyToClipboard(MCP_COMMAND, 'command')}
+                    className="shrink-0"
+                    onClick={() => copyToClipboard(SERVER_URL, 'url')}
                   >
-                    {copiedField === 'command' ? (
-                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                    {copiedField === 'url' ? (
+                      <Check className="h-4 w-4 text-emerald-600" />
                     ) : (
-                      <Copy className="h-3.5 w-3.5" />
+                      <Copy className="h-4 w-4" />
                     )}
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  The first time you use it, Claude Code will open your browser
-                  to sign in. After that, it works automatically.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Available Tools */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Available Tools</CardTitle>
+              <CardDescription>
+                {toolGroups.reduce((sum, g) => sum + g.tools.length, 0)} tools
+                across {toolGroups.length} categories
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {toolGroups.map((group) => (
+                <div key={group.name} className="space-y-1.5">
+                  <span className="text-sm font-medium">{group.name}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {group.tools.map((tool) => (
+                      <code
+                        key={tool}
+                        className="text-xs bg-muted px-2 py-0.5 rounded"
+                      >
+                        {tool}
+                      </code>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Setup */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Setup</CardTitle>
+              <CardDescription>
+                Run this command in your terminal to connect Claude Code
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="relative">
+                <pre className="text-sm bg-muted px-4 py-3 pr-12 rounded-md overflow-x-auto">
+                  {MCP_COMMAND}
+                </pre>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="absolute top-2 right-2 h-7 w-7"
+                  onClick={() => copyToClipboard(MCP_COMMAND, 'command')}
+                >
+                  {copiedField === 'command' ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-600" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                The first time you use it, Claude Code will open your browser
+                to sign in. After that, it works automatically.
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </DashboardLayout>
     </>

@@ -8,12 +8,24 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { appConfig } from "@/config/app";
 import { useUser } from "@/hooks/useUser";
 import { api } from "@/utils/api";
-import { CreditCard, LogOut, Settings } from "lucide-react";
+import {
+  CreditCard,
+  LogOut,
+  Settings,
+  LayoutDashboard,
+  Key,
+  Server,
+  BarChart3,
+  Tag,
+} from "lucide-react";
 import { useRouter } from "next/router";
+import Link from "next/link";
+import { Button } from "./ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +33,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  "/dashboard/youtube": LayoutDashboard,
+  "/dashboard/api-keys": Key,
+  "/dashboard/mcp-server": Server,
+  "/dashboard/usage": BarChart3,
+  "/dashboard/pricing": Tag,
+};
 
 function getInitial(email: string) {
   return email.charAt(0).toUpperCase();
@@ -33,8 +53,10 @@ function getDisplayName(email: string) {
 export default function DashboardSidebar() {
   const { user, signOut } = useUser();
   const router = useRouter();
+  const { open } = useSidebar();
 
   const { data: plan } = api.dashboard.billing.getCurrentPlan.useQuery();
+  const { data: credits } = api.dashboard.apiKeys.getCreditBalance.useQuery();
   const isFreePlan = !plan || plan.planTier === "free";
 
   const navItems = [
@@ -49,17 +71,21 @@ export default function DashboardSidebar() {
   const initial = getInitial(email);
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       {/* Header */}
-      <SidebarHeader>
+      <SidebarHeader className="border-b h-16 flex items-center justify-center p-0">
         <SidebarMenu>
           <SidebarMenuItem>
-            <p
-              onClick={() => router.push("/dashboard")}
-              className="text-foreground-muted cursor-pointer px-2 pt-2 text-2xl font-bold"
+            <Link
+              href="/dashboard/youtube"
+              className={`flex w-full items-center gap-2 ${open ? "px-4" : "justify-center"}`}
             >
-              {appConfig.brand.name}
-            </p>
+              <span
+                className={`font-bold text-foreground ${open ? "text-2xl" : "text-lg"}`}
+              >
+                {open ? appConfig.brand.name : appConfig.brand.name.charAt(0)}
+              </span>
+            </Link>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -69,23 +95,56 @@ export default function DashboardSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <a href={item.url} className="px-4 py-3">
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {navItems.map((item) => {
+                const Icon = iconMap[item.url] ?? CreditCard;
+                const isActive =
+                  router.asPath === item.url ||
+                  router.asPath.startsWith(item.url + "/");
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
+                      <Link href={item.url}>
+                        <Icon />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
 
       {/* Footer */}
-      <SidebarFooter className="border-t">
-        <SidebarMenu>
+      <SidebarFooter className="border-t p-4">
+        <div className="space-y-4">
+          {/* Credits display */}
+          {open && credits && (
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Credits</span>
+                <span>
+                  {credits.balance.toLocaleString()} /{" "}
+                  {credits.monthlyAllocation.toLocaleString()}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Upgrade button for free tier */}
+          {open && isFreePlan && (
+            <Button
+              className="w-full text-xs"
+              size="sm"
+              onClick={() => router.push("/dashboard/pricing")}
+            >
+              Upgrade Plan
+            </Button>
+          )}
+        </div>
+
+        <SidebarMenu className="mt-2">
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -94,11 +153,19 @@ export default function DashboardSidebar() {
                     <div className="bg-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium">
                       {initial}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{displayName}</p>
-                      <p className="text-muted-foreground truncate text-xs">{email}</p>
-                    </div>
-                    <Settings className="text-muted-foreground h-5 w-5 shrink-0" />
+                    {open && (
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {displayName}
+                        </p>
+                        <p className="text-muted-foreground truncate text-xs">
+                          {email}
+                        </p>
+                      </div>
+                    )}
+                    {open && (
+                      <Settings className="text-muted-foreground h-5 w-5 shrink-0" />
+                    )}
                   </div>
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
@@ -113,17 +180,25 @@ export default function DashboardSidebar() {
                       {initial}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{displayName}</p>
-                      <p className="text-muted-foreground truncate text-xs">{email}</p>
+                      <p className="truncate text-sm font-medium">
+                        {displayName}
+                      </p>
+                      <p className="text-muted-foreground truncate text-xs">
+                        {email}
+                      </p>
                     </div>
                   </div>
                 </div>
                 <div className="py-1">
-                  <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
+                  <DropdownMenuItem
+                    onClick={() => router.push("/dashboard/settings")}
+                  >
                     <Settings className="mr-3 h-4 w-4" />
                     <span>Settings</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/dashboard/pricing")}>
+                  <DropdownMenuItem
+                    onClick={() => router.push("/dashboard/pricing")}
+                  >
                     <CreditCard className="mr-3 h-4 w-4" />
                     <span>Billing</span>
                   </DropdownMenuItem>

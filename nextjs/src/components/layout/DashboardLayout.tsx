@@ -1,29 +1,138 @@
 import DashboardSidebar from "@/components/dashboard-sidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Separator } from "@/components/ui/separator";
 import RootLayout from "./RootLayout";
+import { useRouter } from "next/router";
+import React from "react";
+
+export type BreadcrumbItemType = {
+  label: string;
+  href?: string;
+};
+
+const SEGMENT_NAMES: Record<string, string> = {
+  youtube: "YouTube",
+  "api-keys": "API Keys",
+  "mcp-server": "MCP Server",
+  usage: "Usage",
+  settings: "Settings",
+  pricing: "Pricing",
+};
+
+function DashboardBreadcrumb({
+  customBreadcrumbs,
+}: {
+  customBreadcrumbs?: BreadcrumbItemType[];
+}) {
+  const router = useRouter();
+
+  if (customBreadcrumbs) {
+    return (
+      <Breadcrumb>
+        <BreadcrumbList>
+          {customBreadcrumbs.map((item, index) => {
+            const isLast = index === customBreadcrumbs.length - 1;
+            return (
+              <React.Fragment key={index}>
+                <BreadcrumbItem>
+                  {!isLast && item.href ? (
+                    <BreadcrumbLink href={item.href}>
+                      {item.label}
+                    </BreadcrumbLink>
+                  ) : (
+                    <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                  )}
+                </BreadcrumbItem>
+                {!isLast && <BreadcrumbSeparator />}
+              </React.Fragment>
+            );
+          })}
+        </BreadcrumbList>
+      </Breadcrumb>
+    );
+  }
+
+  // Auto-generate breadcrumbs from URL path
+  const pathSegments = router.asPath
+    .split("?")[0]!
+    .split("/")
+    .filter((p) => p);
+
+  // Skip "dashboard" prefix
+  const displaySegments =
+    pathSegments[0] === "dashboard" ? pathSegments.slice(1) : pathSegments;
+
+  const getName = (segment: string) =>
+    SEGMENT_NAMES[segment] ??
+    segment
+      .replace(/-/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  if (displaySegments.length === 0) {
+    return (
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbPage>Dashboard</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+    );
+  }
+
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        {displaySegments.map((segment, index) => {
+          const href = `/dashboard/${displaySegments.slice(0, index + 1).join("/")}`;
+          const isLast = index === displaySegments.length - 1;
+          return (
+            <React.Fragment key={href}>
+              <BreadcrumbItem>
+                {!isLast ? (
+                  <BreadcrumbLink href={href}>{getName(segment)}</BreadcrumbLink>
+                ) : (
+                  <BreadcrumbPage>{getName(segment)}</BreadcrumbPage>
+                )}
+              </BreadcrumbItem>
+              {!isLast && <BreadcrumbSeparator />}
+            </React.Fragment>
+          );
+        })}
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+}
 
 export default function DashboardLayout({
   children,
-  headerContent,
+  breadcrumbs,
 }: {
   children: React.ReactNode;
-  headerContent?: React.ReactNode;
+  breadcrumbs?: BreadcrumbItemType[];
 }) {
   return (
     <RootLayout>
       <SidebarProvider>
         <DashboardSidebar />
-        <main className="flex-1 flex flex-col">
-          <div className="border-b bg-background">
-            <div className="flex items-center gap-4 px-4 py-3">
-              <SidebarTrigger />
-              {headerContent}
-            </div>
-          </div>
-          <div className="flex-1 p-4">
+        <div className="flex flex-col flex-1 min-h-screen">
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
+            <DashboardBreadcrumb customBreadcrumbs={breadcrumbs} />
+          </header>
+          <main className="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto">
             {children}
-          </div>
-        </main>
+          </main>
+        </div>
       </SidebarProvider>
     </RootLayout>
   );

@@ -79,10 +79,11 @@ export default function UsagePage() {
     const s = new Date(start);
     const e = new Date(end);
     const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
-    return `${s.toLocaleDateString('en-US', opts)} – ${e.toLocaleDateString('en-US', opts)}`;
+    return `${s.toLocaleDateString('en-US', opts)} \u2013 ${e.toLocaleDateString('en-US', opts)}`;
   };
 
   const creditPercent = credits ? (credits.balance / credits.monthlyAllocation) * 100 : 100;
+  const creditFull = credits && credits.balance >= credits.monthlyAllocation;
   const creditLow = creditPercent < 10;
 
   return (
@@ -90,14 +91,8 @@ export default function UsagePage() {
       <Head>
         <title>Usage | VidTempla</title>
       </Head>
-      <DashboardLayout
-        headerContent={
-          <nav className="flex items-center gap-2 text-sm flex-1">
-            <span className="font-medium">Usage</span>
-          </nav>
-        }
-      >
-        <div className="container mx-auto py-6 space-y-6">
+      <DashboardLayout>
+        <div className="space-y-6">
           {isLoading ? (
             <div className="flex items-center gap-2 p-2">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -126,15 +121,24 @@ export default function UsagePage() {
                   </CardContent>
                 </Card>
                 {credits && (
-                  <Card className={creditLow ? 'border-red-500' : undefined}>
+                  <Card className={creditFull ? 'border-emerald-500' : creditLow ? 'border-red-500' : undefined}>
                     <CardContent className="pt-6">
-                      <p className="text-sm text-muted-foreground">Credits Remaining</p>
-                      <p className={`text-2xl font-bold ${creditLow ? 'text-red-600' : ''}`}>
-                        {credits.balance.toLocaleString()} / {credits.monthlyAllocation.toLocaleString()}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Resets {formatDate(credits.periodEnd)}
-                      </p>
+                      {creditFull ? (
+                        <>
+                          <p className="text-sm text-muted-foreground">Credits</p>
+                          <p className="text-2xl font-bold text-emerald-600">Full</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm text-muted-foreground">Credits Remaining</p>
+                          <p className={`text-2xl font-bold ${creditLow ? 'text-red-600' : ''}`}>
+                            {credits.balance.toLocaleString()} / {credits.monthlyAllocation.toLocaleString()}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Resets {formatDate(credits.periodEnd)}
+                          </p>
+                        </>
+                      )}
                     </CardContent>
                   </Card>
                 )}
@@ -145,29 +149,29 @@ export default function UsagePage() {
                 <CardHeader>
                   <CardTitle className="text-lg">Daily Breakdown</CardTitle>
                 </CardHeader>
-                <CardContent>
-                {usage.daily.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead className="text-right">Requests</TableHead>
-                        <TableHead className="text-right">Quota Units</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {usage.daily.map((day) => (
-                        <TableRow key={day.date}>
-                          <TableCell>{formatDate(day.date)}</TableCell>
-                          <TableCell className="text-right">{day.requestCount.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">{day.quotaUnits.toLocaleString()}</TableCell>
+                <CardContent className="p-0">
+                  {usage.daily.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead className="text-right">Requests</TableHead>
+                          <TableHead className="text-right">Quota Units</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No requests this period</p>
-                )}
+                      </TableHeader>
+                      <TableBody>
+                        {usage.daily.map((day) => (
+                          <TableRow key={day.date}>
+                            <TableCell>{formatDate(day.date)}</TableCell>
+                            <TableCell className="text-right">{day.requestCount.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{day.quotaUnits.toLocaleString()}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-sm text-muted-foreground py-4 text-center">No requests this period</p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -177,25 +181,25 @@ export default function UsagePage() {
                   <CardHeader>
                     <CardTitle className="text-lg">By Endpoint</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Endpoint</TableHead>
-                        <TableHead className="text-right">Requests</TableHead>
-                        <TableHead className="text-right">Quota Units</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {usage.byEndpoint.map((row) => (
-                        <TableRow key={row.endpoint}>
-                          <TableCell className="font-mono text-sm">{row.endpoint}</TableCell>
-                          <TableCell className="text-right">{row.requests.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">{row.quotaUnits.toLocaleString()}</TableCell>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Endpoint</TableHead>
+                          <TableHead className="text-right">Requests</TableHead>
+                          <TableHead className="text-right">Quota Units</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {usage.byEndpoint.map((row) => (
+                          <TableRow key={row.endpoint}>
+                            <TableCell className="font-mono text-sm">{row.endpoint}</TableCell>
+                            <TableCell className="text-right">{row.requests.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{row.quotaUnits.toLocaleString()}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </CardContent>
                 </Card>
               )}
@@ -206,31 +210,31 @@ export default function UsagePage() {
                   <CardHeader>
                     <CardTitle className="text-lg">By API Key</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Key Name</TableHead>
-                        <TableHead className="text-right">Requests</TableHead>
-                        <TableHead className="text-right">Quota Units</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {usage.byKey.map((row, i) => (
-                        <TableRow key={row.apiKeyId ?? `mcp-${i}`}>
-                          <TableCell className="font-medium">
-                            {row.source === 'mcp' ? (
-                              <Badge variant="secondary">MCP</Badge>
-                            ) : (
-                              row.keyName
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">{row.requests.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">{row.quotaUnits.toLocaleString()}</TableCell>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Key Name</TableHead>
+                          <TableHead className="text-right">Requests</TableHead>
+                          <TableHead className="text-right">Quota Units</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {usage.byKey.map((row, i) => (
+                          <TableRow key={row.apiKeyId ?? `mcp-${i}`}>
+                            <TableCell className="font-medium">
+                              {row.source === 'mcp' ? (
+                                <Badge variant="secondary">MCP</Badge>
+                              ) : (
+                                row.keyName
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">{row.requests.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{row.quotaUnits.toLocaleString()}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </CardContent>
                 </Card>
               )}
@@ -263,7 +267,7 @@ export default function UsagePage() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                   {historyRows.length > 0 ? (
                     <>
                       <Table>
@@ -299,7 +303,7 @@ export default function UsagePage() {
                                 {row.source === 'mcp' ? (
                                   <Badge variant="secondary">MCP</Badge>
                                 ) : (
-                                  row.keyName ?? '—'
+                                  row.keyName ?? '\u2014'
                                 )}
                               </TableCell>
                             </TableRow>
@@ -307,7 +311,7 @@ export default function UsagePage() {
                         </TableBody>
                       </Table>
                       {hasNextPage && (
-                        <div className="flex justify-center pt-4">
+                        <div className="flex justify-center py-4">
                           <Button
                             variant="outline"
                             size="sm"

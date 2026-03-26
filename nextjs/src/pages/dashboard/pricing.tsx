@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Check, Loader2 } from 'lucide-react';
 import { api } from '@/utils/api';
 import { useState } from 'react';
-import { useRouter } from 'next/router';
 import { toast } from 'sonner';
 import PlanChangeConfirmDialog from '@/components/billing/PlanChangeConfirmDialog';
 import { type PlanTier, isUpgrade as checkIsUpgrade, PLAN_CONFIG } from '@/lib/stripe';
@@ -72,7 +71,6 @@ const pricingTiers = [
 ];
 
 export default function PricingPage() {
-  const router = useRouter();
   const utils = api.useUtils();
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [planChangeDialog, setPlanChangeDialog] = useState<{
@@ -159,174 +157,162 @@ export default function PricingPage() {
       <Head>
         <title>Pricing | VidTempla</title>
       </Head>
-      <DashboardLayout
-        headerContent={
-          <nav className="flex items-center gap-2 text-sm flex-1">
-            <span className="font-medium">Pricing</span>
-          </nav>
-        }
-      >
-        <div className="container mx-auto py-6 space-y-6">
-        <div className="text-center mb-12">
-          <h1 className="text-3xl font-bold tracking-tight">Pricing Plans</h1>
-          <p className="text-muted-foreground mt-2">
-            Choose the plan that best fits your needs
-          </p>
-        </div>
+      <DashboardLayout>
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold">Pricing Plans</h2>
 
-        <div className="grid md:grid-cols-3 gap-6">
-          {pricingTiers.map((tier) => {
-            const tierName = tier.name.toLowerCase() as PlanTier;
-            const isCurrentPlan = tierName === currentPlanTier;
-            const isLoading = checkoutLoading === tierName;
-            const isUpgrading = checkIsUpgrade(currentPlanTier, tierName);
+          <div className="grid md:grid-cols-3 gap-6">
+            {pricingTiers.map((tier) => {
+              const tierName = tier.name.toLowerCase() as PlanTier;
+              const isCurrentPlan = tierName === currentPlanTier;
+              const isLoading = checkoutLoading === tierName;
+              const isUpgrading = checkIsUpgrade(currentPlanTier, tierName);
 
-            // Determine button text and state based on current plan and subscription status
-            let buttonText = tier.buttonText;
-            let buttonDisabled = false;
-            let buttonVariant: 'default' | 'outline' | 'destructive' = tier.buttonVariant;
+              // Determine button text and state based on current plan and subscription status
+              let buttonText = tier.buttonText;
+              let buttonDisabled = false;
+              let buttonVariant: 'default' | 'outline' | 'destructive' = tier.buttonVariant;
 
-            if (isCurrentPlan) {
-              buttonText = 'Current Plan';
-              buttonDisabled = true;
-              buttonVariant = 'outline';
-            } else if (tierName === 'free') {
-              // Can only downgrade to free if on a paid plan with active subscription
-              if (hasActiveSubscription && currentPlanTier !== 'free') {
-                buttonText = 'Downgrade to Free';
-                buttonVariant = 'outline';
-              } else {
+              if (isCurrentPlan) {
+                buttonText = 'Current Plan';
                 buttonDisabled = true;
-                buttonText = 'Free Plan';
+                buttonVariant = 'outline';
+              } else if (tierName === 'free') {
+                // Can only downgrade to free if on a paid plan with active subscription
+                if (hasActiveSubscription && currentPlanTier !== 'free') {
+                  buttonText = 'Downgrade to Free';
+                  buttonVariant = 'outline';
+                } else {
+                  buttonDisabled = true;
+                  buttonText = 'Free Plan';
+                }
+              } else if (isCanceled) {
+                // Canceled users need to resubscribe
+                buttonText = `Subscribe to ${tier.name}`;
+              } else if (!hasActiveSubscription) {
+                // Free users upgrading
+                buttonText = `Upgrade to ${tier.name}`;
+              } else if (isUpgrading) {
+                // Active subscribers upgrading
+                buttonText = `Upgrade to ${tier.name}`;
+              } else {
+                // Active subscribers downgrading
+                buttonText = `Downgrade to ${tier.name}`;
+                buttonVariant = 'outline';
               }
-            } else if (isCanceled) {
-              // Canceled users need to resubscribe
-              buttonText = `Subscribe to ${tier.name}`;
-            } else if (!hasActiveSubscription) {
-              // Free users upgrading
-              buttonText = `Upgrade to ${tier.name}`;
-            } else if (isUpgrading) {
-              // Active subscribers upgrading
-              buttonText = `Upgrade to ${tier.name}`;
-            } else {
-              // Active subscribers downgrading
-              buttonText = `Downgrade to ${tier.name}`;
-              buttonVariant = 'outline';
-            }
 
-            return (
-              <Card
-                key={tier.name}
-                className={`relative ${
-                  tier.highlighted
-                    ? 'border-primary shadow-lg scale-105'
-                    : 'border-border'
-                } ${isCurrentPlan ? 'border-primary border-2' : ''}`}
-              >
-                {tier.highlighted && !isCurrentPlan && (
-                  <div className="absolute -top-4 left-0 right-0 flex justify-center">
-                    <span className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-medium">
-                      Most Popular
-                    </span>
-                  </div>
-                )}
-
-                {isCurrentPlan && (
-                  <div className="absolute -top-4 left-0 right-0 flex justify-center">
-                    <span className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-medium">
-                      Current Plan
-                    </span>
-                  </div>
-                )}
-
-                <CardHeader className="text-center pb-8">
-                  <CardTitle className="text-2xl">{tier.name}</CardTitle>
-                  <CardDescription>{tier.description}</CardDescription>
-                  <div className="mt-4">
-                    <span className="text-4xl font-bold">{tier.price}</span>
-                    <span className="text-muted-foreground ml-2">/ {tier.period}</span>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
-                  <ul className="space-y-3">
-                    {tier.features.map((feature, index) => (
-                      <li key={index} className="flex items-start gap-2">
-                        <Check className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                        <span className="text-sm">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {tier.limitations && tier.limitations.length > 0 && (
-                    <div className="pt-4 border-t">
-                      <p className="text-xs font-medium text-muted-foreground mb-2">
-                        Limitations:
-                      </p>
-                      <ul className="space-y-1">
-                        {tier.limitations.map((limitation, index) => (
-                          <li key={index} className="text-xs text-muted-foreground">
-                            • {limitation}
-                          </li>
-                        ))}
-                      </ul>
+              return (
+                <Card
+                  key={tier.name}
+                  className={`relative ${
+                    tier.highlighted
+                      ? 'border-primary shadow-lg scale-105'
+                      : 'border-border'
+                  } ${isCurrentPlan ? 'border-primary border-2' : ''}`}
+                >
+                  {tier.highlighted && !isCurrentPlan && (
+                    <div className="absolute -top-4 left-0 right-0 flex justify-center">
+                      <span className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-medium">
+                        Most Popular
+                      </span>
                     </div>
                   )}
-                </CardContent>
 
-                <CardFooter>
-                  <Button
-                    className="w-full"
-                    variant={buttonVariant}
-                    size="lg"
-                    disabled={buttonDisabled || isLoading || planLoading}
-                    onClick={() => handlePlanChange(tierName)}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      buttonText
+                  {isCurrentPlan && (
+                    <div className="absolute -top-4 left-0 right-0 flex justify-center">
+                      <span className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-medium">
+                        Current Plan
+                      </span>
+                    </div>
+                  )}
+
+                  <CardHeader className="text-center pb-8">
+                    <CardTitle className="text-2xl">{tier.name}</CardTitle>
+                    <CardDescription>{tier.description}</CardDescription>
+                    <div className="mt-4">
+                      <span className="text-4xl font-bold">{tier.price}</span>
+                      <span className="text-muted-foreground ml-2">/ {tier.period}</span>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="space-y-4">
+                    <ul className="space-y-3">
+                      {tier.features.map((feature, index) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <Check className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                          <span className="text-sm">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {tier.limitations && tier.limitations.length > 0 && (
+                      <div className="pt-4 border-t">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">
+                          Limitations:
+                        </p>
+                        <ul className="space-y-1">
+                          {tier.limitations.map((limitation, index) => (
+                            <li key={index} className="text-xs text-muted-foreground">
+                              &bull; {limitation}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
-                  </Button>
-                </CardFooter>
-              </Card>
-            );
-          })}
+                  </CardContent>
+
+                  <CardFooter>
+                    <Button
+                      className="w-full"
+                      variant={buttonVariant}
+                      size="lg"
+                      disabled={buttonDisabled || isLoading || planLoading}
+                      onClick={() => handlePlanChange(tierName)}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        buttonText
+                      )}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              );
+            })}
+          </div>
         </div>
 
-      </div>
-
-      {/* Plan Change Confirmation Dialog */}
-      {planChangeDialog.targetPlan && (
-        <PlanChangeConfirmDialog
-          open={planChangeDialog.open}
-          onOpenChange={(open) => {
-            if (!open) {
-              setPlanChangeDialog({ open: false, targetPlan: null });
-            }
-          }}
-          currentPlan={{
-            tier: currentPlanTier,
-            name: PLAN_CONFIG[currentPlanTier].name,
-          }}
-          targetPlan={{
-            tier: planChangeDialog.targetPlan,
-            name: PLAN_CONFIG[planChangeDialog.targetPlan].name,
-          }}
-          isUpgrade={upgradePreview?.isUpgrade ?? checkIsUpgrade(currentPlanTier, planChangeDialog.targetPlan)}
-          proratedAmountFormatted={upgradePreview?.proratedAmountFormatted ?? '$0.00'}
-          newMonthlyPriceFormatted={upgradePreview?.newMonthlyPriceFormatted ?? PLAN_CONFIG[planChangeDialog.targetPlan].priceMonthly === 0 ? '$0.00' : `$${(PLAN_CONFIG[planChangeDialog.targetPlan].priceMonthly / 100).toFixed(2)}`}
-          currentPeriodEnd={currentPlan?.currentPeriodEnd?.toISOString() ?? null}
-          featuresGaining={upgradePreview?.featuresGaining ?? []}
-          featuresLosing={upgradePreview?.featuresLosing ?? []}
-          onConfirm={handleConfirmPlanChange}
-          isLoading={updateSubscription.isPending || previewLoading}
-        />
-      )}
-    </DashboardLayout>
+        {/* Plan Change Confirmation Dialog */}
+        {planChangeDialog.targetPlan && (
+          <PlanChangeConfirmDialog
+            open={planChangeDialog.open}
+            onOpenChange={(open) => {
+              if (!open) {
+                setPlanChangeDialog({ open: false, targetPlan: null });
+              }
+            }}
+            currentPlan={{
+              tier: currentPlanTier,
+              name: PLAN_CONFIG[currentPlanTier].name,
+            }}
+            targetPlan={{
+              tier: planChangeDialog.targetPlan,
+              name: PLAN_CONFIG[planChangeDialog.targetPlan].name,
+            }}
+            isUpgrade={upgradePreview?.isUpgrade ?? checkIsUpgrade(currentPlanTier, planChangeDialog.targetPlan)}
+            proratedAmountFormatted={upgradePreview?.proratedAmountFormatted ?? '$0.00'}
+            newMonthlyPriceFormatted={upgradePreview?.newMonthlyPriceFormatted ?? PLAN_CONFIG[planChangeDialog.targetPlan].priceMonthly === 0 ? '$0.00' : `$${(PLAN_CONFIG[planChangeDialog.targetPlan].priceMonthly / 100).toFixed(2)}`}
+            currentPeriodEnd={currentPlan?.currentPeriodEnd?.toISOString() ?? null}
+            featuresGaining={upgradePreview?.featuresGaining ?? []}
+            featuresLosing={upgradePreview?.featuresLosing ?? []}
+            onConfirm={handleConfirmPlanChange}
+            isLoading={updateSubscription.isPending || previewLoading}
+          />
+        )}
+      </DashboardLayout>
     </>
   );
 }
