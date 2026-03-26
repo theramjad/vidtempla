@@ -9,7 +9,8 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus, Copy, Check, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Copy, Check, Trash2, BookOpen, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
 import { api } from '@/utils/api';
 import { toast } from 'sonner';
 import {
@@ -47,6 +48,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 
 export default function ApiKeysPage() {
   // API Keys
@@ -269,6 +277,26 @@ export default function ApiKeysPage() {
         }
       >
         <div className="container mx-auto py-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-emerald-600" />
+                <CardTitle className="text-lg">API Documentation</CardTitle>
+              </div>
+              <CardDescription>
+                Explore the full REST API reference with endpoint details, request/response examples, and authentication guides.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/reference">
+                <Button variant="outline">
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  View API Docs
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
           {keysLoading ? (
             <div className="flex items-center gap-2 p-2">
               <Loader2 className="h-4 w-4 animate-spin" />

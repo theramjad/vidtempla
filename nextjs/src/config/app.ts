@@ -40,6 +40,10 @@ export const appConfig = {
         title: "Usage",
         url: "/dashboard/usage",
       },
+      {
+        title: "MCP Server",
+        url: "/dashboard/mcp-server",
+      },
     ],
   },
 } as const;
