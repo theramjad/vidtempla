@@ -380,6 +380,3 @@ export const userCredits = pgTable("user_credits", {
     .notNull()
     .defaultNow(),
 });
-
-// Re-export relations so `import * as schema from "./schema"` includes them
-export * from "./relations";
