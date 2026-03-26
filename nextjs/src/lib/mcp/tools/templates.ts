@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError, getSessionUserId } from "../helpers";
+import { mcpJson, mcpError, getSessionUserId, READ, WRITE, DESTRUCTIVE } from "../helpers";
 import {
   listTemplates,
   getTemplate,
@@ -23,6 +23,7 @@ export function registerTemplateTools(server: McpServer) {
       cursor: z.string().optional().describe("Pagination cursor"),
       limit: z.number().optional().describe("Results per page (max 100, default 50)"),
     },
+    READ,
     async (args) => toMcp(await listTemplates(getSessionUserId(), args))
   );
 
@@ -30,6 +31,7 @@ export function registerTemplateTools(server: McpServer) {
     "get_template",
     "Get a single template by ID with parsed variables",
     { id: z.string().describe("Template UUID") },
+    READ,
     async ({ id }) => toMcp(await getTemplate(id, getSessionUserId()))
   );
 
@@ -40,6 +42,7 @@ export function registerTemplateTools(server: McpServer) {
       name: z.string().describe("Template name"),
       content: z.string().describe("Template content with {{variable}} placeholders"),
     },
+    WRITE,
     async ({ name, content }) => toMcp(await createTemplate(getSessionUserId(), name, content))
   );
 
@@ -51,6 +54,7 @@ export function registerTemplateTools(server: McpServer) {
       name: z.string().optional().describe("New name"),
       content: z.string().optional().describe("New content"),
     },
+    WRITE,
     async ({ id, name, content }) => toMcp(await updateTemplate(id, getSessionUserId(), { name, content }))
   );
 
@@ -58,6 +62,7 @@ export function registerTemplateTools(server: McpServer) {
     "delete_template",
     "Delete a template",
     { id: z.string().describe("Template UUID") },
+    DESTRUCTIVE,
     async ({ id }) => toMcp(await deleteTemplate(id, getSessionUserId()))
   );
 
@@ -65,6 +70,7 @@ export function registerTemplateTools(server: McpServer) {
     "get_template_impact",
     "Show which containers and videos would be affected by changing a template",
     { id: z.string().describe("Template UUID") },
+    READ,
     async ({ id }) => toMcp(await getTemplateImpact(id, getSessionUserId()))
   );
 }

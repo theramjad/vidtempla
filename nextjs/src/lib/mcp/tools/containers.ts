@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError, getSessionUserId } from "../helpers";
+import { mcpJson, mcpError, getSessionUserId, READ, WRITE, DESTRUCTIVE } from "../helpers";
 import {
   listContainers,
   getContainer,
@@ -22,6 +22,7 @@ export function registerContainerTools(server: McpServer) {
       cursor: z.string().optional().describe("Pagination cursor"),
       limit: z.number().optional().describe("Results per page (max 100, default 50)"),
     },
+    READ,
     async (args) => toMcp(await listContainers(getSessionUserId(), args))
   );
 
@@ -29,6 +30,7 @@ export function registerContainerTools(server: McpServer) {
     "get_container",
     "Get container details with ordered templates",
     { id: z.string().describe("Container UUID") },
+    READ,
     async ({ id }) => toMcp(await getContainer(id, getSessionUserId()))
   );
 
@@ -40,6 +42,7 @@ export function registerContainerTools(server: McpServer) {
       templateIds: z.array(z.string()).describe("Ordered array of template UUIDs"),
       separator: z.string().optional().describe("Text between templates (default: two newlines)"),
     },
+    WRITE,
     async ({ name, templateIds, separator }) => toMcp(await createContainer(getSessionUserId(), name, templateIds, separator))
   );
 
@@ -52,6 +55,7 @@ export function registerContainerTools(server: McpServer) {
       templateIds: z.array(z.string()).optional().describe("New ordered array of template UUIDs"),
       separator: z.string().optional().describe("New separator text"),
     },
+    WRITE,
     async ({ id, name, templateIds, separator }) => toMcp(await updateContainer(id, getSessionUserId(), { name, templateIds, separator }))
   );
 
@@ -59,6 +63,7 @@ export function registerContainerTools(server: McpServer) {
     "delete_container",
     "Delete a container. Videos will be unassigned.",
     { id: z.string().describe("Container UUID") },
+    DESTRUCTIVE,
     async ({ id }) => toMcp(await deleteContainer(id, getSessionUserId()))
   );
 }

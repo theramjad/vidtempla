@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError, getSessionUserId } from "../helpers";
+import { mcpJson, mcpError, getSessionUserId, READ, WRITE } from "../helpers";
 import {
   getChannelAnalytics,
   queryAnalytics,
@@ -24,6 +24,7 @@ export function registerAnalyticsTools(server: McpServer) {
       metrics: z.string().optional().describe("Comma-separated metrics (default: views,estimatedMinutesWatched)"),
       dimensions: z.string().optional().describe("Dimensions (default: day)"),
     },
+    READ,
     async ({ channelId, ...opts }) => toMcp(await getChannelAnalytics(channelId, getSessionUserId(), opts))
   );
 
@@ -40,6 +41,7 @@ export function registerAnalyticsTools(server: McpServer) {
       sort: z.string().optional().describe("Sort field (e.g. -views)"),
       maxResults: z.number().optional().describe("Max results"),
     },
+    READ,
     async (args) => toMcp(await queryAnalytics(getSessionUserId(), args))
   );
 
@@ -52,6 +54,7 @@ export function registerAnalyticsTools(server: McpServer) {
       sort: z.string().optional().describe("Sort order: relevance (default), date, viewCount, rating"),
       maxResults: z.number().optional().describe("Max results (default 25, max 50)"),
     },
+    READ,
     async ({ channelId, ...opts }) => toMcp(await searchChannelVideos(channelId, getSessionUserId(), opts))
   );
 
@@ -59,6 +62,7 @@ export function registerAnalyticsTools(server: McpServer) {
     "sync_channel",
     "Trigger a video sync for a channel (imports new videos from YouTube)",
     { channelId: z.string().describe("YouTube channel ID") },
+    WRITE,
     async ({ channelId }) => toMcp(await syncChannel(channelId, getSessionUserId()))
   );
 }

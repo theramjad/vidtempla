@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mcpJson, mcpError, getSessionUserId } from "../helpers";
+import { mcpJson, mcpError, getSessionUserId, READ, WRITE, DESTRUCTIVE } from "../helpers";
 import {
   listVideos,
   getVideo,
@@ -31,6 +31,7 @@ export function registerVideoTools(server: McpServer) {
       cursor: z.string().optional().describe("Pagination cursor from previous response"),
       limit: z.number().optional().describe("Results per page (max 100, default 50)"),
     },
+    READ,
     async (args) => toMcp(await listVideos(getSessionUserId(), args))
   );
 
@@ -38,6 +39,7 @@ export function registerVideoTools(server: McpServer) {
     "get_video",
     "Get video details including live YouTube stats (accepts VidTempla UUID or YouTube video ID)",
     { id: z.string().describe("VidTempla UUID or YouTube video ID (e.g. dQw4w9WgXcQ)") },
+    READ,
     async ({ id }) => toMcp(await getVideo(id, getSessionUserId()))
   );
 
@@ -51,6 +53,7 @@ export function registerVideoTools(server: McpServer) {
       metrics: z.string().optional().describe("Comma-separated metrics (default: views,estimatedMinutesWatched,averageViewDuration)"),
       dimensions: z.string().optional().describe("Dimensions (default: day)"),
     },
+    READ,
     async ({ id, ...opts }) => toMcp(await getVideoAnalytics(id, getSessionUserId(), opts))
   );
 
@@ -58,6 +61,7 @@ export function registerVideoTools(server: McpServer) {
     "get_video_retention",
     "Get audience retention curve (100 data points with position, watchRatio, relativePerformance)",
     { id: z.string().describe("VidTempla UUID or YouTube video ID") },
+    READ,
     async ({ id }) => toMcp(await getVideoRetention(id, getSessionUserId()))
   );
 
@@ -65,6 +69,7 @@ export function registerVideoTools(server: McpServer) {
     "get_video_variables",
     "Get template variables for a video",
     { id: z.string().describe("VidTempla UUID or YouTube video ID") },
+    READ,
     async ({ id }) => toMcp(await getVideoVariables(id, getSessionUserId()))
   );
 
@@ -75,6 +80,7 @@ export function registerVideoTools(server: McpServer) {
       id: z.string().describe("VidTempla UUID or YouTube video ID"),
       containerId: z.string().describe("Container UUID to assign the video to"),
     },
+    WRITE,
     async ({ id, containerId }) => toMcp(await assignVideo(id, containerId, getSessionUserId()))
   );
 
@@ -91,6 +97,7 @@ export function registerVideoTools(server: McpServer) {
         })
       ).describe("Array of variables to update"),
     },
+    WRITE,
     async ({ id, variables }) => toMcp(await updateVideoVariables(id, variables, getSessionUserId()))
   );
 
@@ -101,6 +108,7 @@ export function registerVideoTools(server: McpServer) {
       id: z.string().describe("VidTempla UUID or YouTube video ID"),
       limit: z.number().optional().describe("Max entries to return (default 50, max 100)"),
     },
+    READ,
     async ({ id, limit }) => toMcp(await getDescriptionHistory(id, getSessionUserId(), limit))
   );
 
@@ -111,6 +119,7 @@ export function registerVideoTools(server: McpServer) {
       id: z.string().describe("VidTempla UUID or YouTube video ID"),
       historyId: z.string().describe("History entry UUID (from get_description_history)"),
     },
+    DESTRUCTIVE,
     async ({ id, historyId }) => toMcp(await revertDescription(id, historyId, getSessionUserId()))
   );
 }

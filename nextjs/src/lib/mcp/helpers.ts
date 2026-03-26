@@ -21,6 +21,11 @@ export function mcpJson(data: unknown) {
   };
 }
 
+/** Tool annotations for Claude Desktop permission grouping. */
+export const READ = { readOnlyHint: true, destructiveHint: false } as const;
+export const WRITE = { readOnlyHint: false, destructiveHint: false } as const;
+export const DESTRUCTIVE = { readOnlyHint: false, destructiveHint: true } as const;
+
 /**
  * Returns an MCP error result matching the REST API error shape.
  */
