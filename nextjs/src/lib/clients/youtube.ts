@@ -485,6 +485,466 @@ export async function downloadCaptionTrack(
   return response.data;
 }
 
+// ─── YouTube Caption write functions ──────────────────────────────────
+
+/**
+ * Uploads a new caption track to a video.
+ * Quota cost: 400 units
+ */
+export async function insertCaptionTrack(
+  accessToken: string,
+  videoId: string,
+  language: string,
+  name: string,
+  captionData: string,
+  isDraft: boolean = false,
+  sync: boolean = false
+): Promise<YouTubeCaptionTrack> {
+  const boundary = `caption_boundary_${Date.now()}`;
+  const metadata = JSON.stringify({
+    snippet: { videoId, language, name, isDraft },
+  });
+
+  const body = [
+    `--${boundary}`,
+    'Content-Type: application/json; charset=UTF-8',
+    '',
+    metadata,
+    `--${boundary}`,
+    'Content-Type: text/plain',
+    '',
+    captionData,
+    `--${boundary}--`,
+  ].join('\r\n');
+
+  const params: Record<string, string> = {
+    uploadType: 'multipart',
+    part: 'snippet',
+  };
+  if (sync) params.sync = 'true';
+
+  const response = await axios.post<YouTubeCaptionTrack>(
+    'https://www.googleapis.com/upload/youtube/v3/captions',
+    body,
+    {
+      params,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
+      },
+    }
+  );
+
+  return response.data;
+}
+
+/**
+ * Updates an existing caption track (content and/or metadata).
+ * Quota cost: 450 units
+ */
+export async function updateCaptionTrack(
+  accessToken: string,
+  captionId: string,
+  captionData?: string,
+  isDraft?: boolean
+): Promise<YouTubeCaptionTrack> {
+  if (captionData !== undefined) {
+    // Multipart upload with new caption content
+    const boundary = `caption_boundary_${Date.now()}`;
+    const snippet: Record<string, unknown> = {};
+    if (isDraft !== undefined) snippet.isDraft = isDraft;
+
+    const metadata = JSON.stringify({ id: captionId, snippet });
+
+    const body = [
+      `--${boundary}`,
+      'Content-Type: application/json; charset=UTF-8',
+      '',
+      metadata,
+      `--${boundary}`,
+      'Content-Type: text/plain',
+      '',
+      captionData,
+      `--${boundary}--`,
+    ].join('\r\n');
+
+    const response = await axios.put<YouTubeCaptionTrack>(
+      'https://www.googleapis.com/upload/youtube/v3/captions',
+      body,
+      {
+        params: { uploadType: 'multipart', part: 'snippet' },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': `multipart/related; boundary=${boundary}`,
+        },
+      }
+    );
+
+    return response.data;
+  }
+
+  // Metadata-only update (e.g. isDraft)
+  const response = await axios.put<YouTubeCaptionTrack>(
+    `${YOUTUBE_API_BASE}/captions`,
+    { id: captionId, snippet: { isDraft } },
+    {
+      params: { part: 'snippet' },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  return response.data;
+}
+
+/**
+ * Deletes a caption track.
+ * Quota cost: 50 units
+ */
+export async function deleteCaptionTrack(
+  accessToken: string,
+  captionId: string
+): Promise<void> {
+  await axios.delete(`${YOUTUBE_API_BASE}/captions`, {
+    params: { id: captionId },
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
+// ─── YouTube Comments API functions ──────────────────────────────────
+
+export interface YouTubeCommentThread {
+  id: string;
+  snippet: {
+    videoId: string;
+    topLevelComment: {
+      id: string;
+      snippet: {
+        textDisplay: string;
+        textOriginal: string;
+        authorDisplayName: string;
+        authorProfileImageUrl: string;
+        likeCount: number;
+        publishedAt: string;
+        updatedAt: string;
+      };
+    };
+    totalReplyCount: number;
+    isPublic: boolean;
+  };
+  replies?: {
+    comments: Array<{
+      id: string;
+      snippet: {
+        textDisplay: string;
+        textOriginal: string;
+        authorDisplayName: string;
+        authorProfileImageUrl: string;
+        likeCount: number;
+        publishedAt: string;
+        updatedAt: string;
+        parentId: string;
+      };
+    }>;
+  };
+}
+
+export interface YouTubeComment {
+  id: string;
+  snippet: {
+    textDisplay: string;
+    textOriginal: string;
+    authorDisplayName: string;
+    parentId: string;
+    publishedAt: string;
+  };
+}
+
+/**
+ * Lists comment threads for a video.
+ * Quota cost: 1 unit
+ */
+export async function listCommentThreads(
+  accessToken: string,
+  videoId: string,
+  opts: { maxResults?: number; order?: string; pageToken?: string } = {}
+): Promise<{ items: YouTubeCommentThread[]; nextPageToken?: string }> {
+  const response = await axios.get<{ items: YouTubeCommentThread[]; nextPageToken?: string }>(
+    `${YOUTUBE_API_BASE}/commentThreads`,
+    {
+      params: {
+        part: 'snippet,replies',
+        videoId,
+        maxResults: opts.maxResults ?? 20,
+        order: opts.order ?? 'relevance',
+        ...(opts.pageToken && { pageToken: opts.pageToken }),
+      },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  return { items: response.data.items || [], nextPageToken: response.data.nextPageToken };
+}
+
+/**
+ * Posts a reply to a comment.
+ * Quota cost: 50 units
+ */
+export async function replyToComment(
+  accessToken: string,
+  parentId: string,
+  text: string
+): Promise<YouTubeComment> {
+  const response = await axios.post<YouTubeComment>(
+    `${YOUTUBE_API_BASE}/comments`,
+    { snippet: { parentId, textOriginal: text } },
+    {
+      params: { part: 'snippet' },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  return response.data;
+}
+
+/**
+ * Deletes a comment.
+ * Quota cost: 50 units
+ */
+export async function deleteComment(
+  accessToken: string,
+  commentId: string
+): Promise<void> {
+  await axios.delete(`${YOUTUBE_API_BASE}/comments`, {
+    params: { id: commentId },
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
+// ─── YouTube Playlists API functions ─────────────────────────────────
+
+export interface YouTubePlaylist {
+  id: string;
+  snippet: {
+    title: string;
+    description: string;
+    publishedAt: string;
+    channelId: string;
+    thumbnails: Record<string, { url: string; width: number; height: number }>;
+  };
+  contentDetails: {
+    itemCount: number;
+  };
+  status: {
+    privacyStatus: string;
+  };
+}
+
+export interface YouTubePlaylistItem {
+  id: string;
+  snippet: {
+    title: string;
+    description: string;
+    playlistId: string;
+    position: number;
+    resourceId: {
+      kind: string;
+      videoId: string;
+    };
+    thumbnails: Record<string, { url: string; width: number; height: number }>;
+  };
+  contentDetails: {
+    videoId: string;
+    videoPublishedAt: string;
+  };
+}
+
+/**
+ * Lists playlists for a channel.
+ * Quota cost: 1 unit
+ */
+export async function listPlaylists(
+  accessToken: string,
+  channelId: string,
+  opts: { maxResults?: number; pageToken?: string } = {}
+): Promise<{ items: YouTubePlaylist[]; nextPageToken?: string }> {
+  const response = await axios.get<{ items: YouTubePlaylist[]; nextPageToken?: string }>(
+    `${YOUTUBE_API_BASE}/playlists`,
+    {
+      params: {
+        part: 'snippet,contentDetails,status',
+        channelId,
+        maxResults: opts.maxResults ?? 25,
+        ...(opts.pageToken && { pageToken: opts.pageToken }),
+      },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  return { items: response.data.items || [], nextPageToken: response.data.nextPageToken };
+}
+
+/**
+ * Creates a new playlist.
+ * Quota cost: 50 units
+ */
+export async function createPlaylist(
+  accessToken: string,
+  title: string,
+  description?: string,
+  privacyStatus: string = 'private'
+): Promise<YouTubePlaylist> {
+  const response = await axios.post<YouTubePlaylist>(
+    `${YOUTUBE_API_BASE}/playlists`,
+    {
+      snippet: { title, description: description ?? '' },
+      status: { privacyStatus },
+    },
+    {
+      params: { part: 'snippet,status' },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  return response.data;
+}
+
+/**
+ * Gets a single playlist by ID.
+ * Quota cost: 1 unit
+ */
+export async function getPlaylist(
+  accessToken: string,
+  id: string
+): Promise<YouTubePlaylist | null> {
+  const response = await axios.get<{ items: YouTubePlaylist[] }>(
+    `${YOUTUBE_API_BASE}/playlists`,
+    {
+      params: {
+        part: 'snippet,contentDetails,status',
+        id,
+      },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  return response.data.items?.[0] ?? null;
+}
+
+/**
+ * Updates a playlist (receives already-merged body).
+ * Quota cost: 50 units
+ */
+export async function updatePlaylist(
+  accessToken: string,
+  id: string,
+  mergedBody: { snippet: Record<string, unknown>; status?: Record<string, unknown> }
+): Promise<YouTubePlaylist> {
+  const response = await axios.put<YouTubePlaylist>(
+    `${YOUTUBE_API_BASE}/playlists`,
+    { id, ...mergedBody },
+    {
+      params: { part: 'snippet,status' },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  return response.data;
+}
+
+/**
+ * Deletes a playlist.
+ * Quota cost: 50 units
+ */
+export async function deletePlaylist(
+  accessToken: string,
+  id: string
+): Promise<void> {
+  await axios.delete(`${YOUTUBE_API_BASE}/playlists`, {
+    params: { id },
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
+/**
+ * Lists items in a playlist.
+ * Quota cost: 1 unit
+ */
+export async function listPlaylistItems(
+  accessToken: string,
+  playlistId: string,
+  opts: { maxResults?: number; pageToken?: string } = {}
+): Promise<{ items: YouTubePlaylistItem[]; nextPageToken?: string }> {
+  const response = await axios.get<{ items: YouTubePlaylistItem[]; nextPageToken?: string }>(
+    `${YOUTUBE_API_BASE}/playlistItems`,
+    {
+      params: {
+        part: 'snippet,contentDetails',
+        playlistId,
+        maxResults: opts.maxResults ?? 25,
+        ...(opts.pageToken && { pageToken: opts.pageToken }),
+      },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  return { items: response.data.items || [], nextPageToken: response.data.nextPageToken };
+}
+
+/**
+ * Adds a video to a playlist.
+ * Quota cost: 50 units
+ */
+export async function addPlaylistItem(
+  accessToken: string,
+  playlistId: string,
+  videoId: string
+): Promise<YouTubePlaylistItem> {
+  const response = await axios.post<YouTubePlaylistItem>(
+    `${YOUTUBE_API_BASE}/playlistItems`,
+    {
+      snippet: {
+        playlistId,
+        resourceId: { kind: 'youtube#video', videoId },
+      },
+    },
+    {
+      params: { part: 'snippet' },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  return response.data;
+}
+
+/**
+ * Removes an item from a playlist.
+ * Quota cost: 50 units
+ */
+export async function deletePlaylistItem(
+  accessToken: string,
+  itemId: string
+): Promise<void> {
+  await axios.delete(`${YOUTUBE_API_BASE}/playlistItems`, {
+    params: { id: itemId },
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
 // ─── YouTube Analytics API functions ──────────────────────────────────
 
 export interface AnalyticsReportResponse {

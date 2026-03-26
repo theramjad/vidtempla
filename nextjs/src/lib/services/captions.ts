@@ -2,6 +2,9 @@ import { getChannelTokens, resolveVideo } from "@/lib/api-auth";
 import {
   listCaptionTracks,
   downloadCaptionTrack,
+  insertCaptionTrack,
+  updateCaptionTrack,
+  deleteCaptionTrack,
 } from "@/lib/clients/youtube";
 import { srtToPlainText } from "@/utils/srtParser";
 import type { ServiceResult } from "./types";
@@ -148,5 +151,101 @@ export async function getVideoTranscript(
     };
   } catch {
     return { error: { code: "INTERNAL_ERROR", message: "Failed to download transcript", suggestion: "Try again later", status: 500 } };
+  }
+}
+
+// ── insert_caption ───────────────────────────────────────────
+
+export async function insertCaption(
+  videoId: string,
+  userId: string,
+  opts: { language: string; name: string; captionData: string; isDraft?: boolean; sync?: boolean }
+): Promise<ServiceResult<CaptionTrackInfo>> {
+  try {
+    const video = await resolveVideo(videoId, userId);
+    if (!video) {
+      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    }
+
+    const tokens = await getChannelTokens(video.channelYoutubeId, userId);
+    if ("error" in tokens) {
+      return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
+    }
+
+    const track = await insertCaptionTrack(
+      tokens.accessToken, video.videoId, opts.language, opts.name, opts.captionData, opts.isDraft, opts.sync
+    );
+
+    return {
+      data: {
+        id: track.id,
+        language: track.snippet.language,
+        trackKind: track.snippet.trackKind,
+        name: track.snippet.name,
+        isAutoSynced: track.snippet.isAutoSynced,
+      },
+    };
+  } catch {
+    return { error: { code: "INTERNAL_ERROR", message: "Failed to upload caption", suggestion: "Try again later", status: 500 } };
+  }
+}
+
+// ── update_caption ───────────────────────────────────────────
+
+export async function updateCaption(
+  videoId: string,
+  userId: string,
+  captionId: string,
+  opts: { captionData?: string; isDraft?: boolean }
+): Promise<ServiceResult<CaptionTrackInfo>> {
+  try {
+    const video = await resolveVideo(videoId, userId);
+    if (!video) {
+      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    }
+
+    const tokens = await getChannelTokens(video.channelYoutubeId, userId);
+    if ("error" in tokens) {
+      return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
+    }
+
+    const track = await updateCaptionTrack(tokens.accessToken, captionId, opts.captionData, opts.isDraft);
+
+    return {
+      data: {
+        id: track.id,
+        language: track.snippet.language,
+        trackKind: track.snippet.trackKind,
+        name: track.snippet.name,
+        isAutoSynced: track.snippet.isAutoSynced,
+      },
+    };
+  } catch {
+    return { error: { code: "INTERNAL_ERROR", message: "Failed to update caption", suggestion: "Try again later", status: 500 } };
+  }
+}
+
+// ── delete_caption ───────────────────────────────────────────
+
+export async function deleteCaption(
+  videoId: string,
+  userId: string,
+  captionId: string
+): Promise<ServiceResult<{ deleted: true }>> {
+  try {
+    const video = await resolveVideo(videoId, userId);
+    if (!video) {
+      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    }
+
+    const tokens = await getChannelTokens(video.channelYoutubeId, userId);
+    if ("error" in tokens) {
+      return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
+    }
+
+    await deleteCaptionTrack(tokens.accessToken, captionId);
+    return { data: { deleted: true } };
+  } catch {
+    return { error: { code: "INTERNAL_ERROR", message: "Failed to delete caption", suggestion: "Try again later", status: 500 } };
   }
 }

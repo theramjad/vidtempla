@@ -37,12 +37,12 @@ export const appConfig = {
         url: "/dashboard/api-keys",
       },
       {
-        title: "Usage",
-        url: "/dashboard/usage",
-      },
-      {
         title: "MCP Server",
         url: "/dashboard/mcp-server",
+      },
+      {
+        title: "Usage",
+        url: "/dashboard/usage",
       },
     ],
   },
