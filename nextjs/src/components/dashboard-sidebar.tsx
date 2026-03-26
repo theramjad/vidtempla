@@ -26,7 +26,6 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { Progress } from "./ui/progress";
-import { isSuperAdmin } from "@/lib/admin";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { Button } from "./ui/button";
@@ -73,6 +72,7 @@ export default function DashboardSidebar() {
   const email = user?.email ?? "";
   const displayName = getDisplayName(email);
   const initial = getInitial(email);
+  const isAdmin = email === "r@rayamjad.com";
 
   return (
     <Sidebar collapsible="icon" className="border-r bg-background">
@@ -119,7 +119,7 @@ export default function DashboardSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {isSuperAdmin(user?.email) && (
+        {isAdmin && (
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
