@@ -15,6 +15,7 @@ const mcpRouteHandler = createMcpHandler(
 
 // Wrap with better-auth MCP OAuth, passing session via AsyncLocalStorage
 const mcpHandler = withMcpAuth(auth, async (req, session) => {
+  console.log("[MCP] Auth succeeded, userId:", session.userId);
   return sessionStore.run({ userId: session.userId }, () => mcpRouteHandler(req));
 });
 
@@ -23,6 +24,22 @@ const mcpHandler = withMcpAuth(auth, async (req, session) => {
 const HANDLER_TIMEOUT_MS = 55_000; // 55s — below Vercel's 60s function limit
 
 async function handler(req: Request): Promise<Response> {
+  // Debug: log auth header presence and attempt manual session lookup
+  const authHeader = req.headers.get("Authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  console.log("[MCP] Request:", req.method, new URL(req.url).pathname,
+    "| Auth header present:", !!authHeader,
+    "| Bearer token length:", bearerToken?.length ?? 0);
+
+  if (bearerToken) {
+    try {
+      const sessionCheck = await auth.api.getMcpSession({ headers: req.headers });
+      console.log("[MCP] getMcpSession result:", sessionCheck ? "found (userId: " + sessionCheck.userId + ")" : "null");
+    } catch (e) {
+      console.error("[MCP] getMcpSession threw:", e);
+    }
+  }
+
   try {
     const response = await Promise.race([
       mcpHandler(req),
@@ -36,6 +53,7 @@ async function handler(req: Request): Promise<Response> {
         { status: 500 }
       );
     }
+    console.log("[MCP] Response status:", response.status);
     return response;
   } catch (error) {
     console.error("[MCP] Handler error:", error);
