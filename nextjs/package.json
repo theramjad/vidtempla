@@ -63,7 +63,6 @@
     "micro": "^10.0.1",
     "nanoid": "^5.0.9",
     "next": "15.5.10",
-    "openai": "^6.9.1",
     "postgres": "^3.4.8",
     "posthog-js": "^1.297.2",
     "posthog-node": "^5.13.2",

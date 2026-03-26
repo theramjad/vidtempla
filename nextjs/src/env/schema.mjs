@@ -43,8 +43,6 @@ export const serverSchema = z.object({
   STRIPE_PRO_PRICE_ID: z.string(),
   STRIPE_BUSINESS_PRICE_ID: z.string(),
 
-  // AI
-  OPENAI_API_KEY: z.string(),
 });
 
 /**
@@ -90,8 +88,6 @@ export const serverEnv = {
   STRIPE_PRO_PRICE_ID: process.env.STRIPE_PRO_PRICE_ID,
   STRIPE_BUSINESS_PRICE_ID: process.env.STRIPE_BUSINESS_PRICE_ID,
 
-  // AI
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
 };
 
 /**

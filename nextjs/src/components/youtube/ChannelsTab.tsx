@@ -17,18 +17,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Unplug, RefreshCw, Plus, ArrowUpRight, Wand2, AlertTriangle, Link2 } from 'lucide-react';
+import { Loader2, Unplug, RefreshCw, Plus, ArrowUpRight, AlertTriangle, Link2 } from 'lucide-react';
 import DisconnectConfirmDialog from './DisconnectConfirmDialog';
 import Image from 'next/image';
 import { DateTime } from 'luxon';
 import Link from 'next/link';
-import AIAnalysisModal from './AIAnalysisModal';
-
 export default function ChannelsTab() {
   const { toast } = useToast();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
-  const [aiModalOpen, setAiModalOpen] = useState(false);
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
   const [channelToDisconnect, setChannelToDisconnect] = useState<{
     id: string;
@@ -139,15 +136,6 @@ export default function ChannelsTab() {
             Connect your YouTube channels to manage video descriptions
           </p>
         </div>
-        {process.env.NODE_ENV === 'development' && (
-          <Button
-            onClick={() => setAiModalOpen(true)}
-            className="gap-2 bg-purple-600 text-white hover:bg-purple-700"
-          >
-            <Wand2 className="h-4 w-4" />
-            AI Migration Assistant
-          </Button>
-        )}
       </CardHeader>
       <CardContent className="p-0">
         {isLoading ? (
@@ -320,14 +308,6 @@ export default function ChannelsTab() {
           </div>
         )}
       </CardContent>
-
-      <AIAnalysisModal
-        open={aiModalOpen}
-        onOpenChange={setAiModalOpen}
-        onSuccess={() => {
-          refetch();
-        }}
-      />
 
       <DisconnectConfirmDialog
         open={disconnectDialogOpen}
