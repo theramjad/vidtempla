@@ -15,11 +15,13 @@ VidTempla is a YouTube description management tool built with Next.js 15, TypeSc
 
 ## Schema Changes
 1. Edit `nextjs/src/db/schema.ts` to modify table definitions
-2. For custom SQL (triggers, functions): create manual SQL file in `nextjs/drizzle/`
-3. **Never run `drizzle-kit push`, `drizzle-kit generate`, or `drizzle-kit migrate` manually** — all schema changes are applied automatically by Vercel on deploy
+2. Run `npx drizzle-kit generate` (from `nextjs/`) to create a SQL migration file in `drizzle/`
+3. Review the generated SQL, then commit it alongside your schema changes
+4. For custom SQL (triggers, functions): run `npx drizzle-kit generate --custom` to create a blank migration file
+5. **Never run `drizzle-kit push`** — it prompts interactively and silently fails in CI
 
 ## Deployment
-Vercel's `vercel-build` script runs `drizzle-kit push && next build` on every deploy. Pushing to main applies schema changes to the remote database automatically. No manual migration steps needed.
+Vercel's `vercel-build` script runs `drizzle-kit migrate && next build` on every deploy. Migrations are version-controlled SQL files applied sequentially — no prompts, no silent failures.
 
 # Authentication & Security
 - Better Auth handles auth via `nextjs/src/lib/auth.ts` (server) and `nextjs/src/lib/auth-client.ts` (client)
