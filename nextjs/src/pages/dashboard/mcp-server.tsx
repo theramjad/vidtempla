@@ -19,57 +19,6 @@ import { Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 const SERVER_URL = 'https://www.vidtempla.com/api/mcp';
-const toolGroups = [
-  {
-    name: 'Channels',
-    tools: ['list_channels', 'get_channel', 'get_channel_overview'],
-  },
-  {
-    name: 'Videos',
-    tools: [
-      'list_videos',
-      'get_video',
-      'get_video_analytics',
-      'get_video_retention',
-      'get_video_variables',
-      'assign_video',
-      'update_video_variables',
-      'get_description_history',
-      'revert_description',
-    ],
-  },
-  {
-    name: 'Templates',
-    tools: [
-      'list_templates',
-      'get_template',
-      'create_template',
-      'update_template',
-      'delete_template',
-      'get_template_impact',
-    ],
-  },
-  {
-    name: 'Containers',
-    tools: [
-      'list_containers',
-      'get_container',
-      'create_container',
-      'update_container',
-      'delete_container',
-    ],
-  },
-  {
-    name: 'Analytics',
-    tools: [
-      'get_channel_analytics',
-      'query_analytics',
-      'search_my_videos',
-      'search_youtube',
-      'sync_channel',
-    ],
-  },
-];
 
 const MCP_COMMAND = `claude mcp add --transport http vidtempla ${SERVER_URL} -s user`;
 
@@ -133,34 +82,6 @@ export default function McpServerPage() {
                   </Button>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Available Tools */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Available Tools</CardTitle>
-              <CardDescription>
-                {toolGroups.reduce((sum, g) => sum + g.tools.length, 0)} tools
-                across {toolGroups.length} categories
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {toolGroups.map((group) => (
-                <div key={group.name} className="space-y-1.5">
-                  <span className="text-sm font-medium">{group.name}</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {group.tools.map((tool) => (
-                      <code
-                        key={tool}
-                        className="text-xs bg-muted px-2 py-0.5 rounded"
-                      >
-                        {tool}
-                      </code>
-                    ))}
-                  </div>
-                </div>
-              ))}
             </CardContent>
           </Card>
 
