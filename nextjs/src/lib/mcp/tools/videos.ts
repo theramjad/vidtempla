@@ -19,7 +19,7 @@ export function registerVideoTools(server: McpServer) {
     "list_videos",
     "List videos with filtering, sorting, and cursor pagination",
     {
-      channelId: z.string().optional().describe("Filter by YouTube channel ID"),
+      channelId: z.string().describe("YouTube channel ID (required — used to sync fresh data from YouTube)"),
       containerId: z.string().optional().describe("Filter by container UUID"),
       search: z.string().optional().describe("Search by video title"),
       unassigned: z.boolean().optional().describe("Only show unassigned videos"),
@@ -31,8 +31,10 @@ export function registerVideoTools(server: McpServer) {
     async (args) => {
       const userId = getSessionUserId();
       const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 2);
+      if (!credits.success) return mcpQuotaExceeded(userId, "list_videos");
       const result = await listVideos(userId, args, orgId);
-      logMcpRequest(userId, "list_videos", 0, "error" in result ? 400 : 200);
+      logMcpRequest(userId, "list_videos", 2, "error" in result ? 400 : 200);
       return toMcp(result);
     }
   );

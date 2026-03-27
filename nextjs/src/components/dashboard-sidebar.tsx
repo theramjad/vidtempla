@@ -249,9 +249,34 @@ export default function DashboardSidebar() {
       {/* Content */}
       <SidebarContent>
         <SidebarGroup>
+          <SidebarGroupLabel>Channel</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => {
+              {navItems.filter((i) => i.key === "dashboard" || i.key === "usage" || i.key === "pricing").map((item) => {
+                const Icon = iconMap[item.key] ?? CreditCard;
+                const isActive =
+                  router.asPath === item.url ||
+                  router.asPath.startsWith(item.url + "/");
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild tooltip={item.title} isActive={isActive}>
+                      <Link href={item.url}>
+                        <Icon />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Integrations</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navItems.filter((i) => i.key === "api-keys" || i.key === "mcp-server").map((item) => {
                 const Icon = iconMap[item.key] ?? CreditCard;
                 const isActive =
                   router.asPath === item.url ||
@@ -308,17 +333,18 @@ export default function DashboardSidebar() {
 
         {isAdmin && (
           <SidebarGroup>
+            <SidebarGroupLabel>Super Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
-                    tooltip="Admin"
+                    tooltip="Admin Panel"
                     isActive={router.asPath.startsWith("/admin")}
                   >
                     <Link href="/admin">
                       <Shield />
-                      <span>Admin</span>
+                      <span>Admin Panel</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

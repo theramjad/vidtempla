@@ -23,6 +23,7 @@ import {
 } from "@/db/schema";
 import { getChannelTokens, resolveVideo } from "@/lib/api-auth";
 import {
+  fetchChannelVideos,
   fetchVideoDetails,
   fetchVideoAnalytics,
   fetchVideoRetention,
@@ -50,6 +51,57 @@ export async function listVideos(
   organizationId?: string
 ): Promise<ServiceResult<{ data: unknown[]; meta: PaginationMeta }>> {
   try {
+    // Sync from YouTube if channelId is provided
+    if (opts.channelId) {
+      try {
+        const tokens = await getChannelTokens(opts.channelId, userId, organizationId);
+        if (!("error" in tokens)) {
+          // Look up internal channel ID
+          const ownerCond = organizationId
+            ? eq(youtubeChannels.organizationId, organizationId)
+            : eq(youtubeChannels.userId, userId);
+          const [channel] = await db
+            .select({ id: youtubeChannels.id })
+            .from(youtubeChannels)
+            .where(and(eq(youtubeChannels.channelId, opts.channelId), ownerCond));
+
+          if (channel) {
+            // Fetch all pages from YouTube
+            let nextPageToken: string | undefined;
+            do {
+              const page = await fetchChannelVideos(opts.channelId, tokens.accessToken, nextPageToken);
+              if (page.videos.length > 0) {
+                await Promise.all(
+                  page.videos.map((v) =>
+                    db
+                      .insert(youtubeVideos)
+                      .values({
+                        channelId: channel.id,
+                        videoId: v.id,
+                        title: v.snippet.title,
+                        currentDescription: v.snippet.description,
+                        publishedAt: new Date(v.snippet.publishedAt),
+                      })
+                      .onConflictDoUpdate({
+                        target: youtubeVideos.videoId,
+                        set: {
+                          title: v.snippet.title,
+                          publishedAt: new Date(v.snippet.publishedAt),
+                          updatedAt: new Date(),
+                        },
+                      })
+                  )
+                );
+              }
+              nextPageToken = page.nextPageToken;
+            } while (nextPageToken);
+          }
+        }
+      } catch {
+        // YouTube sync failed — fall through to DB query with stale data
+      }
+    }
+
     const limit = Math.min(opts.limit ?? 50, 100);
     const sortParam = opts.sort ?? "publishedAt:desc";
 
