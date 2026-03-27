@@ -57,6 +57,13 @@
       "when": 1774583416942,
       "tag": "0007_nosy_nico_minoru",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1774584244819,
+      "tag": "0008_migrate_existing_users_to_orgs",
+      "breakpoints": true
     }
   ]
 }

@@ -28,7 +28,7 @@ export async function middleware(request: NextRequest) {
     // Redirect authenticated users to org resolver
     const url = request.nextUrl.clone();
     // Map /dashboard/youtube → youtube, /dashboard/api-keys → api-keys, etc.
-    const subPath = pathname.replace(/^\/dashboard\/?/, "") || "youtube";
+    const subPath = pathname.replace(/^\/dashboard\/?/, "") || "dashboard/youtube";
     url.pathname = "/org/resolve";
     url.searchParams.set("returnTo", subPath);
     return NextResponse.redirect(url);
