@@ -237,6 +237,37 @@ export default function OrgUsagePage() {
                 </Card>
               )}
 
+              {/* Per-member breakdown */}
+              {usage.byMember.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">By Member</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Member</TableHead>
+                          <TableHead className="text-right">Requests</TableHead>
+                          <TableHead className="text-right">Quota Units</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {usage.byMember.map((row) => (
+                          <TableRow key={row.userId}>
+                            <TableCell className="font-medium">
+                              {row.userName ?? row.userEmail ?? 'Unknown'}
+                            </TableCell>
+                            <TableCell className="text-right">{row.requests.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{row.quotaUnits.toLocaleString()}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Request History */}
               <Card>
                 <CardHeader>
@@ -278,6 +309,7 @@ export default function OrgUsagePage() {
                             <TableHead className="text-right">Status</TableHead>
                             <TableHead className="text-right">Quota</TableHead>
                             <TableHead>API Key</TableHead>
+                            <TableHead>Member</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -303,6 +335,9 @@ export default function OrgUsagePage() {
                                 ) : (
                                   row.keyName ?? '\u2014'
                                 )}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {row.memberName ?? '\u2014'}
                               </TableCell>
                             </TableRow>
                           ))}

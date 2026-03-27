@@ -1,9 +1,9 @@
 import Head from "next/head";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { OrganizationProvider, useOrganization } from "@/contexts/OrganizationContext";
 import { authClient } from "@/lib/auth-client";
-import { setOrganizationId } from "@/utils/api";
+import { api, setOrganizationId } from "@/utils/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +26,19 @@ function OrgSettingsContent() {
   const router = useRouter();
   const [orgName, setOrgName] = useState(name);
   const [saving, setSaving] = useState(false);
+  const [orgCount, setOrgCount] = useState<number | null>(null);
+
+  const { data: plan } = api.dashboard.billing.getCurrentPlan.useQuery();
+
+  useEffect(() => {
+    authClient.organization.list().then(({ data }) => {
+      setOrgCount(data?.length ?? 0);
+    });
+  }, []);
+
+  const isPaid = plan?.planTier && plan.planTier !== "free";
+  const isLastOrg = orgCount !== null && orgCount <= 1;
+  const canDelete = isOwner && !isPaid && !isLastOrg;
 
   async function handleSave() {
     setSaving(true);
@@ -81,25 +94,40 @@ function OrgSettingsContent() {
             Deleting this organization is permanent and cannot be undone. All channels,
             templates, containers, and API keys will be lost.
           </p>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive">Delete Organization</Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete &quot;{name}&quot;?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will permanently delete the organization and all its data. This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          {isPaid && (
+            <p className="text-sm text-destructive">
+              Cancel your subscription before deleting this organization.{" "}
+              <a href={`/org/${slug}/settings`} className="underline">Go to billing →</a>
+            </p>
+          )}
+          {!isPaid && isLastOrg && (
+            <p className="text-sm text-destructive">
+              You cannot delete your only organization.
+            </p>
+          )}
+          {canDelete ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive">Delete Organization</Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete &quot;{name}&quot;?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete the organization and all its data. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : (
+            <Button variant="destructive" disabled>Delete Organization</Button>
+          )}
         </div>
       )}
     </div>

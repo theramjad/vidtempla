@@ -6,7 +6,7 @@
 import { z } from "zod";
 import { orgProcedure, router } from "@/server/trpc/init";
 import { db } from "@/db";
-import { apiKeys, apiRequestLog } from "@/db/schema";
+import { apiKeys, apiRequestLog, user } from "@/db/schema";
 import { eq, and, desc, sql, gte, lte, count, like, lt, or } from "drizzle-orm";
 import { generateApiKey } from "@/lib/api-keys";
 import { getCredits } from "@/lib/plan-limits";
@@ -161,7 +161,7 @@ export const apiKeysRouter = router({
         lte(apiRequestLog.createdAt, end),
       ];
 
-      const [daily, [totals], byEndpoint, byKey] = await Promise.all([
+      const [daily, [totals], byEndpoint, byKey, byMember] = await Promise.all([
         // Per-day counts
         db
           .select({
@@ -221,6 +221,25 @@ export const apiKeysRouter = router({
           .where(and(...filters))
           .groupBy(apiRequestLog.apiKeyId, apiRequestLog.source, apiKeys.name)
           .orderBy(desc(count())),
+
+        // Per-member breakdown
+        db
+          .select({
+            userId: apiRequestLog.userId,
+            userName: user.name,
+            userEmail: user.email,
+            userImage: user.image,
+            requests: count().as("requests"),
+            quotaUnits:
+              sql<number>`COALESCE(SUM(${apiRequestLog.quotaUnits}), 0)`.as(
+                "quota_units"
+              ),
+          })
+          .from(apiRequestLog)
+          .leftJoin(user, eq(apiRequestLog.userId, user.id))
+          .where(and(...filters))
+          .groupBy(apiRequestLog.userId, user.name, user.email, user.image)
+          .orderBy(desc(count())),
       ]);
 
       return {
@@ -231,6 +250,7 @@ export const apiKeysRouter = router({
         },
         byEndpoint,
         byKey,
+        byMember,
         periodStart: start.toISOString(),
         periodEnd: end.toISOString(),
       };
@@ -286,9 +306,11 @@ export const apiKeysRouter = router({
           statusCode: apiRequestLog.statusCode,
           quotaUnits: apiRequestLog.quotaUnits,
           keyName: sql<string | null>`${apiKeys.name}`.as("key_name"),
+          memberName: user.name,
         })
         .from(apiRequestLog)
         .leftJoin(apiKeys, eq(apiRequestLog.apiKeyId, apiKeys.id))
+        .leftJoin(user, eq(apiRequestLog.userId, user.id))
         .where(and(...filters))
         .orderBy(desc(apiRequestLog.createdAt), desc(apiRequestLog.id))
         .limit(input.limit + 1);
