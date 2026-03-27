@@ -1,13 +1,24 @@
-import Head from "next/head";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/useUser";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/router";
 import { useEffect, useState, useRef } from "react";
 import { appConfig } from "@/config/app";
-import { Loader2 } from "lucide-react";
 import Link from "next/link";
-import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { AuthLayout } from "@/components/layout/AuthLayout";
+
+const btnStyle: React.CSSProperties = {
+  fontFamily: "'Bricolage Grotesque', sans-serif",
+  fontWeight: 700,
+  fontSize: 16,
+  lineHeight: 1,
+  border: "none",
+  borderRadius: 999,
+  cursor: "pointer",
+  width: "100%",
+  padding: "14px 24px",
+  transition: "transform 0.15s, box-shadow 0.15s",
+};
 
 export default function Page() {
   const router = useRouter();
@@ -17,24 +28,24 @@ export default function Page() {
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const shownErrorsRef = useRef(new Set<string>());
 
-  // If user is already signed in, redirect
   useEffect(() => {
     if (user && !userLoading) {
       const returnTo = router.query.returnTo as string;
-      if (returnTo && returnTo.startsWith('/')) {
+      if (returnTo && returnTo.startsWith("/")) {
         router.push(decodeURIComponent(returnTo));
       } else {
-        router.push('/dashboard');
+        router.push("/dashboard");
       }
     }
   }, [user, userLoading]);
 
-  // Handle error params in URL
   useEffect(() => {
-    const { error: queryError, error_description: queryErrorDesc } = router.query;
+    const { error: queryError, error_description: queryErrorDesc } =
+      router.query;
     if (queryError && queryErrorDesc) {
       const errorKey = `query:${queryError}:${queryErrorDesc}`;
       if (!shownErrorsRef.current.has(errorKey)) {
@@ -51,13 +62,11 @@ export default function Page() {
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     setIsSubmitting(true);
-
     try {
       const { error } = await authClient.signIn.magicLink({
         email,
         callbackURL: "/dashboard/youtube",
       });
-
       if (error) {
         toast({
           variant: "destructive",
@@ -71,7 +80,7 @@ export default function Page() {
           description: "Check your email for the login link!",
         });
       }
-    } catch (err) {
+    } catch {
       toast({
         variant: "destructive",
         title: "Error",
@@ -82,120 +91,309 @@ export default function Page() {
     }
   }
 
+  async function handleGoogleSignIn() {
+    setGoogleLoading(true);
+    try {
+      await authClient.signIn.social({
+        provider: "google",
+        callbackURL: "/dashboard/youtube",
+      });
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+      });
+      setGoogleLoading(false);
+    }
+  }
+
+  if (userLoading || user) {
+    return (
+      <AuthLayout title="Sign In" headTitle="Sign In | VidTempla">
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 12,
+            padding: "24px 0",
+          }}
+        >
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              border: "3px solid var(--cream-dark)",
+              borderTopColor: "var(--teal)",
+              borderRadius: "50%",
+              animation: "spin 0.8s linear infinite",
+            }}
+          />
+          <style jsx>{`
+            @keyframes spin {
+              to {
+                transform: rotate(360deg);
+              }
+            }
+          `}</style>
+          <p style={{ fontSize: 15, color: "var(--text-light)" }}>
+            Redirecting...
+          </p>
+        </div>
+      </AuthLayout>
+    );
+  }
+
   return (
-    <>
-      <Head>
-        <title>Sign In | VidTempla</title>
-      </Head>
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        {userLoading || user ? (
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-            <p className="text-sm text-gray-500">Redirecting...</p>
+    <AuthLayout title="Sign In" headTitle="Sign In | VidTempla">
+      {!magicLinkSent ? (
+        <form onSubmit={handleSignIn}>
+          <div style={{ marginBottom: 20 }}>
+            <label
+              htmlFor="email"
+              style={{
+                display: "block",
+                fontFamily: "'Bricolage Grotesque', sans-serif",
+                fontSize: 14,
+                fontWeight: 600,
+                color: "var(--text)",
+                marginBottom: 6,
+              }}
+            >
+              Email address
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                fontSize: 16,
+                fontFamily: "'Source Serif 4', Georgia, serif",
+                border: "2px solid var(--cream-dark)",
+                borderRadius: 12,
+                background: "var(--cream)",
+                color: "var(--text)",
+                outline: "none",
+                transition: "border-color 0.15s",
+              }}
+              onFocus={(e) =>
+                (e.target.style.borderColor = "var(--teal-light)")
+              }
+              onBlur={(e) =>
+                (e.target.style.borderColor = "var(--cream-dark)")
+              }
+            />
           </div>
-        ) : (
-          <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-6 shadow-md">
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-            Sign In
-          </h2>
 
-          {!magicLinkSent && (
-              <form className="mt-8 space-y-6" onSubmit={handleSignIn}>
-                <div className="-space-y-px rounded-md shadow-sm">
-                  <div>
-                    <label htmlFor="email" className="sr-only">
-                      Email address
-                    </label>
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="relative block w-full rounded-md border-0 px-4 py-2 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-emerald-600 sm:text-sm sm:leading-6"
-                      placeholder="Email address"
-                    />
-                  </div>
-                </div>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            style={{
+              ...btnStyle,
+              background: "var(--terracotta)",
+              color: "white",
+              opacity: isSubmitting ? 0.7 : 1,
+              marginBottom: 16,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-1px)";
+              e.currentTarget.style.boxShadow =
+                "0 4px 12px rgba(199,92,46,0.3)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "none";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            {isSubmitting ? "Sending link..." : "Send Magic Link"}
+          </button>
 
-                <div>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="group relative flex w-full justify-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:bg-emerald-300"
-                  >
-                    {isSubmitting ? "Sending link..." : "Send Magic Link"}
-                  </button>
-                </div>
-
-                {appConfig.auth.enableSignUp && (
-                  <div className="text-center">
-                    <Link
-                      href="/sign-up"
-                      className="text-sm text-emerald-600 hover:text-emerald-500"
-                    >
-                      Don't have an account? Sign up
-                    </Link>
-                  </div>
-                )}
-
-                {/* Divider */}
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300"></div>
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="bg-white px-2 text-gray-500">Or continue with</span>
-                  </div>
-                </div>
-
-                {/* Google Sign-in Button */}
-                <div>
-                  <GoogleSignInButton className="w-full" />
-                </div>
-              </form>
-            )}
-
-            {/* Show message when magic link is sent */}
-            {magicLinkSent && (
-              <div className="mt-8 flex flex-col items-center space-y-6">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
-                  <svg
-                    className="h-8 w-8 text-emerald-600"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-medium text-gray-900">Check your email</h3>
-                <p className="text-center text-gray-600">
-                  We've sent a magic link to <span className="font-semibold">{email}</span>
-                </p>
-                <p className="text-center text-sm text-gray-500">
-                  Click the link in your email to sign in.
-                </p>
-
-                <button
-                  onClick={() => {
-                    setMagicLinkSent(false);
-                  }}
-                  className="text-sm text-emerald-600 hover:text-emerald-500"
-                >
-                  Use a different email
-                </button>
-              </div>
-            )}
+          {/* Divider */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              margin: "20px 0",
+            }}
+          >
+            <div
+              style={{
+                flex: 1,
+                height: 1,
+                background: "var(--cream-dark)",
+              }}
+            />
+            <span
+              style={{
+                fontSize: 14,
+                color: "var(--text-light)",
+                fontFamily: "'Bricolage Grotesque', sans-serif",
+              }}
+            >
+              or
+            </span>
+            <div
+              style={{
+                flex: 1,
+                height: 1,
+                background: "var(--cream-dark)",
+              }}
+            />
           </div>
-        )}
-      </div>
-    </>
+
+          {/* Google button */}
+          <button
+            type="button"
+            disabled={googleLoading}
+            onClick={handleGoogleSignIn}
+            style={{
+              ...btnStyle,
+              background: "white",
+              color: "var(--text)",
+              border: "2px solid var(--cream-dark)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              opacity: googleLoading ? 0.7 : 1,
+              marginBottom: 24,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = "var(--teal-light)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = "var(--cream-dark)";
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24">
+              <path
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                fill="#4285F4"
+              />
+              <path
+                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                fill="#34A853"
+              />
+              <path
+                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                fill="#FBBC05"
+              />
+              <path
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                fill="#EA4335"
+              />
+            </svg>
+            {googleLoading ? "Signing in..." : "Continue with Google"}
+          </button>
+
+          {appConfig.auth.enableSignUp && (
+            <p
+              style={{
+                textAlign: "center",
+                fontSize: 15,
+                color: "var(--text-light)",
+              }}
+            >
+              Don't have an account?{" "}
+              <Link
+                href="/sign-up"
+                style={{ color: "var(--terracotta)", fontWeight: 600 }}
+              >
+                Sign up
+              </Link>
+            </p>
+          )}
+        </form>
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 16,
+            padding: "16px 0",
+          }}
+        >
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: "50%",
+              background: "var(--cream)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <svg
+              width="32"
+              height="32"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="var(--teal)"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
+            </svg>
+          </div>
+          <h3
+            style={{
+              fontFamily: "'Bricolage Grotesque', sans-serif",
+              fontSize: 22,
+              fontWeight: 700,
+              color: "var(--teal)",
+            }}
+          >
+            Check your email
+          </h3>
+          <p
+            style={{
+              textAlign: "center",
+              fontSize: 16,
+              color: "var(--text-light)",
+            }}
+          >
+            We sent a magic link to{" "}
+            <strong style={{ color: "var(--text)" }}>{email}</strong>
+          </p>
+          <p
+            style={{
+              textAlign: "center",
+              fontSize: 14,
+              color: "var(--text-light)",
+            }}
+          >
+            Click the link in your email to sign in.
+          </p>
+          <button
+            onClick={() => setMagicLinkSent(false)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--terracotta)",
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "'Bricolage Grotesque', sans-serif",
+              marginTop: 8,
+            }}
+          >
+            Use a different email
+          </button>
+        </div>
+      )}
+    </AuthLayout>
   );
 }
