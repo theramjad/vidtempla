@@ -10,7 +10,7 @@ export function registerCommentTools(server: McpServer) {
     "List top-level comment threads on a YouTube video, including replies. Returns up to 100 threads per page with pagination support.",
     {
       videoId: z.string().describe("YouTube video ID (e.g. 'dQw4w9WgXcQ')"),
-      channelId: z.string().describe("YouTube channel ID that owns the video"),
+      channelId: z.string().optional().describe("YouTube channel ID (optional — if omitted, reads comments using any connected channel's token)"),
       maxResults: z.number().optional().describe("Number of threads to return (1-100, default 20)"),
       order: z.enum(["relevance", "time"]).optional().describe("Sort order: 'relevance' (default) or 'time' (newest first)"),
       pageToken: z.string().optional().describe("Pagination token from a previous response's nextPageToken"),
@@ -21,7 +21,7 @@ export function registerCommentTools(server: McpServer) {
       const orgId = getSessionOrgId();
       const credits = await consumeCredits(orgId, 1);
       if (!credits.success) return mcpQuotaExceeded(userId, "list_comment_threads");
-      const result = await listCommentThreads(videoId, channelId, userId, { maxResults, order, pageToken });
+      const result = await listCommentThreads(videoId, channelId, userId, { maxResults, order, pageToken, organizationId: orgId });
       logMcpRequest(userId, "list_comment_threads", 1, "error" in result ? 400 : 200);
       return toMcp(result);
     }

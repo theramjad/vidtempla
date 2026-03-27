@@ -1,4 +1,4 @@
-import { getChannelTokens } from "@/lib/api-auth";
+import { getChannelTokens, getAnyUserToken } from "@/lib/api-auth";
 import {
   listCommentThreads as ytListCommentThreads,
   replyToComment as ytReplyToComment,
@@ -10,17 +10,27 @@ import type { ServiceResult } from "./types";
 
 export async function listCommentThreads(
   videoId: string,
-  channelId: string,
+  channelId: string | undefined,
   userId: string,
-  opts: { maxResults?: number; order?: string; pageToken?: string } = {}
+  opts: { maxResults?: number; order?: string; pageToken?: string; organizationId?: string } = {}
 ): Promise<ServiceResult<{ items: unknown[]; nextPageToken?: string }>> {
   try {
-    const tokens = await getChannelTokens(channelId, userId);
-    if ("error" in tokens) {
-      return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
+    // Try specific channel token if provided, fall back to any connected channel
+    const specificResult = channelId
+      ? await getChannelTokens(channelId, userId, opts.organizationId)
+      : undefined;
+
+    const tokenResult = specificResult && !("error" in specificResult)
+      ? specificResult
+      : await getAnyUserToken(userId, opts.organizationId);
+
+    if ("error" in tokenResult) {
+      return { error: { code: tokenResult.error.error.code, message: tokenResult.error.error.message, suggestion: tokenResult.error.error.suggestion ?? "", status: tokenResult.status } };
     }
 
-    const result = await ytListCommentThreads(tokens.accessToken, videoId, opts);
+    const accessToken = tokenResult.accessToken;
+
+    const result = await ytListCommentThreads(accessToken, videoId, opts);
     return { data: result };
   } catch {
     return { error: { code: "INTERNAL_ERROR", message: "Failed to list comment threads", suggestion: "Try again later", status: 500 } };

@@ -26,7 +26,8 @@
       "mcp__exa__get_code_context_exa",
       "Bash(cd /Users/ray/Desktop/vidtempla/nextjs && npx drizzle-kit generate 2>&1)",
       "Bash(cd:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "mcp__Claude_Preview__preview_start"
     ],
     "deny": [],
     "ask": []

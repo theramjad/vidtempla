@@ -21,7 +21,7 @@ import {
   videoVariables,
   descriptionHistory,
 } from "@/db/schema";
-import { getChannelTokens, resolveVideo } from "@/lib/api-auth";
+import { getChannelTokens, getAnyUserToken, resolveVideo } from "@/lib/api-auth";
 import {
   fetchChannelVideos,
   fetchVideoDetails,
@@ -49,59 +49,89 @@ export async function listVideos(
   userId: string,
   opts: ListVideosOpts,
   organizationId?: string
-): Promise<ServiceResult<{ data: unknown[]; meta: PaginationMeta }>> {
+): Promise<ServiceResult<{ data: unknown[]; meta: PaginationMeta; source: "db" | "youtube" }>> {
   try {
-    // Sync from YouTube if channelId is provided
+    // Check if the channel is owned by the user
+    let isOwned = false;
     if (opts.channelId) {
-      try {
-        const tokens = await getChannelTokens(opts.channelId, userId, organizationId);
-        if (!("error" in tokens)) {
-          // Look up internal channel ID
-          const ownerCond = organizationId
-            ? eq(youtubeChannels.organizationId, organizationId)
-            : eq(youtubeChannels.userId, userId);
-          const [channel] = await db
-            .select({ id: youtubeChannels.id })
-            .from(youtubeChannels)
-            .where(and(eq(youtubeChannels.channelId, opts.channelId), ownerCond));
+      const tokens = await getChannelTokens(opts.channelId, userId, organizationId);
+      if (!("error" in tokens)) {
+        isOwned = true;
 
-          if (channel) {
-            // Fetch all pages from YouTube
-            let nextPageToken: string | undefined;
-            do {
-              const page = await fetchChannelVideos(opts.channelId, tokens.accessToken, nextPageToken);
-              if (page.videos.length > 0) {
-                await Promise.all(
-                  page.videos.map((v) =>
-                    db
-                      .insert(youtubeVideos)
-                      .values({
-                        channelId: channel.id,
-                        videoId: v.id,
+        // Sync from YouTube for owned channels
+        try {
+          let nextPageToken: string | undefined;
+          do {
+            const page = await fetchChannelVideos(opts.channelId, tokens.accessToken, nextPageToken);
+            if (page.videos.length > 0) {
+              await Promise.all(
+                page.videos.map((v) =>
+                  db
+                    .insert(youtubeVideos)
+                    .values({
+                      channelId: tokens.channelDbId,
+                      videoId: v.id,
+                      title: v.snippet.title,
+                      currentDescription: v.snippet.description,
+                      publishedAt: new Date(v.snippet.publishedAt),
+                    })
+                    .onConflictDoUpdate({
+                      target: youtubeVideos.videoId,
+                      set: {
                         title: v.snippet.title,
-                        currentDescription: v.snippet.description,
                         publishedAt: new Date(v.snippet.publishedAt),
-                      })
-                      .onConflictDoUpdate({
-                        target: youtubeVideos.videoId,
-                        set: {
-                          title: v.snippet.title,
-                          publishedAt: new Date(v.snippet.publishedAt),
-                          updatedAt: new Date(),
-                        },
-                      })
-                  )
-                );
-              }
-              nextPageToken = page.nextPageToken;
-            } while (nextPageToken);
-          }
+                        updatedAt: new Date(),
+                      },
+                    })
+                )
+              );
+            }
+            nextPageToken = page.nextPageToken;
+          } while (nextPageToken);
+        } catch {
+          // YouTube sync failed — fall through to DB query with stale data
         }
-      } catch {
-        // YouTube sync failed — fall through to DB query with stale data
       }
     }
 
+    // Unowned channel: fetch directly from YouTube API without DB storage
+    if (opts.channelId && !isOwned) {
+      const anyToken = await getAnyUserToken(userId, organizationId);
+      if ("error" in anyToken) {
+        return { error: { code: anyToken.error.error.code, message: anyToken.error.error.message, suggestion: anyToken.error.error.suggestion ?? "", status: anyToken.status } };
+      }
+
+      const limit = Math.min(opts.limit ?? 50, 100);
+      const videos: Array<{ videoId: string; title: string; description: string; publishedAt: string }> = [];
+      let nextPageToken: string | undefined;
+
+      // Fetch pages until we have enough
+      do {
+        const page = await fetchChannelVideos(opts.channelId, anyToken.accessToken, nextPageToken);
+        for (const v of page.videos) {
+          videos.push({
+            videoId: v.id,
+            title: v.snippet.title,
+            description: v.snippet.description,
+            publishedAt: v.snippet.publishedAt,
+          });
+        }
+        nextPageToken = page.nextPageToken;
+      } while (nextPageToken && videos.length < limit);
+
+      const items = videos.slice(0, limit);
+      const hasMore = videos.length > limit || !!nextPageToken;
+
+      return {
+        data: {
+          data: items,
+          meta: { cursor: undefined, hasMore, total: null },
+          source: "youtube" as const,
+        },
+      };
+    }
+
+    // Owned path: DB query (existing behavior)
     const limit = Math.min(opts.limit ?? 50, 100);
     const sortParam = opts.sort ?? "publishedAt:desc";
 
@@ -170,6 +200,7 @@ export async function listVideos(
       data: {
         data: items,
         meta: { cursor: nextCursor, hasMore, total: totalResult?.total ?? 0 },
+        source: "db" as const,
       },
     };
   } catch {

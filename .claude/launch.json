@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Next.js Dev Server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "nextjs", "--", "-p", "3005"],
+      "port": 3005
+    },
+    {
+      "name": "Trigger.dev Worker",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:trigger", "--prefix", "nextjs"],
+      "port": 3030
+    }
+  ]
+}

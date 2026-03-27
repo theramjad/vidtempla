@@ -13,5 +13,5 @@ export interface PaginationOpts {
 export interface PaginationMeta {
   cursor?: string;
   hasMore: boolean;
-  total: number;
+  total: number | null;
 }

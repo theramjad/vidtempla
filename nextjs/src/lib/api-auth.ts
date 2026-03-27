@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { apiKeys, apiRequestLog, youtubeChannels, youtubeVideos } from "@/db/schema";
 import { hashApiKey } from "@/lib/api-keys";
@@ -171,7 +171,7 @@ export async function getChannelTokens(
   userId: string,
   organizationId?: string
 ): Promise<
-  | { accessToken: string; channelId: string }
+  | { accessToken: string; channelId: string; channelDbId: string }
   | { error: ReturnType<typeof apiError>; status: number }
 > {
   const channelFilter = organizationId
@@ -284,7 +284,44 @@ export async function getChannelTokens(
     }
   }
 
-  return { accessToken, channelId: channel.channelId };
+  return { accessToken, channelId: channel.channelId, channelDbId: channel.id };
+}
+
+/**
+ * Returns a valid OAuth token from ANY channel the user/org owns.
+ * Used when we need YouTube API access but don't require ownership of a specific channel.
+ */
+export async function getAnyUserToken(
+  userId: string,
+  organizationId?: string
+): Promise<
+  | { accessToken: string; channelId: string; channelDbId: string }
+  | { error: ReturnType<typeof apiError>; status: number }
+> {
+  const ownerFilter = organizationId
+    ? eq(youtubeChannels.organizationId, organizationId)
+    : eq(youtubeChannels.userId, userId);
+
+  const [channel] = await db
+    .select({ channelId: youtubeChannels.channelId })
+    .from(youtubeChannels)
+    .where(and(ownerFilter, ne(youtubeChannels.tokenStatus, "invalid")))
+    .limit(1);
+
+  if (!channel) {
+    return {
+      error: apiError(
+        "NO_CONNECTED_CHANNEL",
+        "No connected YouTube channel found",
+        "Connect at least one YouTube channel from the dashboard to use this feature",
+        400
+      ),
+      status: 400,
+    };
+  }
+
+  // Delegate to getChannelTokens for decrypt + refresh logic
+  return getChannelTokens(channel.channelId, userId, organizationId);
 }
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -180,6 +180,10 @@ export default function LandingPage() {
                   fontSize: 16,
                   lineHeight: 1,
                   textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  whiteSpace: "nowrap",
                 }}
               >
                 Get started free
