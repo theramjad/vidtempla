@@ -19,7 +19,7 @@ export function registerVideoTools(server: McpServer) {
     "list_videos",
     "List videos with filtering, sorting, and cursor pagination",
     {
-      channelId: z.string().describe("YouTube channel ID — syncs from DB for owned channels, fetches directly from YouTube API for unowned public channels"),
+      channelId: z.string().describe("YouTube channel ID, @handle, or channel URL — syncs from DB for owned channels, fetches directly from YouTube API for unowned public channels"),
       containerId: z.string().optional().describe("Filter by container UUID"),
       search: z.string().optional().describe("Search by video title"),
       unassigned: z.boolean().optional().describe("Only show unassigned videos"),

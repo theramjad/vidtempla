@@ -27,6 +27,7 @@ import {
   fetchVideoDetails,
   fetchVideoAnalytics,
   fetchVideoRetention,
+  resolveChannelId,
 } from "@/lib/clients/youtube";
 import { parseUserVariables } from "@/utils/templateParser";
 import { checkVideoLimit } from "@/lib/plan-limits";
@@ -51,6 +52,19 @@ export async function listVideos(
   organizationId?: string
 ): Promise<ServiceResult<{ data: unknown[]; meta: PaginationMeta; source: "db" | "youtube" }>> {
   try {
+    // Resolve @handle or URL to UC... channel ID
+    if (opts.channelId && !/^UC[\w-]{22}$/.test(opts.channelId)) {
+      const anyToken = await getAnyUserToken(userId, organizationId);
+      if ("error" in anyToken) {
+        return { error: { code: anyToken.error.error.code, message: anyToken.error.error.message, suggestion: anyToken.error.error.suggestion ?? "", status: anyToken.status } };
+      }
+      try {
+        opts.channelId = await resolveChannelId(opts.channelId, anyToken.accessToken);
+      } catch (e) {
+        return { error: { code: "INVALID_CHANNEL", message: e instanceof Error ? e.message : "Failed to resolve channel", suggestion: "Pass a UC... channel ID, @handle, or YouTube channel URL", status: 400 } };
+      }
+    }
+
     // Check if the channel is owned by the user
     let isOwned = false;
     if (opts.channelId) {

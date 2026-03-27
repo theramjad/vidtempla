@@ -3,6 +3,7 @@ import {
   listCommentThreads as ytListCommentThreads,
   replyToComment as ytReplyToComment,
   deleteComment as ytDeleteComment,
+  resolveChannelId,
 } from "@/lib/clients/youtube";
 import type { ServiceResult } from "./types";
 
@@ -15,6 +16,19 @@ export async function listCommentThreads(
   opts: { maxResults?: number; order?: string; pageToken?: string; organizationId?: string } = {}
 ): Promise<ServiceResult<{ items: unknown[]; nextPageToken?: string }>> {
   try {
+    // Resolve @handle or URL to UC... channel ID
+    if (channelId && !/^UC[\w-]{22}$/.test(channelId)) {
+      const anyToken = await getAnyUserToken(userId, opts.organizationId);
+      if ("error" in anyToken) {
+        return { error: { code: anyToken.error.error.code, message: anyToken.error.error.message, suggestion: anyToken.error.error.suggestion ?? "", status: anyToken.status } };
+      }
+      try {
+        channelId = await resolveChannelId(channelId, anyToken.accessToken);
+      } catch (e) {
+        return { error: { code: "INVALID_CHANNEL", message: e instanceof Error ? e.message : "Failed to resolve channel", suggestion: "Pass a UC... channel ID, @handle, or YouTube channel URL", status: 400 } };
+      }
+    }
+
     // Try specific channel token if provided, fall back to any connected channel
     const specificResult = channelId
       ? await getChannelTokens(channelId, userId, opts.organizationId)

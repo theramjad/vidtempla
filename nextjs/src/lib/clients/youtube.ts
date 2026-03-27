@@ -76,6 +76,78 @@ interface YouTubeVideo {
 }
 
 /**
+ * Resolves a YouTube channel identifier to a UC... channel ID.
+ * Accepts: UC... ID, @handle, or full YouTube URL (youtube.com/@handle, youtube.com/channel/UC...).
+ * If already a UC... ID, returns as-is (no API call).
+ * Quota cost: 1 unit (only when resolution is needed)
+ */
+export async function resolveChannelId(
+  input: string,
+  accessToken: string
+): Promise<string> {
+  const trimmed = input.trim();
+
+  // Already a UC... channel ID
+  if (/^UC[\w-]{22}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Extract handle or channel ID from URL
+  let handle: string | undefined;
+
+  try {
+    const url = new URL(trimmed);
+    if (url.hostname.replace('www.', '').endsWith('youtube.com')) {
+      const pathParts = url.pathname.split('/').filter(Boolean);
+      // youtube.com/channel/UC...
+      if (pathParts[0] === 'channel' && pathParts[1] && /^UC[\w-]{22}$/.test(pathParts[1])) {
+        return pathParts[1];
+      }
+      // youtube.com/@handle
+      if (pathParts[0]?.startsWith('@')) {
+        handle = pathParts[0];
+      }
+    }
+  } catch {
+    // Not a URL — treat as @handle
+  }
+
+  // Bare @handle
+  if (!handle && trimmed.startsWith('@')) {
+    handle = trimmed;
+  }
+
+  if (!handle) {
+    throw new Error(
+      `Cannot resolve channel identifier "${trimmed}". Expected a UC... channel ID, @handle, or YouTube channel URL.`
+    );
+  }
+
+  // Strip leading @ for the API call
+  const forHandle = handle.startsWith('@') ? handle.slice(1) : handle;
+
+  const response = await axios.get<{ items: { id: string }[] }>(
+    `${YOUTUBE_API_BASE}/channels`,
+    {
+      params: {
+        part: 'id',
+        forHandle,
+      },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  const channelId = response.data.items?.[0]?.id;
+  if (!channelId) {
+    throw new Error(`No YouTube channel found for handle @${forHandle}`);
+  }
+
+  return channelId;
+}
+
+/**
  * Generates OAuth authorization URL for YouTube
  */
 export function getOAuthUrl(): string {
