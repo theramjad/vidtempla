@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VidTempla — Supercharge your YouTube channel with AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --cream: #faf8f5;
+  --cream-dark: #f0ece5;
+  --terracotta: #c75c2e;
+  --terracotta-light: #e8845a;
+  --teal: #1a535c;
+  --teal-light: #2a7a87;
+  --yellow: #f4b942;
+  --yellow-light: #f9d47e;
+  --text: #2d2a26;
+  --text-light: #6b6560;
+  --radius: 16px;
+}
+
+body {
+  font-family: 'Source Serif 4', Georgia, serif;
+  background: var(--cream);
+  color: var(--text);
+  line-height: 1.7;
+  font-size: 18px;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  line-height: 1.2;
+}
+
+a { color: var(--terracotta); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Decorative dots pattern */
+.dot-pattern {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  background-image: radial-gradient(var(--yellow-light) 2px, transparent 2px);
+  background-size: 16px 16px;
+  opacity: 0.5;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Wavy separator */
+.wavy-sep {
+  width: 100%;
+  height: 40px;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 1200 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 20 Q150 0 300 20 T600 20 T900 20 T1200 20 V40 H0Z' fill='%23faf8f5'/%3E%3C/svg%3E") center/cover no-repeat;
+}
+
+/* ─── NAV ─── */
+nav {
+  padding: 20px 0;
+  position: relative;
+  z-index: 10;
+}
+nav .container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.logo {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  color: var(--teal);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo span {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  background: var(--terracotta);
+  border-radius: 8px;
+  transform: rotate(3deg);
+}
+nav ul {
+  list-style: none;
+  display: flex;
+  gap: 32px;
+  align-items: center;
+}
+nav ul li a {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  color: var(--text);
+  font-weight: 500;
+  font-size: 16px;
+}
+.nav-cta {
+  background: var(--terracotta);
+  color: white !important;
+  padding: 10px 24px;
+  border-radius: 50px;
+  font-weight: 600 !important;
+  transition: background 0.2s;
+}
+.nav-cta:hover {
+  background: var(--terracotta-light);
+  text-decoration: none !important;
+}
+
+/* ─── HERO ─── */
+.hero {
+  padding: 80px 0 100px;
+  text-align: center;
+  position: relative;
+}
+.hero .dot-pattern {
+  top: 20px;
+  right: 5%;
+}
+.hero .dot-pattern:nth-child(2) {
+  bottom: 40px;
+  left: 3%;
+  top: auto;
+  right: auto;
+}
+.hero-badge {
+  display: inline-block;
+  background: var(--yellow-light);
+  color: var(--text);
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 6px 18px;
+  border-radius: 50px;
+  margin-bottom: 28px;
+  border: 2px dashed var(--yellow);
+}
+.hero h1 {
+  font-size: clamp(40px, 6vw, 72px);
+  font-weight: 800;
+  color: var(--teal);
+  max-width: 800px;
+  margin: 0 auto 24px;
+}
+.hero h1 em {
+  font-style: normal;
+  color: var(--terracotta);
+  position: relative;
+}
+.hero h1 em::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: -4px;
+  right: -4px;
+  height: 12px;
+  background: var(--yellow-light);
+  z-index: -1;
+  border-radius: 4px;
+  transform: rotate(-1deg);
+}
+.hero p {
+  font-size: 20px;
+  color: var(--text-light);
+  max-width: 560px;
+  margin: 0 auto 40px;
+}
+.hero-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.btn-primary {
+  display: inline-block;
+  background: var(--terracotta);
+  color: white;
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  padding: 16px 36px;
+  border-radius: 50px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 0 #a04a22;
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #a04a22;
+  text-decoration: none;
+  color: white;
+}
+.btn-secondary {
+  display: inline-block;
+  background: transparent;
+  color: var(--teal);
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  padding: 16px 36px;
+  border-radius: 50px;
+  border: 3px solid var(--teal);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-secondary:hover {
+  background: var(--teal);
+  color: white;
+  text-decoration: none;
+}
+
+/* ─── FEATURES ─── */
+.features {
+  padding: 80px 0 100px;
+  position: relative;
+}
+.features .dot-pattern {
+  top: -40px;
+  left: 2%;
+}
+.section-label {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--terracotta);
+  text-align: center;
+  margin-bottom: 12px;
+}
+.section-title {
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 800;
+  color: var(--teal);
+  text-align: center;
+  margin-bottom: 60px;
+}
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+.feature-card {
+  background: white;
+  padding: 36px 32px;
+  border-radius: var(--radius);
+  border: 2px solid var(--cream-dark);
+  position: relative;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.feature-card:nth-child(1) { transform: rotate(-0.8deg); }
+.feature-card:nth-child(2) { transform: rotate(0.5deg); }
+.feature-card:nth-child(3) { transform: rotate(-0.4deg); }
+.feature-card:nth-child(4) { transform: rotate(0.7deg); }
+.feature-card:nth-child(5) { transform: rotate(-0.6deg); }
+.feature-card:nth-child(6) { transform: rotate(0.3deg); }
+.feature-card:hover {
+  transform: rotate(0deg) translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.08);
+}
+.feature-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin-bottom: 20px;
+}
+.feature-icon.teal { background: #e0f0f2; }
+.feature-icon.terra { background: #fce8de; }
+.feature-icon.yellow { background: #fef3d9; }
+.feature-card h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--teal);
+  margin-bottom: 10px;
+}
+.feature-card p {
+  font-size: 16px;
+  color: var(--text-light);
+  line-height: 1.6;
+}
+
+/* ─── PRICING ─── */
+.pricing {
+  padding: 80px 0 100px;
+  background: linear-gradient(180deg, var(--cream) 0%, #f3efe8 100%);
+  position: relative;
+}
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.pricing-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 40px 32px;
+  border: 2px solid var(--cream-dark);
+  position: relative;
+  transition: transform 0.2s;
+}
+.pricing-card:hover { transform: translateY(-4px); }
+.pricing-card.featured {
+  border-color: var(--terracotta);
+  box-shadow: 0 8px 32px rgba(199, 92, 46, 0.15);
+}
+.pricing-card.featured::before {
+  content: 'Most popular';
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--terracotta);
+  color: white;
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 4px 20px;
+  border-radius: 50px;
+}
+.pricing-card h3 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--teal);
+  margin-bottom: 6px;
+}
+.pricing-card .price {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 48px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.pricing-card .price span {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-light);
+}
+.pricing-card .price-note {
+  font-size: 15px;
+  color: var(--text-light);
+  margin-bottom: 28px;
+}
+.pricing-card ul {
+  list-style: none;
+  margin-bottom: 32px;
+}
+.pricing-card ul li {
+  padding: 8px 0;
+  font-size: 16px;
+  color: var(--text);
+  border-bottom: 1px dashed var(--cream-dark);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pricing-card ul li::before {
+  content: '✓';
+  color: var(--terracotta);
+  font-weight: 700;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.pricing-btn {
+  display: block;
+  text-align: center;
+  padding: 14px;
+  border-radius: 50px;
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+.pricing-btn-outline {
+  border: 3px solid var(--teal);
+  color: var(--teal);
+}
+.pricing-btn-outline:hover { background: var(--teal); color: white; text-decoration: none; }
+.pricing-btn-solid {
+  background: var(--terracotta);
+  color: white;
+  box-shadow: 0 4px 0 #a04a22;
+}
+.pricing-btn-solid:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #a04a22;
+  text-decoration: none;
+  color: white;
+}
+
+/* ─── FAQ ─── */
+.faq {
+  padding: 80px 0 100px;
+  position: relative;
+}
+.faq-grid {
+  max-width: 780px;
+  margin: 0 auto;
+}
+.faq-item {
+  border-bottom: 2px dashed var(--cream-dark);
+  padding: 28px 0;
+}
+.faq-item:first-child { border-top: 2px dashed var(--cream-dark); }
+.faq-q {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--teal);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.faq-q::after {
+  content: '+';
+  font-size: 28px;
+  font-weight: 400;
+  color: var(--terracotta);
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+.faq-item.open .faq-q::after {
+  transform: rotate(45deg);
+}
+.faq-a {
+  font-size: 17px;
+  color: var(--text-light);
+  margin-top: 14px;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+.faq-item.open .faq-a {
+  max-height: 200px;
+}
+
+/* ─── CTA ─── */
+.cta {
+  padding: 80px 0 100px;
+  text-align: center;
+  position: relative;
+}
+.cta-box {
+  background: var(--teal);
+  border-radius: 24px;
+  padding: 64px 48px;
+  position: relative;
+  overflow: hidden;
+}
+.cta-box::before {
+  content: '';
+  position: absolute;
+  top: -60px;
+  right: -60px;
+  width: 200px;
+  height: 200px;
+  background: var(--teal-light);
+  border-radius: 50%;
+  opacity: 0.3;
+}
+.cta-box::after {
+  content: '';
+  position: absolute;
+  bottom: -40px;
+  left: -40px;
+  width: 140px;
+  height: 140px;
+  background: var(--yellow);
+  border-radius: 50%;
+  opacity: 0.15;
+}
+.cta-box h2 {
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 800;
+  color: white;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+.cta-box p {
+  font-size: 19px;
+  color: rgba(255,255,255,0.8);
+  max-width: 500px;
+  margin: 0 auto 36px;
+  position: relative;
+  z-index: 1;
+}
+.cta-box .btn-primary {
+  background: var(--yellow);
+  color: var(--text);
+  box-shadow: 0 4px 0 #c99520;
+  position: relative;
+  z-index: 1;
+}
+.cta-box .btn-primary:hover {
+  box-shadow: 0 6px 0 #c99520;
+}
+
+/* ─── FOOTER ─── */
+footer {
+  padding: 48px 0;
+  border-top: 2px dashed var(--cream-dark);
+}
+footer .container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+footer .logo { font-size: 20px; }
+.footer-links {
+  display: flex;
+  gap: 28px;
+  list-style: none;
+}
+.footer-links a {
+  font-size: 15px;
+  color: var(--text-light);
+  font-family: 'Bricolage Grotesque', sans-serif;
+}
+.footer-copy {
+  font-size: 14px;
+  color: var(--text-light);
+  width: 100%;
+  text-align: center;
+  margin-top: 12px;
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 900px) {
+  .features-grid, .pricing-grid { grid-template-columns: 1fr; max-width: 480px; margin-left: auto; margin-right: auto; }
+  .feature-card { transform: none !important; }
+  nav ul { gap: 16px; }
+}
+@media (max-width: 600px) {
+  nav ul li:not(:last-child) { display: none; }
+  .hero { padding: 48px 0 64px; }
+  .hero-buttons { flex-direction: column; align-items: center; }
+  .cta-box { padding: 40px 24px; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="container">
+    <div class="logo"><span></span> VidTempla</div>
+    <ul>
+      <li><a href="#features">Features</a></li>
+      <li><a href="#pricing">Pricing</a></li>
+      <li><a href="#faq">FAQ</a></li>
+      <li><a href="#" class="nav-cta">Get started free</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="dot-pattern" aria-hidden="true"></div>
+  <div class="dot-pattern" aria-hidden="true"></div>
+  <div class="container">
+    <div class="hero-badge">Open source &amp; free to start</div>
+    <h1>Supercharge your YouTube with <em>AI</em></h1>
+    <p>Connect Claude, Cursor, or any AI to your channel and unlock abilities you never had before — descriptions, playlists, comments, analytics, all at your fingertips.</p>
+    <div class="hero-buttons">
+      <a href="#" class="btn-primary">Unlock your channel's potential</a>
+      <a href="#" class="btn-secondary">See the docs</a>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features" id="features">
+  <div class="dot-pattern" aria-hidden="true"></div>
+  <div class="container">
+    <div class="section-label">What you get</div>
+    <h2 class="section-title">Your channel, amplified</h2>
+    <div class="features-grid">
+
+      <div class="feature-card">
+        <div class="feature-icon teal">🔌</div>
+        <h3>Power up your AI tools</h3>
+        <p>Your AI connects to VidTempla through our MCP server. No copy-pasting, no middle steps — just instant access.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon terra">🔑</div>
+        <h3>Simple API access</h3>
+        <p>Grab an API key and use AI to level up your workflow. Works with any tool that can make web requests.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon yellow">📺</div>
+        <h3>Your whole channel, unlocked</h3>
+        <p>Search, playlists, comments, captions, thumbnails, analytics — everything in one place, ready when you are.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon teal">🛡️</div>
+        <h3>You set the boundaries</h3>
+        <p>Give AI read-only access or let it make changes. You decide exactly what it's allowed to do, always.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon terra">📝</div>
+        <h3>Smart descriptions</h3>
+        <p>Create reusable templates with variables. Update one template and every video using it gets updated too.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon yellow">⏪</div>
+        <h3>Undo anything</h3>
+        <p>Every description change is saved. Made a mistake? Roll back to any previous version in one click.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing" id="pricing">
+  <div class="container">
+    <div class="section-label">Pricing</div>
+    <h2 class="section-title">Pick what works for you</h2>
+    <div class="pricing-grid">
+
+      <div class="pricing-card">
+        <h3>Free</h3>
+        <div class="price">$0</div>
+        <div class="price-note">Free forever, no credit card</div>
+        <ul>
+          <li>1 YouTube channel</li>
+          <li>MCP server access</li>
+          <li>Read-only API key</li>
+          <li>5 templates</li>
+          <li>7 days of version history</li>
+        </ul>
+        <a href="#" class="pricing-btn pricing-btn-outline">Get started</a>
+      </div>
+
+      <div class="pricing-card featured">
+        <h3>Pro</h3>
+        <div class="price">$12<span>/mo</span></div>
+        <div class="price-note">Everything you need for one channel</div>
+        <ul>
+          <li>3 YouTube channels</li>
+          <li>Read &amp; write API keys</li>
+          <li>Unlimited templates</li>
+          <li>Full version history</li>
+          <li>Priority support</li>
+        </ul>
+        <a href="#" class="pricing-btn pricing-btn-solid">Start free trial</a>
+      </div>
+
+      <div class="pricing-card">
+        <h3>Business</h3>
+        <div class="price">$39<span>/mo</span></div>
+        <div class="price-note">For agencies and multi-channel creators</div>
+        <ul>
+          <li>Unlimited channels</li>
+          <li>Team members</li>
+          <li>Multiple API keys</li>
+          <li>Advanced analytics</li>
+          <li>Dedicated support</li>
+        </ul>
+        <a href="#" class="pricing-btn pricing-btn-outline">Contact us</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="faq" id="faq">
+  <div class="container">
+    <div class="section-label">Questions?</div>
+    <h2 class="section-title">We've got answers</h2>
+    <div class="faq-grid">
+
+      <div class="faq-item open">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What even is VidTempla?</div>
+        <div class="faq-a">It's a bridge between your AI tools (like Claude or Cursor) and your YouTube channel. Instead of switching between apps to update things, you use AI as your superpower to get it all done faster.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Do I need to be a developer to use this?</div>
+        <div class="faq-a">Not at all! If you use an AI assistant that supports MCP (like Claude Desktop), it connects automatically. No coding needed — just click connect and you're good to go.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Is my YouTube account safe?</div>
+        <div class="faq-a">Absolutely. You're always in charge — you can give AI view-only access so it can't change anything, or let it make edits you've approved. Plus, every change is tracked so you can undo anything.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What AI tools work with VidTempla?</div>
+        <div class="faq-a">Anything that supports MCP — Claude Desktop, Cursor, Windsurf, and more. If your tool can make API calls, it works with our REST API too. Pretty much any AI can connect.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What can I do with AI and my channel?</div>
+        <div class="faq-a">Search videos, organize playlists, reply to comments, check analytics, update descriptions, manage captions, swap thumbnails — basically anything you'd do in YouTube Studio, but faster with AI at your side.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">How do the description templates work?</div>
+        <div class="faq-a">You create a template once — say, your standard video description with links and social media. Then every video that uses it stays in sync. Update the template, and boom, all those descriptions update too.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Can I manage multiple YouTube channels?</div>
+        <div class="faq-a">Yep! The free plan covers one channel. Pro gives you three, and Business is unlimited. Great if you're running channels for different brands or clients.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Is VidTempla open source?</div>
+        <div class="faq-a">It is! The code is on GitHub. You can look at it, contribute, or even host it yourself if you want to. We think transparency matters.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="container">
+    <div class="cta-box">
+      <h2>Ready to level up your YouTube?</h2>
+      <p>Set it up in a few minutes. Free plan, no credit card, no hassle.</p>
+      <a href="#" class="btn-primary">Unlock your channel's potential</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="logo"><span></span> VidTempla</div>
+    <ul class="footer-links">
+      <li><a href="#">Docs</a></li>
+      <li><a href="#">GitHub</a></li>
+      <li><a href="#">Twitter</a></li>
+      <li><a href="#">Privacy</a></li>
+      <li><a href="#">Terms</a></li>
+    </ul>
+    <div class="footer-copy">&copy; 2026 VidTempla. Made with care for creators and their AI superpowers.</div>
+  </div>
+</footer>
+
+</body>
+</html>

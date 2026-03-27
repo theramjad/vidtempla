@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VidTempla — Let AI manage your YouTube channel</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #1a1815;
+    --bg-card: #211f1b;
+    --bg-card-hover: #2a2722;
+    --text: #e8e2d8;
+    --text-muted: #a09888;
+    --accent: #c4a882;
+    --accent-light: #d4bc9a;
+    --border: #3a3530;
+    --border-light: #4a4540;
+    --serif: 'Fraunces', Georgia, serif;
+    --sans: 'Inter', -apple-system, sans-serif;
+  }
+
+  html { font-size: 16px; scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-weight: 300;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- Layout ---- */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  .container-narrow {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  section { padding: 7rem 0; }
+
+  /* ---- Nav ---- */
+  nav {
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 100;
+  }
+
+  nav .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .logo {
+    font-family: var(--serif);
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: var(--text);
+    text-decoration: none;
+    letter-spacing: -0.02em;
+  }
+
+  .nav-links { display: flex; gap: 2.5rem; align-items: center; }
+
+  .nav-links a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 400;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    transition: color 0.2s;
+  }
+
+  .nav-links a:hover { color: var(--text); }
+
+  .btn-nav {
+    border: 1px solid var(--border-light);
+    padding: 0.5rem 1.25rem;
+    font-size: 0.85rem;
+    color: var(--text) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.03em;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .btn-nav:hover {
+    border-color: var(--accent);
+    background: rgba(196, 168, 130, 0.05);
+  }
+
+  /* ---- Hero ---- */
+  .hero {
+    padding: 10rem 0 8rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .hero-eyebrow {
+    font-size: 0.8rem;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 2rem;
+  }
+
+  .hero h1 {
+    font-family: var(--serif);
+    font-size: 4.5rem;
+    font-weight: 300;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    max-width: 800px;
+    margin: 0 auto 2rem;
+  }
+
+  .hero h1 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .hero p {
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    max-width: 520px;
+    margin: 0 auto 3.5rem;
+    line-height: 1.8;
+  }
+
+  .hero-actions { display: flex; gap: 1.5rem; justify-content: center; }
+
+  .btn-primary {
+    display: inline-block;
+    font-family: var(--sans);
+    font-size: 0.85rem;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--bg);
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 0.9rem 2.5rem;
+    text-decoration: none;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .btn-primary:hover {
+    background: transparent;
+    color: var(--accent);
+  }
+
+  .btn-secondary {
+    display: inline-block;
+    font-family: var(--sans);
+    font-size: 0.85rem;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    padding: 0.9rem 2.5rem;
+    text-decoration: none;
+    transition: border-color 0.2s, color 0.2s;
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--text-muted);
+    color: var(--text);
+  }
+
+  /* ---- Features ---- */
+  .features { border-bottom: 1px solid var(--border); }
+
+  .section-label {
+    font-size: 0.8rem;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1.5rem;
+  }
+
+  .section-heading {
+    font-family: var(--serif);
+    font-size: 2.8rem;
+    font-weight: 300;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    margin-bottom: 4rem;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+  }
+
+  .feature-card {
+    background: var(--bg);
+    padding: 3rem 2.5rem;
+    transition: background 0.3s;
+  }
+
+  .feature-card:hover { background: var(--bg-card); }
+
+  .feature-number {
+    font-family: var(--serif);
+    font-size: 0.9rem;
+    color: var(--accent);
+    margin-bottom: 1.5rem;
+    font-weight: 400;
+  }
+
+  .feature-card h3 {
+    font-family: var(--serif);
+    font-size: 1.35rem;
+    font-weight: 400;
+    margin-bottom: 1rem;
+    letter-spacing: -0.01em;
+  }
+
+  .feature-card p {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+
+  /* ---- Pricing ---- */
+  .pricing { border-bottom: 1px solid var(--border); }
+
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+  }
+
+  .pricing-card {
+    background: var(--bg);
+    padding: 3.5rem 2.5rem;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pricing-card.featured { background: var(--bg-card); }
+
+  .pricing-tier {
+    font-size: 0.8rem;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1rem;
+  }
+
+  .pricing-price {
+    font-family: var(--serif);
+    font-size: 3rem;
+    font-weight: 300;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.25rem;
+  }
+
+  .pricing-price span {
+    font-size: 1rem;
+    color: var(--text-muted);
+    font-family: var(--sans);
+    font-weight: 300;
+  }
+
+  .pricing-desc {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 2.5rem;
+    padding-bottom: 2.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pricing-features {
+    list-style: none;
+    margin-bottom: 3rem;
+    flex-grow: 1;
+  }
+
+  .pricing-features li {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pricing-features li:last-child { border-bottom: none; }
+
+  .pricing-card .btn-primary,
+  .pricing-card .btn-secondary {
+    text-align: center;
+    width: 100%;
+  }
+
+  /* ---- FAQ ---- */
+  .faq { border-bottom: 1px solid var(--border); }
+
+  .faq-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+
+  .faq-item {
+    padding: 2.5rem 2.5rem;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+
+  .faq-item:nth-child(even) { border-right: none; }
+
+  .faq-item:nth-last-child(-n+2) { border-bottom: none; }
+
+  .faq-item h3 {
+    font-family: var(--serif);
+    font-size: 1.15rem;
+    font-weight: 400;
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.01em;
+  }
+
+  .faq-item p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+
+  /* ---- CTA ---- */
+  .cta {
+    padding: 10rem 0;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cta h2 {
+    font-family: var(--serif);
+    font-size: 3.5rem;
+    font-weight: 300;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+    margin-bottom: 1.5rem;
+  }
+
+  .cta h2 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .cta p {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    max-width: 460px;
+    margin: 0 auto 3rem;
+  }
+
+  /* ---- Footer ---- */
+  footer {
+    padding: 3.5rem 0;
+  }
+
+  footer .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-left {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .footer-links { display: flex; gap: 2rem; }
+
+  .footer-links a {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    transition: color 0.2s;
+  }
+
+  .footer-links a:hover { color: var(--text); }
+
+  /* ---- Responsive ---- */
+  @media (max-width: 900px) {
+    .hero h1 { font-size: 3rem; }
+    .features-grid, .pricing-grid { grid-template-columns: 1fr; }
+    .faq-grid { grid-template-columns: 1fr; }
+    .faq-item { border-right: none !important; }
+    .faq-item:nth-last-child(2) { border-bottom: 1px solid var(--border); }
+    .hero-actions { flex-direction: column; align-items: center; }
+    .section-heading { font-size: 2.2rem; }
+    .cta h2 { font-size: 2.5rem; }
+    footer .container { flex-direction: column; gap: 1.5rem; text-align: center; }
+    .nav-links { gap: 1.5rem; }
+  }
+
+  @media (max-width: 600px) {
+    .hero { padding: 6rem 0 5rem; }
+    .hero h1 { font-size: 2.2rem; }
+    section { padding: 4rem 0; }
+    .cta { padding: 6rem 0; }
+    .nav-links a:not(.btn-nav) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="container">
+    <a href="#" class="logo">VidTempla</a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+      <a href="#" class="btn-nav">Get Started</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <p class="hero-eyebrow">Open Source</p>
+    <h1>Your AI assistant now manages your <em>YouTube channel</em></h1>
+    <p>Connect Claude, Cursor, or any AI tool to your YouTube account. It handles descriptions, playlists, comments, and more — while you stay in control.</p>
+    <div class="hero-actions">
+      <a href="#" class="btn-primary">Start for free</a>
+      <a href="#" class="btn-secondary">View on GitHub</a>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features" id="features">
+  <div class="container">
+    <p class="section-label">What you get</p>
+    <h2 class="section-heading">Everything your AI needs<br>to run your channel</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <p class="feature-number">01</p>
+        <h3>Plug-and-play AI connection</h3>
+        <p>Your AI tools connect to YouTube through our MCP server. No code needed — just point and go.</p>
+      </div>
+      <div class="feature-card">
+        <p class="feature-number">02</p>
+        <h3>A proper API</h3>
+        <p>Do everything through a simple API. Get a key, make requests, done.</p>
+      </div>
+      <div class="feature-card">
+        <p class="feature-number">03</p>
+        <h3>Full YouTube access</h3>
+        <p>Search, playlists, comments, captions, thumbnails, analytics. If YouTube has it, your AI can use it.</p>
+      </div>
+      <div class="feature-card">
+        <p class="feature-number">04</p>
+        <h3>You set the boundaries</h3>
+        <p>Create read-only keys for safe browsing, or read-write keys when your AI needs to make changes.</p>
+      </div>
+      <div class="feature-card">
+        <p class="feature-number">05</p>
+        <h3>Smart description templates</h3>
+        <p>Build reusable templates with variables. Update one template, and every video using it gets the change.</p>
+      </div>
+      <div class="feature-card">
+        <p class="feature-number">06</p>
+        <h3>Undo anything</h3>
+        <p>Every description change is saved. One click to go back to any previous version.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing -->
+<section class="pricing" id="pricing">
+  <div class="container">
+    <p class="section-label">Pricing</p>
+    <h2 class="section-heading">Simple, honest pricing</h2>
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <p class="pricing-tier">Free</p>
+        <p class="pricing-price">$0</p>
+        <p class="pricing-desc">For trying it out and small channels.</p>
+        <ul class="pricing-features">
+          <li>1 YouTube channel</li>
+          <li>1 API key</li>
+          <li>100 API requests per day</li>
+          <li>5 templates</li>
+          <li>7-day version history</li>
+          <li>MCP server access</li>
+        </ul>
+        <a href="#" class="btn-secondary">Get started</a>
+      </div>
+      <div class="pricing-card featured">
+        <p class="pricing-tier">Pro</p>
+        <p class="pricing-price">$19 <span>/ month</span></p>
+        <p class="pricing-desc">For creators who use AI tools daily.</p>
+        <ul class="pricing-features">
+          <li>3 YouTube channels</li>
+          <li>5 API keys</li>
+          <li>5,000 API requests per day</li>
+          <li>Unlimited templates</li>
+          <li>Unlimited version history</li>
+          <li>Priority support</li>
+        </ul>
+        <a href="#" class="btn-primary">Start free trial</a>
+      </div>
+      <div class="pricing-card">
+        <p class="pricing-tier">Business</p>
+        <p class="pricing-price">$49 <span>/ month</span></p>
+        <p class="pricing-desc">For teams and agencies managing multiple channels.</p>
+        <ul class="pricing-features">
+          <li>Unlimited channels</li>
+          <li>Unlimited API keys</li>
+          <li>50,000 API requests per day</li>
+          <li>Unlimited templates</li>
+          <li>Unlimited version history</li>
+          <li>Dedicated support</li>
+        </ul>
+        <a href="#" class="btn-secondary">Contact us</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="faq" id="faq">
+  <div class="container">
+    <p class="section-label">Questions</p>
+    <h2 class="section-heading">Things people ask</h2>
+    <div class="faq-grid">
+      <div class="faq-item">
+        <h3>What exactly does this do?</h3>
+        <p>VidTempla gives your AI tools (like Claude or Cursor) safe access to your YouTube channel. They can update descriptions, manage playlists, reply to comments, and more.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Is my YouTube account safe?</h3>
+        <p>Yes. You choose what your AI can do by creating read-only or read-write keys. You can revoke access anytime, and every change is logged with full undo history.</p>
+      </div>
+      <div class="faq-item">
+        <h3>What AI tools work with this?</h3>
+        <p>Any tool that supports MCP (like Claude Desktop, Cursor, or Windsurf) connects directly. Everything else can use the REST API with a simple key.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Do I need to write code?</h3>
+        <p>Not at all. If you use an MCP-compatible AI tool, it connects in a couple of clicks. The API is there for developers who want more control.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Can I manage multiple channels?</h3>
+        <p>Yes. Free gets you one channel, Pro gives you three, and Business has no limit. Each channel gets its own set of templates and settings.</p>
+      </div>
+      <div class="faq-item">
+        <h3>What if my AI messes something up?</h3>
+        <p>Every description change is saved with version history. You can undo any change with one click and go back to exactly how it was before.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Is it open source?</h3>
+        <p>Yes, fully open source. You can self-host it or use our hosted version. The code is on GitHub for anyone to review, fork, or contribute to.</p>
+      </div>
+      <div class="faq-item">
+        <h3>What happens if I cancel?</h3>
+        <p>Your YouTube channel stays exactly as it is. We never touch your channel without your AI making an explicit request. Your data exports are always available.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="container">
+    <h2>Give your AI the keys<br>to your <em>channel</em></h2>
+    <p>Free to start. Takes about two minutes. No credit card required.</p>
+    <a href="#" class="btn-primary">Get started now</a>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <p class="footer-left">&copy; 2026 VidTempla. Open source, MIT licensed.</p>
+    <div class="footer-links">
+      <a href="#">GitHub</a>
+      <a href="#">Docs</a>
+      <a href="#">Privacy</a>
+      <a href="#">Terms</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
