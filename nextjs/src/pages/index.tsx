@@ -9,20 +9,13 @@ import { Footer } from "@/components/layout/Footer";
 import { Navbar } from "@/components/layout/Navbar";
 import {
   FileText,
-  RefreshCw,
   History,
-  Layers,
-  Zap,
   Youtube,
   Check,
   ArrowRight,
-  Menu,
   Code,
-  BarChart3,
   Bot,
-  Search,
   Shield,
-  MessageSquare,
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -30,7 +23,7 @@ export default function LandingPage() {
     <>
       <Head>
         <title>VidTempla</title>
-        <meta name="description" content="REST API, MCP server, and dashboard for AI agents to securely manage YouTube channels — descriptions, analytics, playlists, comments, captions, search, and more" />
+        <meta name="description" content="Your YouTube channel, with an AI co-pilot. Connect Claude, Cursor, or any AI assistant to help with descriptions, analytics, playlists, comments, and more." />
       </Head>
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -39,26 +32,26 @@ export default function LandingPage() {
         <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
           <div className="text-center max-w-4xl mx-auto">
             <Badge className="mb-4" variant="secondary">
-              YouTube Management for AI Agents & Humans
+              Open source & free to start
             </Badge>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-              The YouTube API{" "}
-              <span className="text-primary">Your AI Agent Needs</span>
+              Your YouTube channel, with an{" "}
+              <span className="text-primary">AI co-pilot</span>
             </h1>
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              REST API, MCP server, and dashboard to manage descriptions, analytics, playlists,
-              comments, captions, search, and more. OAuth complexity handled for you.
+              Connect Claude, Cursor, or any AI as your creative assistant.
+              It helps with descriptions, playlists, comments, analytics — while you stay in the driver&apos;s seat.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/sign-in">
                 <Button size="lg" className="w-full sm:w-auto">
-                  Get Started Free
+                  Start working smarter
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
               <a href="#features">
                 <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                  Learn More
+                  See how it works
                 </Button>
               </a>
             </div>
@@ -74,13 +67,13 @@ export default function LandingPage() {
         <section id="features" className="container mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="text-center mb-16">
             <Badge className="mb-4" variant="secondary">
-              Features
+              What you get
             </Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Everything agents need to manage YouTube
+              Tools for you and your AI to work together
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              API-first platform with a dashboard for humans when you need it
+              Everything your AI assistant needs to help with your channel
             </p>
           </div>
 
@@ -91,10 +84,9 @@ export default function LandingPage() {
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                   <Bot className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle>MCP Server for AI Agents</CardTitle>
+                <CardTitle>Connects to your favorite AI</CardTitle>
                 <CardDescription>
-                  Connect Claude, Cursor, or any MCP-compatible AI agent directly to your YouTube channel.
-                  Agents get structured tools for every operation — no prompt engineering needed.
+                  Your AI assistant hooks into VidTempla through our MCP server. No copy-pasting, no middle steps.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -105,108 +97,61 @@ export default function LandingPage() {
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                   <Code className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle>REST API</CardTitle>
+                <CardTitle>Simple API access</CardTitle>
                 <CardDescription>
-                  Full REST API with Bearer token auth. Manage templates, videos, playlists, comments, captions,
-                  thumbnails, and more. Every response includes error suggestions so agents can self-correct.
+                  Grab an API key and your AI co-pilot can start helping with your channel. Works with any tool that can make web requests.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            {/* Feature 3 - Full YouTube Proxy */}
+            {/* Feature 3 - Full YouTube */}
             <Card>
               <CardHeader>
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                   <Youtube className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle>Full YouTube API Proxy</CardTitle>
+                <CardTitle>Your whole channel, one connection</CardTitle>
                 <CardDescription>
-                  Search YouTube, manage playlists, read and reply to comments, handle captions, update thumbnails,
-                  and query analytics — all through one API key. No YouTube OAuth headaches.
+                  Search, playlists, comments, captions, thumbnails, analytics — your AI can assist with all of it from one place.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            {/* Feature 4 - Granular Permissions */}
+            {/* Feature 4 - Permissions */}
             <Card>
               <CardHeader>
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                   <Shield className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle>Granular Permissions</CardTitle>
+                <CardTitle>You set the boundaries</CardTitle>
                 <CardDescription>
-                  Issue read-only API keys for analytics and monitoring, or read-write keys when agents need to make changes.
-                  Each key is scoped so you stay in control.
+                  Give your AI read-only access or let it make changes. You decide exactly what it&apos;s allowed to help with.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            {/* Feature 5 - Analytics */}
-            <Card>
-              <CardHeader>
-                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                  <BarChart3 className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle>Analytics & Search</CardTitle>
-                <CardDescription>
-                  Query YouTube Analytics for views, watch time, retention curves, and audience data.
-                  Search across YouTube or within your own channel to find any video.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            {/* Feature 6 - Smart Templates */}
+            {/* Feature 5 - Smart Templates */}
             <Card>
               <CardHeader>
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                   <FileText className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle>Smart Templates & Containers</CardTitle>
+                <CardTitle>Smart descriptions</CardTitle>
                 <CardDescription>
-                  Create reusable templates with {"`{{variables}}`"}, compose them into containers, and auto-update
-                  every linked video description when a template changes.
+                  Create reusable templates with variables. Update one template and every video using it gets updated too.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            {/* Feature 7 - Comments */}
-            <Card>
-              <CardHeader>
-                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                  <MessageSquare className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle>Comment Management</CardTitle>
-                <CardDescription>
-                  List, read, and reply to comments on your videos via API or MCP. Let your AI agent
-                  handle community engagement while you focus on creating content.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            {/* Feature 8 - Multi-Channel */}
-            <Card>
-              <CardHeader>
-                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                  <Layers className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle>Multi-Channel Support</CardTitle>
-                <CardDescription>
-                  Manage multiple YouTube channels with secure OAuth. Tokens encrypted at rest
-                  and auto-refreshed on every API call.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            {/* Feature 9 - Version History */}
+            {/* Feature 6 - Undo */}
             <Card>
               <CardHeader>
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                   <History className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle>Version History & Rollback</CardTitle>
+                <CardTitle>Undo anything</CardTitle>
                 <CardDescription>
-                  Every description change is tracked. View the full history for any video and roll back
-                  to any previous version with one click or one API call.
+                  Every description change is saved. Made a mistake? Roll back to any previous version in one click.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -222,10 +167,10 @@ export default function LandingPage() {
               Pricing
             </Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Simple, transparent pricing
+              Pick what works for you
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Choose the plan that fits your needs
+              Start free, upgrade when you&apos;re ready
             </p>
           </div>
 
@@ -234,7 +179,7 @@ export default function LandingPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Free</CardTitle>
-                <CardDescription>Perfect for trying out VidTempla</CardDescription>
+                <CardDescription>Free forever, no credit card</CardDescription>
                 <div className="mt-4">
                   <span className="text-4xl font-bold">$0</span>
                   <span className="text-muted-foreground">/forever</span>
@@ -280,7 +225,7 @@ export default function LandingPage() {
               </div>
               <CardHeader>
                 <CardTitle>Pro</CardTitle>
-                <CardDescription>For content creators</CardDescription>
+                <CardDescription>Everything you need for one channel</CardDescription>
                 <div className="mt-4">
                   <span className="text-4xl font-bold">$20</span>
                   <span className="text-muted-foreground">/month</span>
@@ -331,7 +276,7 @@ export default function LandingPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Business</CardTitle>
-                <CardDescription>For agencies & businesses</CardDescription>
+                <CardDescription>For agencies and multi-channel creators</CardDescription>
                 <div className="mt-4">
                   <span className="text-4xl font-bold">$100</span>
                   <span className="text-muted-foreground">/month</span>
@@ -378,10 +323,10 @@ export default function LandingPage() {
         <section id="faq" className="container mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="text-center mb-16">
             <Badge className="mb-4" variant="secondary">
-              FAQ
+              Questions?
             </Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Frequently asked questions
+              We&apos;ve got answers
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Everything you need to know about VidTempla
@@ -389,94 +334,83 @@ export default function LandingPage() {
           </div>
 
           <div className="max-w-4xl mx-auto bg-card/50 backdrop-blur-xl border rounded-2xl shadow-lg overflow-hidden">
-            <Accordion type="single" collapsible className="w-full">
+            <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
               <AccordionItem value="item-1">
                 <AccordionTrigger className="text-left">
-                  What is VidTempla?
+                  What even is VidTempla?
                 </AccordionTrigger>
                 <AccordionContent>
-                  VidTempla is an API-first platform that lets AI agents securely manage YouTube channels. It provides a REST API
-                  and an MCP server that proxy the YouTube Data API and Analytics API, so your agent can do everything from
-                  updating descriptions to managing playlists — without ever touching YouTube OAuth credentials directly.
-                  There&apos;s also a dashboard for when humans want to do things manually.
+                  It&apos;s a bridge between your AI tools (like Claude or Cursor) and your YouTube channel.
+                  Instead of doing all the busywork yourself, your AI assistant helps you get it done faster through VidTempla.
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="item-2">
                 <AccordionTrigger className="text-left">
-                  What is the MCP server and how do I use it?
+                  Do I need to be a developer to use this?
                 </AccordionTrigger>
                 <AccordionContent>
-                  MCP (Model Context Protocol) lets AI agents like Claude, Cursor, and Windsurf call structured tools directly.
-                  VidTempla&apos;s MCP server exposes tools for searching YouTube, managing playlists, reading comments, querying
-                  analytics, updating descriptions, and more. You connect it via OAuth from your AI client — no API key management
-                  needed. Your agent gets the same capabilities as the REST API but through native tool calls.
+                  Not at all! If you use an AI assistant that supports MCP (like Claude Desktop), it connects automatically.
+                  No coding needed — just click connect and you&apos;re good to go.
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="item-3">
                 <AccordionTrigger className="text-left">
-                  What YouTube operations can I perform?
+                  Is my YouTube account safe?
                 </AccordionTrigger>
                 <AccordionContent>
-                  Nearly everything available through the YouTube API: search across YouTube or within your channel, list and manage
-                  videos, create and edit playlists, read and reply to comments, upload and manage captions, update thumbnails,
-                  query analytics (views, watch time, retention curves, audience demographics), fetch transcripts, and manage
-                  video descriptions with templates. All operations happen in real-time through YouTube&apos;s API — we don&apos;t
-                  store your YouTube data.
+                  Absolutely. You choose exactly what your AI assistant can help with — read-only access so it can only look,
+                  or write access so it can make edits with you. Plus, every change is tracked so you can undo anything.
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="item-4">
                 <AccordionTrigger className="text-left">
-                  How do API key permissions work?
+                  What AI tools work with VidTempla?
                 </AccordionTrigger>
                 <AccordionContent>
-                  Each API key has a permission level: <strong>read-only</strong> for safe operations like fetching analytics, searching
-                  videos, and reading comments, or <strong>read-write</strong> for operations that modify your channel like updating
-                  descriptions, managing playlists, and replying to comments. This lets you give agents only the access they need.
+                  Anything that supports MCP — Claude Desktop, Cursor, Windsurf, and more. If your tool can make API calls,
+                  it works with our REST API too. Pretty much any AI can connect.
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="item-5">
                 <AccordionTrigger className="text-left">
-                  Do I need to handle YouTube OAuth myself?
+                  What can my AI assistant help with?
                 </AccordionTrigger>
                 <AccordionContent>
-                  No. You connect your YouTube channel once through VidTempla&apos;s dashboard. After that, the API and MCP server
-                  handle all OAuth token management transparently — encryption, storage, and automatic refresh. Your agent just
-                  uses a VidTempla API key and never touches YouTube credentials directly.
+                  Searching videos, organizing playlists, drafting comment replies, checking analytics, updating descriptions,
+                  handling captions, swapping thumbnails — basically all the repetitive YouTube Studio tasks you&apos;d rather not do yourself.
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="item-6">
                 <AccordionTrigger className="text-left">
-                  How does the template system work?
+                  How do the description templates work?
                 </AccordionTrigger>
                 <AccordionContent>
-                  Templates use variables like {"`{{product_name}}`"} or {"`{{link}}`"} that you can customize for each video.
-                  Compose multiple templates into containers with custom ordering and separators. When you update a template,
-                  all linked video descriptions update automatically. This works via the dashboard, REST API, or MCP tools.
+                  You create a template once — say, your standard video description with links and social media.
+                  Then every video that uses it stays in sync. Update the template, and all those descriptions update too.
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="item-7">
                 <AccordionTrigger className="text-left">
-                  Is my YouTube account secure?
+                  Can I work with multiple YouTube channels?
                 </AccordionTrigger>
                 <AccordionContent>
-                  Yes. We use YouTube&apos;s official OAuth — we never see your password. Access tokens are encrypted at rest and
-                  auto-refreshed on every API call. You can revoke access at any time through your Google account. API keys
-                  are hashed and support granular permissions so agents only get the access level you choose.
+                  Yep! The free plan covers one channel. Pro gives you three, and Business is unlimited.
+                  Great if you&apos;re working across channels for different brands or clients.
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="item-8">
                 <AccordionTrigger className="text-left">
-                  How can I trust this application?
+                  Is VidTempla open source?
                 </AccordionTrigger>
                 <AccordionContent>
-                  VidTempla is fully open source at{" "}
+                  It is! The code is on{" "}
                   <a
                     href="https://github.com/theramjad/vidtempla"
                     target="_blank"
@@ -485,29 +419,7 @@ export default function LandingPage() {
                   >
                     GitHub
                   </a>
-                  . You can audit every line of code — or have an AI audit it for you. The API never stores YouTube data;
-                  it proxies requests in real-time and returns results directly to your agent.
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="item-9">
-                <AccordionTrigger className="text-left">
-                  Can I try it before upgrading?
-                </AccordionTrigger>
-                <AccordionContent>
-                  Yes! The Free plan includes full API and MCP server access with up to 5 videos and 1 channel. No credit card required.
-                  When you need unlimited videos, automatic description updates, or multiple channels, upgrade to Pro or Business.
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="item-10">
-                <AccordionTrigger className="text-left">
-                  What happens if I make a mistake?
-                </AccordionTrigger>
-                <AccordionContent>
-                  Every description change is versioned. You can view the full history for any video and roll back to any
-                  previous version with one click in the dashboard or one API call. Description updates appear on YouTube
-                  within seconds.
+                  . You can look at it, contribute, or even host it yourself if you want to. We think transparency matters.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -518,14 +430,14 @@ export default function LandingPage() {
         <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="bg-primary/5 rounded-2xl p-12 text-center">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Ready to give your AI agent a YouTube toolkit?
+              Get your AI assistant set up in minutes
             </h2>
             <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Connect your channel, set up the MCP server or grab an API key, and let your agent manage YouTube in minutes.
+              Free plan, no credit card, no hassle. You and your AI, working together.
             </p>
             <Link href="/sign-in">
               <Button size="lg">
-                Get Started Free
+                Start working smarter
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
