@@ -183,6 +183,20 @@ export async function consumeCredits(
 ): Promise<{ success: boolean; remaining: number }> {
   if (quotaUnits <= 0) return { success: true, remaining: Infinity };
 
+  // Check if period has expired and replenish if needed
+  const [currentRow] = await defaultDb
+    .select({ id: userCredits.id, periodEnd: userCredits.periodEnd })
+    .from(userCredits)
+    .where(eq(userCredits.userId, userId));
+
+  if (currentRow && currentRow.periodEnd <= new Date()) {
+    const planTier = await getUserPlanTier(userId, defaultDb);
+    const allocation = PLAN_CONFIG[planTier].monthlyCredits;
+    const now = new Date();
+    const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    await upsertCredits(userId, allocation, now, periodEnd);
+  }
+
   // Try atomic decrement
   const rows = await defaultDb.execute<{ balance: number }>(
     sql`UPDATE user_credits SET balance = balance - ${quotaUnits}, updated_at = NOW() WHERE user_id = ${userId} AND balance >= ${quotaUnits} RETURNING balance`
@@ -192,22 +206,14 @@ export async function consumeCredits(
     return { success: true, remaining: rows[0]!.balance };
   }
 
-  // No row matched — check if row exists at all
-  const [existing] = await defaultDb
-    .select({ id: userCredits.id })
-    .from(userCredits)
-    .where(eq(userCredits.userId, userId));
-
-  if (!existing) {
-    // Lazy provision: determine plan tier and create credits row
+  // No row — lazy provision
+  if (!currentRow) {
     const planTier = await getUserPlanTier(userId, defaultDb);
     const allocation = PLAN_CONFIG[planTier].monthlyCredits;
     const now = new Date();
     const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
     await upsertCredits(userId, allocation, now, periodEnd);
 
-    // Retry the decrement
     const retryRows = await defaultDb.execute<{ balance: number }>(
       sql`UPDATE user_credits SET balance = balance - ${quotaUnits}, updated_at = NOW() WHERE user_id = ${userId} AND balance >= ${quotaUnits} RETURNING balance`
     );

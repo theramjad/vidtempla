@@ -290,7 +290,7 @@ export default function LandingPage() {
               }}
             >
               Connect Claude, Cursor, or any AI as your creative assistant. It
-              helps with descriptions, playlists, comments, analytics — while
+              helps with descriptions, playlists, comments, and analytics while
               you stay in the driver&apos;s seat.
             </p>
             <div
@@ -415,7 +415,7 @@ export default function LandingPage() {
                   icon: "📺",
                   bg: "#fef3d9",
                   title: "Your whole channel, one connection",
-                  desc: "Search, playlists, comments, captions, thumbnails, analytics — your AI can assist with all of it from one place.",
+                  desc: "Search, playlists, comments, captions, thumbnails, analytics. Your AI can assist with all of it from one place.",
                   rotate: -0.4,
                 },
                 {
@@ -591,9 +591,9 @@ export default function LandingPage() {
                   {[
                     "1 YouTube channel",
                     "Up to 5 videos",
-                    "MCP server access",
-                    "REST API access",
-                    "Basic templates",
+                    "10,000 API credits / month",
+                    "Templates & containers",
+                    "MCP server & REST API access",
                   ].map((item) => (
                     <li
                       key={item}
@@ -713,8 +713,8 @@ export default function LandingPage() {
                   {[
                     "Unlimited videos",
                     "1 YouTube channel",
-                    "Read & write API keys",
-                    "Advanced templates & containers",
+                    "100,000 API credits / month",
+                    "Templates & containers",
                     "Automatic description updates",
                     "Version history & rollback",
                     "Priority support",
@@ -819,8 +819,8 @@ export default function LandingPage() {
                   {[
                     "Everything in Pro",
                     "Unlimited channels",
+                    "500,000 API credits / month",
                     "Team members",
-                    "Multiple API keys",
                     "Dedicated support",
                   ].map((item) => (
                     <li
@@ -912,27 +912,31 @@ export default function LandingPage() {
                 },
                 {
                   q: "Do I need to be a developer to use this?",
-                  a: "Not at all! If you use an AI assistant that supports MCP (like Claude Desktop), it connects automatically. No coding needed — just click connect and you're good to go.",
+                  a: "Not at all! If you use an AI assistant that supports MCP (like Claude Desktop), it connects automatically. No coding needed, just click connect and you're good to go.",
                 },
                 {
                   q: "Is my YouTube account safe?",
-                  a: "Absolutely. You choose exactly what your AI assistant can help with — read-only access so it can only look, or write access so it can make edits with you. Plus, every change is tracked so you can undo anything.",
+                  a: "Absolutely. You choose exactly what your AI assistant can help with: read-only access so it can only look, or write access so it can make edits with you. Plus, every change is tracked so you can undo anything.",
                 },
                 {
                   q: "What AI tools work with VidTempla?",
-                  a: "Anything that supports MCP — Claude Desktop, Cursor, Windsurf, and more. If your tool can make API calls, it works with our REST API too. Pretty much any AI can connect.",
+                  a: "Anything that supports MCP: Claude Desktop, Cursor, Windsurf, and more. If your tool can make API calls, it works with our REST API too. Pretty much any AI can connect.",
                 },
                 {
                   q: "What can my AI assistant help with?",
-                  a: "Searching videos, organizing playlists, drafting comment replies, checking analytics, updating descriptions, handling captions, swapping thumbnails — basically all the repetitive YouTube Studio tasks you'd rather not do yourself.",
+                  a: "Searching videos, organizing playlists, drafting comment replies, checking analytics, updating descriptions, handling captions, swapping thumbnails. Basically all the repetitive YouTube Studio tasks you'd rather not do yourself.",
                 },
                 {
                   q: "How do the description templates work?",
-                  a: "You create a template once — say, your standard video description with links and social media. Then every video that uses it stays in sync. Update the template, and all those descriptions update too.",
+                  a: "You create a template once, like your standard video description with links and social media. Then every video that uses it stays in sync. Update the template, and all those descriptions update too.",
                 },
                 {
                   q: "Can I work with multiple YouTube channels?",
-                  a: "Yep! The free plan covers one channel. Pro gives you three, and Business is unlimited. Great if you're working across channels for different brands or clients.",
+                  a: "Yep! Free and Pro both cover one channel. Business gives you unlimited channels, great if you're working across brands or clients.",
+                },
+                {
+                  q: "How do API credits work?",
+                  a: "Every API call costs a certain number of credits depending on the operation. Simple reads like listing videos are cheap; writes like updating descriptions cost more. Credits reset monthly. Free gets 10,000, Pro gets 100,000, and Business gets 500,000.",
                 },
                 {
                   q: "Is VidTempla open source?",
