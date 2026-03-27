@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { protectedProcedure } from '@/server/trpc/init';
+import { orgProcedure } from '@/server/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { getOAuthUrl } from '@/lib/clients/youtube';
 import { decrypt, encrypt } from '@/utils/encryption';
@@ -22,42 +22,64 @@ import { eq, and, desc, asc, sql, count, isNull, ilike, inArray, getTableColumns
 import { checkVideoLimit, checkChannelLimit } from '@/lib/plan-limits';
 import { router } from '@/server/trpc/init';
 
+/** Verify a video belongs to the given org (via its channel). Throws NOT_FOUND if not. */
+async function verifyVideoOwnership(videoId: string, organizationId: string) {
+  const [video] = await db
+    .select({ id: youtubeVideos.id })
+    .from(youtubeVideos)
+    .innerJoin(youtubeChannels, eq(youtubeVideos.channelId, youtubeChannels.id))
+    .where(and(eq(youtubeVideos.id, videoId), eq(youtubeChannels.organizationId, organizationId)));
+  if (!video) throw new TRPCError({ code: "NOT_FOUND", message: "Video not found" });
+  return video;
+}
+
+/** Verify a channel belongs to the given org. Throws NOT_FOUND if not. */
+async function verifyChannelOwnership(channelId: string, organizationId: string) {
+  const [channel] = await db
+    .select({ id: youtubeChannels.id })
+    .from(youtubeChannels)
+    .where(and(eq(youtubeChannels.id, channelId), eq(youtubeChannels.organizationId, organizationId)));
+  if (!channel) throw new TRPCError({ code: "NOT_FOUND", message: "Channel not found" });
+  return channel;
+}
+
 export const youtubeRouter = router({
   // ==================== Channel Management ====================
 
   channels: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
+    list: orgProcedure.query(async ({ ctx }) => {
       const data = await db
         .select()
         .from(youtubeChannels)
-        .where(eq(youtubeChannels.userId, ctx.user.id))
+        .where(eq(youtubeChannels.organizationId, ctx.organizationId))
         .orderBy(desc(youtubeChannels.createdAt));
 
       return data;
     }),
 
-    checkLimit: protectedProcedure.query(async ({ ctx }) => {
-      const result = await checkChannelLimit(ctx.user.id, db);
+    checkLimit: orgProcedure.query(async ({ ctx }) => {
+      const result = await checkChannelLimit(ctx.organizationId, db);
       return result;
     }),
 
-    initiateOAuth: protectedProcedure.mutation(async () => {
+    initiateOAuth: orgProcedure.mutation(async () => {
       return { url: getOAuthUrl() };
     }),
 
-    disconnect: protectedProcedure
+    disconnect: orgProcedure
       .input(z.object({ channelId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         await db
           .delete(youtubeChannels)
-          .where(and(eq(youtubeChannels.id, input.channelId), eq(youtubeChannels.userId, ctx.user.id)));
+          .where(and(eq(youtubeChannels.id, input.channelId), eq(youtubeChannels.organizationId, ctx.organizationId)));
 
         return { success: true };
       }),
 
-    syncVideos: protectedProcedure
+    syncVideos: orgProcedure
       .input(z.object({ channelId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
+        await verifyChannelOwnership(input.channelId, ctx.organizationId);
         await tasks.trigger("youtube-sync-channel-videos", {
           channelId: input.channelId,
           userId: ctx.user.id,
@@ -70,7 +92,7 @@ export const youtubeRouter = router({
   // ==================== Container Management ====================
 
   containers: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
+    list: orgProcedure.query(async ({ ctx }) => {
       const data = await db
         .select({
           ...getTableColumns(containers),
@@ -78,14 +100,14 @@ export const youtubeRouter = router({
         })
         .from(containers)
         .leftJoin(youtubeVideos, eq(youtubeVideos.containerId, containers.id))
-        .where(eq(containers.userId, ctx.user.id))
+        .where(eq(containers.organizationId, ctx.organizationId))
         .groupBy(containers.id)
         .orderBy(desc(containers.createdAt));
 
       return data;
     }),
 
-    create: protectedProcedure
+    create: orgProcedure
       .input(
         z.object({
           name: z.string().min(1),
@@ -98,6 +120,7 @@ export const youtubeRouter = router({
           .insert(containers)
           .values({
             userId: ctx.user.id,
+            organizationId: ctx.organizationId,
             name: input.name,
             templateOrder: input.templateIds,
             separator: input.separator ?? '\n\n',
@@ -107,7 +130,7 @@ export const youtubeRouter = router({
         return data;
       }),
 
-    update: protectedProcedure
+    update: orgProcedure
       .input(
         z.object({
           id: z.string().uuid(),
@@ -129,7 +152,7 @@ export const youtubeRouter = router({
         const [data] = await db
           .update(containers)
           .set(updateData)
-          .where(and(eq(containers.id, input.id), eq(containers.userId, ctx.user.id)))
+          .where(and(eq(containers.id, input.id), eq(containers.organizationId, ctx.organizationId)))
           .returning();
 
         // Trigger task to update all videos in this container
@@ -151,17 +174,17 @@ export const youtubeRouter = router({
         return data;
       }),
 
-    delete: protectedProcedure
+    delete: orgProcedure
       .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         await db
           .delete(containers)
-          .where(and(eq(containers.id, input.id), eq(containers.userId, ctx.user.id)));
+          .where(and(eq(containers.id, input.id), eq(containers.organizationId, ctx.organizationId)));
 
         return { success: true };
       }),
 
-    getAffectedVideos: protectedProcedure
+    getAffectedVideos: orgProcedure
       .input(z.object({ containerId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         const videos = await db
@@ -184,11 +207,11 @@ export const youtubeRouter = router({
   // ==================== Template Management ====================
 
   templates: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
+    list: orgProcedure.query(async ({ ctx }) => {
       const data = await db
         .select()
         .from(templates)
-        .where(eq(templates.userId, ctx.user.id))
+        .where(eq(templates.organizationId, ctx.organizationId))
         .orderBy(desc(templates.createdAt));
 
       // Add variable count to each template
@@ -198,7 +221,7 @@ export const youtubeRouter = router({
       }));
     }),
 
-    create: protectedProcedure
+    create: orgProcedure
       .input(
         z.object({
           name: z.string().min(1),
@@ -210,6 +233,7 @@ export const youtubeRouter = router({
           .insert(templates)
           .values({
             userId: ctx.user.id,
+            organizationId: ctx.organizationId,
             name: input.name,
             content: input.content,
           })
@@ -218,7 +242,7 @@ export const youtubeRouter = router({
         return data;
       }),
 
-    update: protectedProcedure
+    update: orgProcedure
       .input(
         z.object({
           id: z.string().uuid(),
@@ -237,7 +261,7 @@ export const youtubeRouter = router({
         const [data] = await db
           .update(templates)
           .set(updateData)
-          .where(and(eq(templates.id, input.id), eq(templates.userId, ctx.user.id)))
+          .where(and(eq(templates.id, input.id), eq(templates.organizationId, ctx.organizationId)))
           .returning();
 
         // Trigger task to update all videos using this template
@@ -247,7 +271,7 @@ export const youtubeRouter = router({
           const allContainers = await db
             .select({ id: containers.id, templateOrder: containers.templateOrder })
             .from(containers)
-            .where(eq(containers.userId, ctx.user.id));
+            .where(eq(containers.organizationId, ctx.organizationId));
           const containersData = allContainers.filter((c) =>
             Array.isArray(c.templateOrder) && c.templateOrder.includes(input.id)
           );
@@ -273,23 +297,23 @@ export const youtubeRouter = router({
         return data;
       }),
 
-    delete: protectedProcedure
+    delete: orgProcedure
       .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         await db
           .delete(templates)
-          .where(and(eq(templates.id, input.id), eq(templates.userId, ctx.user.id)));
+          .where(and(eq(templates.id, input.id), eq(templates.organizationId, ctx.organizationId)));
 
         return { success: true };
       }),
 
-    parseVariables: protectedProcedure
+    parseVariables: orgProcedure
       .input(z.object({ content: z.string() }))
       .query(({ input }) => {
         return { variables: parseVariables(input.content) };
       }),
 
-    getAffectedVideos: protectedProcedure
+    getAffectedVideos: orgProcedure
       .input(z.object({ templateId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         // First, find all containers that use this template
@@ -300,7 +324,7 @@ export const youtubeRouter = router({
             templateOrder: containers.templateOrder,
           })
           .from(containers)
-          .where(eq(containers.userId, ctx.user.id));
+          .where(eq(containers.organizationId, ctx.organizationId));
         const containersData = allContainers.filter((c) =>
           Array.isArray(c.templateOrder) && c.templateOrder.includes(input.templateId)
         );
@@ -344,7 +368,7 @@ export const youtubeRouter = router({
   // ==================== Video Management ====================
 
   videos: router({
-    list: protectedProcedure
+    list: orgProcedure
       .input(
         z.object({
           channelId: z.union([z.string().uuid(), z.literal('')]).optional(),
@@ -353,7 +377,7 @@ export const youtubeRouter = router({
         })
       )
       .query(async ({ ctx, input }) => {
-        const filters = [eq(youtubeChannels.userId, ctx.user.id)];
+        const filters = [eq(youtubeChannels.organizationId, ctx.organizationId)];
 
         if (input.channelId && input.channelId !== '') {
           filters.push(eq(youtubeVideos.channelId, input.channelId));
@@ -390,7 +414,7 @@ export const youtubeRouter = router({
         return results;
       }),
 
-    unassigned: protectedProcedure.query(async ({ ctx }) => {
+    unassigned: orgProcedure.query(async ({ ctx }) => {
       const data = await db
         .select({
           ...getTableColumns(youtubeVideos),
@@ -403,13 +427,13 @@ export const youtubeRouter = router({
         })
         .from(youtubeVideos)
         .innerJoin(youtubeChannels, eq(youtubeVideos.channelId, youtubeChannels.id))
-        .where(and(eq(youtubeChannels.userId, ctx.user.id), isNull(youtubeVideos.containerId)))
+        .where(and(eq(youtubeChannels.organizationId, ctx.organizationId), isNull(youtubeVideos.containerId)))
         .orderBy(desc(youtubeVideos.publishedAt));
 
       return data;
     }),
 
-    assignToContainer: protectedProcedure
+    assignToContainer: orgProcedure
       .input(
         z.object({
           videoId: z.string().uuid(),
@@ -417,6 +441,7 @@ export const youtubeRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        await verifyVideoOwnership(input.videoId, ctx.organizationId);
         // First verify the video isn't already assigned
         const [video] = await db
           .select({ containerId: youtubeVideos.containerId })
@@ -430,12 +455,11 @@ export const youtubeRouter = router({
           });
         }
 
-        // Check if user has reached their assigned video limit
-        // We count videos that are already assigned to containers
+        // Check if org has reached their assigned video limit
         const channels = await db
           .select({ id: youtubeChannels.id })
           .from(youtubeChannels)
-          .where(eq(youtubeChannels.userId, ctx.user.id));
+          .where(eq(youtubeChannels.organizationId, ctx.organizationId));
 
         const channelIds = channels?.map((c) => c.id) || [];
 
@@ -451,7 +475,7 @@ export const youtubeRouter = router({
             );
           const assignedCount = countResult[0]?.assignedCount ?? 0;
 
-          const limitCheck = await checkVideoLimit(ctx.user.id, db);
+          const limitCheck = await checkVideoLimit(ctx.organizationId, db);
 
           // If adding this video would exceed the limit, reject
           if ((assignedCount || 0) >= limitCheck.limit) {
@@ -466,7 +490,7 @@ export const youtubeRouter = router({
         const [container] = await db
           .select({ templateOrder: containers.templateOrder })
           .from(containers)
-          .where(and(eq(containers.id, input.containerId), eq(containers.userId, ctx.user.id)));
+          .where(and(eq(containers.id, input.containerId), eq(containers.organizationId, ctx.organizationId)));
 
         if (!container) {
           throw new TRPCError({
@@ -520,9 +544,10 @@ export const youtubeRouter = router({
         return { success: true };
       }),
 
-    getVariables: protectedProcedure
+    getVariables: orgProcedure
       .input(z.object({ videoId: z.string().uuid() }))
       .query(async ({ ctx, input }) => {
+        await verifyVideoOwnership(input.videoId, ctx.organizationId);
         const data = await db
           .select({
             ...getTableColumns(videoVariables),
@@ -556,7 +581,7 @@ export const youtubeRouter = router({
         };
       }),
 
-    updateVariables: protectedProcedure
+    updateVariables: orgProcedure
       .input(
         z.object({
           videoId: z.string().uuid(),
@@ -570,6 +595,7 @@ export const youtubeRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        await verifyVideoOwnership(input.videoId, ctx.organizationId);
         // Upsert all variables
         for (const variable of input.variables) {
           await db
@@ -596,9 +622,10 @@ export const youtubeRouter = router({
         return { success: true };
       }),
 
-    getHistory: protectedProcedure
+    getHistory: orgProcedure
       .input(z.object({ videoId: z.string().uuid() }))
       .query(async ({ ctx, input }) => {
+        await verifyVideoOwnership(input.videoId, ctx.organizationId);
         const data = await db
           .select()
           .from(descriptionHistory)
@@ -608,7 +635,7 @@ export const youtubeRouter = router({
         return data;
       }),
 
-    rollback: protectedProcedure
+    rollback: orgProcedure
       .input(
         z.object({
           videoId: z.string().uuid(),
@@ -616,6 +643,7 @@ export const youtubeRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        await verifyVideoOwnership(input.videoId, ctx.organizationId);
         // Get the historical description
         const [history] = await db
           .select({ description: descriptionHistory.description })
@@ -682,13 +710,17 @@ export const youtubeRouter = router({
         };
       }),
 
-    updateToYouTube: protectedProcedure
+    updateToYouTube: orgProcedure
       .input(
         z.object({
           videoIds: z.array(z.string().uuid()),
         })
       )
       .mutation(async ({ ctx, input }) => {
+        // Verify all videos belong to this org
+        for (const videoId of input.videoIds) {
+          await verifyVideoOwnership(videoId, ctx.organizationId);
+        }
         await tasks.trigger("youtube-update-video-descriptions", {
           videoIds: input.videoIds,
           userId: ctx.user.id,

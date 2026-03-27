@@ -19,6 +19,28 @@ const getBaseUrl = () => {
   return `http://localhost:${process.env.PORT ?? 3000}`; // dev SSR should use localhost
 };
 
+/** Module-level active organization ID, injected into every tRPC request */
+let _organizationId: string | null = null;
+
+export function setOrganizationId(id: string | null) {
+  _organizationId = id;
+  if (typeof window !== "undefined") {
+    if (id) {
+      localStorage.setItem("activeOrganizationId", id);
+    } else {
+      localStorage.removeItem("activeOrganizationId");
+    }
+  }
+}
+
+export function getOrganizationId(): string | null {
+  if (_organizationId) return _organizationId;
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("activeOrganizationId");
+  }
+  return null;
+}
+
 /**
  * A set of typesafe react-query hooks for your tRPC API
  */
@@ -43,6 +65,10 @@ export const api = createTRPCNext<AppRouter>({
         }),
         httpLink({
           url: `${getBaseUrl()}/api/trpc`,
+          headers() {
+            const orgId = getOrganizationId();
+            return orgId ? { "x-organization-id": orgId } : {};
+          },
         }),
       ],
     };

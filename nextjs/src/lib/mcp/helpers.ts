@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { db } from "@/db";
 import { apiRequestLog } from "@/db/schema";
 
-const sessionStore = new AsyncLocalStorage<{ userId: string }>();
+const sessionStore = new AsyncLocalStorage<{ userId: string; organizationId: string }>();
 
 export { sessionStore };
 
@@ -10,6 +10,12 @@ export function getSessionUserId(): string {
   const session = sessionStore.getStore();
   if (!session) throw new Error("No MCP session available");
   return session.userId;
+}
+
+export function getSessionOrgId(): string {
+  const session = sessionStore.getStore();
+  if (!session) throw new Error("No MCP session available");
+  return session.organizationId;
 }
 
 /**
@@ -37,10 +43,12 @@ export function logMcpRequest(
   quotaUnits: number,
   statusCode: number
 ): void {
+  const session = sessionStore.getStore();
   db.insert(apiRequestLog)
     .values({
       apiKeyId: null,
       userId,
+      organizationId: session?.organizationId ?? null,
       endpoint: toolName,
       method: "MCP",
       statusCode,

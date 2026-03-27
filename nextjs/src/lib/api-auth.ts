@@ -9,6 +9,7 @@ import { encrypt } from "@/utils/encryption";
 
 export interface ApiContext {
   userId: string;
+  organizationId: string;
   apiKeyId: string;
   permission: "read" | "read-write";
 }
@@ -84,7 +85,7 @@ export async function withApiKey(
     .then(() => {})
     .catch(() => {});
 
-  return { userId: key.userId, apiKeyId: key.id, permission: key.permission as "read" | "read-write" };
+  return { userId: key.userId, organizationId: key.organizationId ?? key.userId, apiKeyId: key.id, permission: key.permission as "read" | "read-write" };
 }
 
 /**
@@ -167,20 +168,19 @@ export function requireWriteAccess(ctx: ApiContext): NextResponse | null {
  */
 export async function getChannelTokens(
   channelId: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<
   | { accessToken: string; channelId: string }
   | { error: ReturnType<typeof apiError>; status: number }
 > {
+  const channelFilter = organizationId
+    ? and(eq(youtubeChannels.channelId, channelId), eq(youtubeChannels.organizationId, organizationId))
+    : and(eq(youtubeChannels.channelId, channelId), eq(youtubeChannels.userId, userId));
   const [channel] = await db
     .select()
     .from(youtubeChannels)
-    .where(
-      and(
-        eq(youtubeChannels.channelId, channelId),
-        eq(youtubeChannels.userId, userId)
-      )
-    );
+    .where(channelFilter);
 
   if (!channel) {
     return {
@@ -295,9 +295,14 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  */
 export async function resolveVideo(
   id: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ) {
   const isUUID = UUID_REGEX.test(id);
+
+  const ownerFilter = organizationId
+    ? eq(youtubeChannels.organizationId, organizationId)
+    : eq(youtubeChannels.userId, userId);
 
   const [video] = await db
     .select({
@@ -312,7 +317,7 @@ export async function resolveVideo(
     .where(
       and(
         isUUID ? eq(youtubeVideos.id, id) : eq(youtubeVideos.videoId, id),
-        eq(youtubeChannels.userId, userId)
+        ownerFilter
       )
     );
 

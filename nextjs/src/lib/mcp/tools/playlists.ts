@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { toMcp, mcpQuotaExceeded, getSessionUserId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
+import { toMcp, mcpQuotaExceeded, getSessionUserId, getSessionOrgId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
 import { consumeCredits } from "@/lib/plan-limits";
 import {
   listPlaylists,
@@ -25,7 +25,8 @@ export function registerPlaylistTools(server: McpServer) {
     READ,
     async ({ channelId, maxResults, pageToken }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 1);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 1);
       if (!credits.success) return mcpQuotaExceeded(userId, "list_playlists");
       const result = await listPlaylists(channelId, userId, { maxResults, pageToken });
       logMcpRequest(userId, "list_playlists", 1, "error" in result ? 400 : 200);
@@ -45,7 +46,8 @@ export function registerPlaylistTools(server: McpServer) {
     WRITE,
     async ({ channelId, title, description, privacyStatus }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 50);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 50);
       if (!credits.success) return mcpQuotaExceeded(userId, "create_playlist");
       const result = await createPlaylist(channelId, userId, { title, description, privacyStatus });
       logMcpRequest(userId, "create_playlist", 50, "error" in result ? 400 : 200);
@@ -63,7 +65,8 @@ export function registerPlaylistTools(server: McpServer) {
     READ,
     async ({ playlistId, channelId }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 1);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 1);
       if (!credits.success) return mcpQuotaExceeded(userId, "get_playlist");
       const result = await getPlaylist(playlistId, channelId, userId);
       logMcpRequest(userId, "get_playlist", 1, "error" in result ? 400 : 200);
@@ -84,7 +87,8 @@ export function registerPlaylistTools(server: McpServer) {
     WRITE,
     async ({ playlistId, channelId, title, description, privacyStatus }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 50);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 50);
       if (!credits.success) return mcpQuotaExceeded(userId, "update_playlist");
       const result = await updatePlaylist(playlistId, channelId, userId, { title, description, privacyStatus });
       logMcpRequest(userId, "update_playlist", 50, "error" in result ? 400 : 200);
@@ -102,7 +106,8 @@ export function registerPlaylistTools(server: McpServer) {
     DESTRUCTIVE,
     async ({ playlistId, channelId }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 50);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 50);
       if (!credits.success) return mcpQuotaExceeded(userId, "delete_playlist");
       const result = await deletePlaylist(playlistId, channelId, userId);
       logMcpRequest(userId, "delete_playlist", 50, "error" in result ? 400 : 200);
@@ -122,7 +127,8 @@ export function registerPlaylistTools(server: McpServer) {
     READ,
     async ({ playlistId, channelId, maxResults, pageToken }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 1);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 1);
       if (!credits.success) return mcpQuotaExceeded(userId, "list_playlist_items");
       const result = await listPlaylistItems(playlistId, channelId, userId, { maxResults, pageToken });
       logMcpRequest(userId, "list_playlist_items", 1, "error" in result ? 400 : 200);
@@ -141,7 +147,8 @@ export function registerPlaylistTools(server: McpServer) {
     WRITE,
     async ({ playlistId, channelId, videoId }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 50);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 50);
       if (!credits.success) return mcpQuotaExceeded(userId, "add_playlist_item");
       const result = await addPlaylistItem(playlistId, channelId, userId, videoId);
       logMcpRequest(userId, "add_playlist_item", 50, "error" in result ? 400 : 200);
@@ -159,7 +166,8 @@ export function registerPlaylistTools(server: McpServer) {
     DESTRUCTIVE,
     async ({ itemId, channelId }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 50);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 50);
       if (!credits.success) return mcpQuotaExceeded(userId, "delete_playlist_item");
       const result = await deletePlaylistItem(itemId, channelId, userId);
       logMcpRequest(userId, "delete_playlist_item", 50, "error" in result ? 400 : 200);

@@ -24,7 +24,7 @@ export async function POST(
     );
   }
 
-  const result = await assignVideo(id, containerId, auth.userId);
+  const result = await assignVideo(id, containerId, auth.userId, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, `/v1/videos/${id}/assign`, "POST", result.error.status, 0);

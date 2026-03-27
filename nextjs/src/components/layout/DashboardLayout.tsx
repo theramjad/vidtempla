@@ -67,9 +67,15 @@ function DashboardBreadcrumb({
     .split("/")
     .filter((p) => p);
 
-  // Skip "dashboard" prefix
-  const displaySegments =
-    pathSegments[0] === "dashboard" ? pathSegments.slice(1) : pathSegments;
+  // Skip "org/[slug]/" or "dashboard/" prefix
+  let displaySegments: string[];
+  if (pathSegments[0] === "org" && pathSegments.length >= 2) {
+    // /org/[slug]/dashboard/youtube → skip org, slug, then handle rest
+    const afterSlug = pathSegments.slice(2);
+    displaySegments = afterSlug[0] === "dashboard" ? afterSlug.slice(1) : afterSlug;
+  } else {
+    displaySegments = pathSegments[0] === "dashboard" ? pathSegments.slice(1) : pathSegments;
+  }
 
   const getName = (segment: string) =>
     SEGMENT_NAMES[segment] ??

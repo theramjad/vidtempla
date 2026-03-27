@@ -13,9 +13,13 @@ import type { ServiceResult } from "./types";
 // ── list_channels ────────────────────────────────────────────
 
 export async function listChannels(
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
+    const ownerFilter = organizationId
+      ? eq(youtubeChannels.organizationId, organizationId)
+      : eq(youtubeChannels.userId, userId);
     const channels = await db
       .select({
         id: youtubeChannels.id,
@@ -27,7 +31,7 @@ export async function listChannels(
         lastSyncedAt: youtubeChannels.lastSyncedAt,
       })
       .from(youtubeChannels)
-      .where(eq(youtubeChannels.userId, userId))
+      .where(ownerFilter)
       .orderBy(desc(youtubeChannels.createdAt));
 
     return { data: channels };
@@ -40,10 +44,11 @@ export async function listChannels(
 
 export async function getChannel(
   channelId: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -63,16 +68,20 @@ export async function getChannel(
 
 export async function getChannelOverview(
   channelId: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
+    const ownerFilter = organizationId
+      ? eq(youtubeChannels.organizationId, organizationId)
+      : eq(youtubeChannels.userId, userId);
     const [channel] = await db
       .select()
       .from(youtubeChannels)
       .where(
         and(
           eq(youtubeChannels.channelId, channelId),
-          eq(youtubeChannels.userId, userId)
+          ownerFilter
         )
       );
 
@@ -80,10 +89,17 @@ export async function getChannelOverview(
       return { error: { code: "CHANNEL_NOT_FOUND", message: "Channel not found or not connected", suggestion: "Connect a YouTube channel from the dashboard first", status: 404 } };
     }
 
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
+
+    const templateFilter = organizationId
+      ? eq(templates.organizationId, organizationId)
+      : eq(templates.userId, userId);
+    const containerFilter = organizationId
+      ? eq(containers.organizationId, organizationId)
+      : eq(containers.userId, userId);
 
     const [youtubeDetails, userTemplates, userContainers, videoCounts] =
       await Promise.all([
@@ -96,7 +112,7 @@ export async function getChannelOverview(
               sql<number>`(SELECT COUNT(*) FROM regexp_matches(${templates.content}, '\\{\\{[^}]+\\}\\}', 'g'))`.as("variable_count"),
           })
           .from(templates)
-          .where(eq(templates.userId, userId)),
+          .where(templateFilter),
         db
           .select({
             id: containers.id,
@@ -105,7 +121,7 @@ export async function getChannelOverview(
           })
           .from(containers)
           .leftJoin(youtubeVideos, eq(youtubeVideos.containerId, containers.id))
-          .where(eq(containers.userId, userId))
+          .where(containerFilter)
           .groupBy(containers.id),
         db
           .select({

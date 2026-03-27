@@ -15,10 +15,15 @@ export default createNextApiHandler({
     }
 
     const session = await auth.api.getSession({ headers });
+    const organizationId =
+      headers.get("x-organization-id") ??
+      session?.session?.activeOrganizationId ??
+      null;
 
     return {
       db,
       user: session?.user ?? null,
+      organizationId,
     };
   },
 });

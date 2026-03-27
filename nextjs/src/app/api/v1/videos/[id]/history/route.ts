@@ -13,7 +13,7 @@ export async function GET(
   const url = new URL(request.url);
   const limit = url.searchParams.has("limit") ? parseInt(url.searchParams.get("limit")!) : undefined;
 
-  const result = await getDescriptionHistory(id, auth.userId, limit);
+  const result = await getDescriptionHistory(id, auth.userId, limit, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, `/v1/videos/${id}/history`, "GET", result.error.status, 0);

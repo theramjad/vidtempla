@@ -46,13 +46,17 @@ export interface ListVideosOpts {
 
 export async function listVideos(
   userId: string,
-  opts: ListVideosOpts
+  opts: ListVideosOpts,
+  organizationId?: string
 ): Promise<ServiceResult<{ data: unknown[]; meta: PaginationMeta }>> {
   try {
     const limit = Math.min(opts.limit ?? 50, 100);
     const sortParam = opts.sort ?? "publishedAt:desc";
 
-    const filters: ReturnType<typeof eq>[] = [eq(youtubeChannels.userId, userId)];
+    const ownerFilter = organizationId
+      ? eq(youtubeChannels.organizationId, organizationId)
+      : eq(youtubeChannels.userId, userId);
+    const filters: ReturnType<typeof eq>[] = [ownerFilter];
     if (opts.channelId) filters.push(eq(youtubeChannels.channelId, opts.channelId));
     if (opts.containerId) filters.push(eq(youtubeVideos.containerId, opts.containerId));
     if (opts.search) filters.push(ilike(youtubeVideos.title, `%${opts.search}%`));
@@ -98,7 +102,7 @@ export async function listVideos(
         ? items[items.length - 1]!.publishedAt?.toISOString()
         : undefined;
 
-    const baseFilters: ReturnType<typeof eq>[] = [eq(youtubeChannels.userId, userId)];
+    const baseFilters: ReturnType<typeof eq>[] = [ownerFilter];
     if (opts.channelId) baseFilters.push(eq(youtubeChannels.channelId, opts.channelId));
     if (opts.containerId) baseFilters.push(eq(youtubeVideos.containerId, opts.containerId));
     if (opts.search) baseFilters.push(ilike(youtubeVideos.title, `%${opts.search}%`));
@@ -125,10 +129,11 @@ export async function listVideos(
 
 export async function getVideo(
   id: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const resolved = await resolveVideo(id, userId);
+    const resolved = await resolveVideo(id, userId, organizationId);
     if (!resolved) {
       return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
     }
@@ -154,7 +159,7 @@ export async function getVideo(
       return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
     }
 
-    const tokens = await getChannelTokens(video.channel.channelId, userId);
+    const tokens = await getChannelTokens(video.channel.channelId, userId, organizationId);
     let youtubeData = null;
     if (!("error" in tokens)) {
       try {
@@ -181,10 +186,11 @@ export interface VideoAnalyticsOpts {
 export async function getVideoAnalytics(
   id: string,
   userId: string,
-  opts: VideoAnalyticsOpts
+  opts: VideoAnalyticsOpts,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const video = await resolveVideo(id, userId);
+    const video = await resolveVideo(id, userId, organizationId);
     if (!video) {
       return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
     }
@@ -196,7 +202,7 @@ export async function getVideoAnalytics(
     const metrics = opts.metrics ?? "views,estimatedMinutesWatched,averageViewDuration";
     const dimensions = opts.dimensions ?? "day";
 
-    const tokens = await getChannelTokens(video.channelYoutubeId, userId);
+    const tokens = await getChannelTokens(video.channelYoutubeId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -212,15 +218,16 @@ export async function getVideoAnalytics(
 
 export async function getVideoRetention(
   id: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const video = await resolveVideo(id, userId);
+    const video = await resolveVideo(id, userId, organizationId);
     if (!video) {
       return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
     }
 
-    const tokens = await getChannelTokens(video.channelYoutubeId, userId);
+    const tokens = await getChannelTokens(video.channelYoutubeId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -242,10 +249,11 @@ export async function getVideoRetention(
 
 export async function getVideoVariables(
   id: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const video = await resolveVideo(id, userId);
+    const video = await resolveVideo(id, userId, organizationId);
     if (!video) {
       return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
     }
@@ -270,10 +278,11 @@ export async function getVideoVariables(
 export async function assignVideo(
   id: string,
   containerId: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<{ success: true }>> {
   try {
-    const video = await resolveVideo(id, userId);
+    const video = await resolveVideo(id, userId, organizationId);
     if (!video) {
       return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
     }
@@ -282,10 +291,13 @@ export async function assignVideo(
       return { error: { code: "ALREADY_ASSIGNED", message: "Video is already assigned to a container", suggestion: "Unassign the video first or use a different video", status: 400 } };
     }
 
+    const channelOwnerFilter = organizationId
+      ? eq(youtubeChannels.organizationId, organizationId)
+      : eq(youtubeChannels.userId, userId);
     const channels = await db
       .select({ id: youtubeChannels.id })
       .from(youtubeChannels)
-      .where(eq(youtubeChannels.userId, userId));
+      .where(channelOwnerFilter);
     const channelIds = channels.map((c) => c.id);
 
     if (channelIds.length > 0) {
@@ -294,16 +306,19 @@ export async function assignVideo(
         .from(youtubeVideos)
         .where(and(inArray(youtubeVideos.channelId, channelIds), sql`${youtubeVideos.containerId} IS NOT NULL`));
 
-      const limitCheck = await checkVideoLimit(userId, db);
+      const limitCheck = await checkVideoLimit(organizationId ?? userId, db);
       if ((countResult?.assignedCount ?? 0) >= limitCheck.limit) {
         return { error: { code: "VIDEO_LIMIT_REACHED", message: `Assigned video limit reached (${limitCheck.limit} on ${limitCheck.planTier} plan)`, suggestion: "Upgrade your plan to assign more videos", status: 403 } };
       }
     }
 
+    const containerOwnerFilter = organizationId
+      ? eq(containers.organizationId, organizationId)
+      : eq(containers.userId, userId);
     const [container] = await db
       .select({ id: containers.id, templateOrder: containers.templateOrder })
       .from(containers)
-      .where(and(eq(containers.id, containerId), eq(containers.userId, userId)));
+      .where(and(eq(containers.id, containerId), containerOwnerFilter));
 
     if (!container) {
       return { error: { code: "CONTAINER_NOT_FOUND", message: "Container not found", suggestion: "Check the container ID", status: 404 } };
@@ -357,10 +372,11 @@ export interface VariableUpdate {
 export async function updateVideoVariables(
   id: string,
   variables: VariableUpdate[],
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<{ success: true }>> {
   try {
-    const video = await resolveVideo(id, userId);
+    const video = await resolveVideo(id, userId, organizationId);
     if (!video) {
       return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
     }
@@ -396,10 +412,11 @@ export async function updateVideoVariables(
 export async function getDescriptionHistory(
   id: string,
   userId: string,
-  limit?: number
+  limit?: number,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const video = await resolveVideo(id, userId);
+    const video = await resolveVideo(id, userId, organizationId);
     if (!video) {
       return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
     }
@@ -424,10 +441,11 @@ export async function getDescriptionHistory(
 export async function revertDescription(
   id: string,
   historyId: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<{ success: true; delinkedContainer: boolean; variablesCleared: number }>> {
   try {
-    const video = await resolveVideo(id, userId);
+    const video = await resolveVideo(id, userId, organizationId);
     if (!video) {
       return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
     }

@@ -4,7 +4,7 @@
  */
 
 import { z } from "zod";
-import { protectedProcedure } from "@/server/trpc/init";
+import { orgProcedure } from "@/server/trpc/init";
 import { TRPCError } from "@trpc/server";
 import { stripe } from "@/lib/stripe-server";
 import {
@@ -22,13 +22,13 @@ import { router } from "@/server/trpc/init";
 
 export const billingRouter = router({
   /**
-   * Get the current user's subscription plan
+   * Get the current org's subscription plan
    */
-  getCurrentPlan: protectedProcedure.query(async ({ ctx }) => {
+  getCurrentPlan: orgProcedure.query(async ({ ctx }) => {
     const [subscription] = await db
       .select()
       .from(subscriptions)
-      .where(eq(subscriptions.userId, ctx.user.id))
+      .where(eq(subscriptions.organizationId, ctx.organizationId))
       .orderBy(desc(subscriptions.createdAt))
       .limit(1);
 
@@ -38,6 +38,7 @@ export const billingRouter = router({
         .insert(subscriptions)
         .values({
           userId: ctx.user.id,
+          organizationId: ctx.organizationId,
           planTier: "free",
           status: "active",
         })
@@ -52,7 +53,7 @@ export const billingRouter = router({
   /**
    * Create a checkout session for upgrading to a paid plan
    */
-  createCheckoutSession: protectedProcedure
+  createCheckoutSession: orgProcedure
     .input(
       z.object({
         planTier: z.enum(["pro", "business"]),
@@ -73,7 +74,7 @@ export const billingRouter = router({
         let [subscription] = await db
           .select()
           .from(subscriptions)
-          .where(eq(subscriptions.userId, ctx.user.id));
+          .where(eq(subscriptions.organizationId, ctx.organizationId));
 
         // Create subscription record if it doesn't exist
         if (!subscription) {
@@ -81,6 +82,7 @@ export const billingRouter = router({
             .insert(subscriptions)
             .values({
               userId: ctx.user.id,
+              organizationId: ctx.organizationId,
               planTier: "free",
               status: "active",
             })
@@ -105,11 +107,13 @@ export const billingRouter = router({
           allow_promotion_codes: true,
           metadata: {
             userId: ctx.user.id,
+            organizationId: ctx.organizationId,
             planTier: input.planTier,
           },
           subscription_data: {
             metadata: {
               userId: ctx.user.id,
+              organizationId: ctx.organizationId,
               planTier: input.planTier,
             },
           },
@@ -134,12 +138,12 @@ export const billingRouter = router({
   /**
    * Get the customer portal URL for managing subscriptions
    */
-  getCustomerPortalUrl: protectedProcedure.query(async ({ ctx }) => {
+  getCustomerPortalUrl: orgProcedure.query(async ({ ctx }) => {
     try {
       const [subscription] = await db
         .select({ stripeCustomerId: subscriptions.stripeCustomerId })
         .from(subscriptions)
-        .where(eq(subscriptions.userId, ctx.user.id));
+        .where(eq(subscriptions.organizationId, ctx.organizationId));
 
       if (!subscription?.stripeCustomerId) {
         throw new TRPCError({
@@ -172,14 +176,14 @@ export const billingRouter = router({
   /**
    * Get current usage statistics
    */
-  getUsageStats: protectedProcedure.query(async ({ ctx }) => {
+  getUsageStats: orgProcedure.query(async ({ ctx }) => {
     // Get channel count
     const channels = await db
       .select({ id: youtubeChannels.id })
       .from(youtubeChannels)
-      .where(eq(youtubeChannels.userId, ctx.user.id));
+      .where(eq(youtubeChannels.organizationId, ctx.organizationId));
 
-    // Get video count across all user's channels
+    // Get video count across all org's channels
     const channelIds = channels.map((c) => c.id);
     let videos: { id: string }[] = [];
 
@@ -194,7 +198,7 @@ export const billingRouter = router({
     const [subscription] = await db
       .select({ planTier: subscriptions.planTier })
       .from(subscriptions)
-      .where(eq(subscriptions.userId, ctx.user.id));
+      .where(eq(subscriptions.organizationId, ctx.organizationId));
 
     const planTier = (subscription?.planTier as PlanTier) || "free";
     const limits = PLAN_CONFIG[planTier].features;
@@ -216,7 +220,7 @@ export const billingRouter = router({
   /**
    * Get upgrade preview with prorated amount calculation
    */
-  getUpgradePreview: protectedProcedure
+  getUpgradePreview: orgProcedure
     .input(
       z.object({
         targetPlanTier: z.enum(["pro", "business"]),
@@ -227,7 +231,7 @@ export const billingRouter = router({
       const [subscription] = await db
         .select()
         .from(subscriptions)
-        .where(eq(subscriptions.userId, ctx.user.id));
+        .where(eq(subscriptions.organizationId, ctx.organizationId));
 
       if (!subscription) {
         throw new TRPCError({
@@ -283,7 +287,7 @@ export const billingRouter = router({
   /**
    * Update subscription to a different plan
    */
-  updateSubscription: protectedProcedure
+  updateSubscription: orgProcedure
     .input(
       z.object({
         targetPlanTier: z.enum(["free", "pro", "business"]),
@@ -294,7 +298,7 @@ export const billingRouter = router({
       const [subscription] = await db
         .select()
         .from(subscriptions)
-        .where(eq(subscriptions.userId, ctx.user.id));
+        .where(eq(subscriptions.organizationId, ctx.organizationId));
 
       if (!subscription) {
         throw new TRPCError({

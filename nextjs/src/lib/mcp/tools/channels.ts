@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { toMcp, mcpQuotaExceeded, getSessionUserId, logMcpRequest, READ } from "../helpers";
+import { toMcp, mcpQuotaExceeded, getSessionUserId, getSessionOrgId, logMcpRequest, READ } from "../helpers";
 import { consumeCredits } from "@/lib/plan-limits";
 import {
   listChannels,
@@ -16,7 +16,8 @@ export function registerChannelTools(server: McpServer) {
     READ,
     async () => {
       const userId = getSessionUserId();
-      const result = await listChannels(userId);
+      const orgId = getSessionOrgId();
+      const result = await listChannels(userId, orgId);
       logMcpRequest(userId, "list_channels", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -29,9 +30,10 @@ export function registerChannelTools(server: McpServer) {
     READ,
     async ({ channelId }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 1);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 1);
       if (!credits.success) return mcpQuotaExceeded(userId, "get_channel");
-      const result = await getChannel(channelId, userId);
+      const result = await getChannel(channelId, userId, orgId);
       logMcpRequest(userId, "get_channel", 1, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -44,9 +46,10 @@ export function registerChannelTools(server: McpServer) {
     READ,
     async ({ channelId }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 1);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 1);
       if (!credits.success) return mcpQuotaExceeded(userId, "get_channel_overview");
-      const result = await getChannelOverview(channelId, userId);
+      const result = await getChannelOverview(channelId, userId, orgId);
       logMcpRequest(userId, "get_channel_overview", 1, "error" in result ? 400 : 200);
       return toMcp(result);
     }

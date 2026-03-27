@@ -10,24 +10,25 @@ export const creditReset = schedules.task({
   cron: "0 */6 * * *",
   run: async () => {
     const expiredRows = await db
-      .select({ userId: userCredits.userId })
+      .select({ organizationId: userCredits.organizationId, userId: userCredits.userId })
       .from(userCredits)
       .where(sql`${userCredits.periodEnd} <= NOW()`);
 
     for (const row of expiredRows) {
-      const tier = await getUserPlanTier(row.userId, db);
+      const orgId = row.organizationId ?? row.userId;
+      const tier = await getUserPlanTier(orgId, db);
       const allocation = PLAN_CONFIG[tier].monthlyCredits;
       const now = new Date();
       const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-      await upsertCredits(row.userId, allocation, now, periodEnd);
+      await upsertCredits(orgId, allocation, now, periodEnd);
     }
 
-    logger.info("Credit reset complete", { usersReset: expiredRows.length });
+    logger.info("Credit reset complete", { orgsReset: expiredRows.length });
 
     return {
       success: true,
-      usersReset: expiredRows.length,
+      orgsReset: expiredRows.length,
       timestamp: new Date().toISOString(),
     };
   },

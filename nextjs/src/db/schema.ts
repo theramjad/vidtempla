@@ -10,7 +10,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 
-// Better Auth tables (4)
+// Better Auth tables (4 + 3 organization plugin)
 
 export const user = pgTable("user", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -35,6 +35,7 @@ export const session = pgTable("session", {
   expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }).notNull(),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
+  activeOrganizationId: text("active_organization_id"),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -82,13 +83,59 @@ export const verification = pgTable("verification", {
   ),
 });
 
-// App tables (8)
+// Organization plugin tables (Better Auth)
+
+export const organization = pgTable("organization", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").unique(),
+  logo: text("logo"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const member = pgTable("member", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  role: text("role").notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const invitation = pgTable("invitation", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  role: text("role"),
+  status: text("status").notNull(),
+  expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }).notNull(),
+  inviterId: uuid("inviter_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// App tables
 
 export const youtubeChannels = pgTable("youtube_channels", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
+  organizationId: text("organization_id")
+    .references(() => organization.id, { onDelete: "cascade" }),
   channelId: text("channel_id").unique().notNull(),
   title: text("title"),
   thumbnailUrl: text("thumbnail_url"),
@@ -118,6 +165,8 @@ export const containers = pgTable("containers", {
   userId: uuid("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
+  organizationId: text("organization_id")
+    .references(() => organization.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   separator: text("separator").notNull().default("\n\n"),
   templateOrder: jsonb("template_order").$type<string[]>(),
@@ -134,6 +183,8 @@ export const templates = pgTable("templates", {
   userId: uuid("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
+  organizationId: text("organization_id")
+    .references(() => organization.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   content: text("content").notNull(),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
@@ -214,8 +265,9 @@ export const subscriptions = pgTable("subscriptions", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")
     .notNull()
-    .references(() => user.id, { onDelete: "cascade" })
-    .unique(),
+    .references(() => user.id, { onDelete: "cascade" }),
+  organizationId: text("organization_id")
+    .references(() => organization.id, { onDelete: "cascade" }),
   stripeSubscriptionId: text("stripe_subscription_id").unique(),
   stripeCustomerId: text("stripe_customer_id"),
   stripeCheckoutSessionId: text("stripe_checkout_session_id"),
@@ -323,6 +375,8 @@ export const apiKeys = pgTable("api_keys", {
   userId: uuid("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
+  organizationId: text("organization_id")
+    .references(() => organization.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   keyHash: text("key_hash").notNull(),
   keyPrefix: text("key_prefix").notNull(),
@@ -349,6 +403,8 @@ export const apiRequestLog = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .references(() => organization.id, { onDelete: "cascade" }),
     endpoint: text("endpoint").notNull(),
     method: text("method").notNull(),
     statusCode: integer("status_code").notNull(),
@@ -363,6 +419,10 @@ export const apiRequestLog = pgTable(
       table.userId,
       table.createdAt
     ),
+    orgCreatedAtIdx: index("api_request_log_org_created_at_idx").on(
+      table.organizationId,
+      table.createdAt
+    ),
   })
 );
 
@@ -370,8 +430,10 @@ export const userCredits = pgTable("user_credits", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")
     .notNull()
-    .unique()
     .references(() => user.id, { onDelete: "cascade" }),
+  organizationId: text("organization_id")
+    .unique()
+    .references(() => organization.id, { onDelete: "cascade" }),
   balance: integer("balance").notNull().default(0),
   monthlyAllocation: integer("monthly_allocation").notNull(),
   periodStart: timestamp("period_start", { mode: "date", withTimezone: true }).notNull(),

@@ -14,7 +14,7 @@ import { encrypt } from '@/utils/encryption';
 import { checkChannelLimit } from '@/lib/plan-limits';
 import { tasks } from '@trigger.dev/sdk/v3';
 import { db } from '@/db';
-import { youtubeChannels } from '@/db/schema';
+import { youtubeChannels, member } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
 export default async function handler(
@@ -49,6 +49,21 @@ export default async function handler(
 
     if (!session) {
       return res.redirect('/sign-in?redirect=/dashboard/youtube');
+    }
+
+    // Resolve user's active organization (use session's active org or first membership)
+    let organizationId = session.session?.activeOrganizationId ?? null;
+    if (!organizationId) {
+      const [membership] = await db
+        .select({ organizationId: member.organizationId })
+        .from(member)
+        .where(eq(member.userId, session.user.id))
+        .limit(1);
+      organizationId = membership?.organizationId ?? null;
+    }
+
+    if (!organizationId) {
+      return res.redirect('/dashboard/youtube?error=' + encodeURIComponent('No organization found. Please set up your account first.'));
     }
 
     // Exchange code for tokens
@@ -95,7 +110,7 @@ export default async function handler(
       });
     } else {
       // Check channel limit before adding a new channel
-      const limitCheck = await checkChannelLimit(session.user.id, db);
+      const limitCheck = await checkChannelLimit(organizationId, db);
 
       if (!limitCheck.canAddChannel) {
         return res.redirect(
@@ -110,6 +125,7 @@ export default async function handler(
         .insert(youtubeChannels)
         .values({
           userId: session.user.id,
+          organizationId,
           channelId: channelInfo.id,
           title: channelInfo.snippet.title,
           thumbnailUrl: channelInfo.snippet.thumbnails.high.url,

@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { toMcp, mcpQuotaExceeded, getSessionUserId, logMcpRequest, READ, WRITE } from "../helpers";
+import { toMcp, mcpQuotaExceeded, getSessionUserId, getSessionOrgId, logMcpRequest, READ, WRITE } from "../helpers";
 import { consumeCredits } from "@/lib/plan-limits";
 import {
   getChannelAnalytics,
@@ -64,7 +64,8 @@ export function registerAnalyticsTools(server: McpServer) {
     READ,
     async ({ channelId, ...opts }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 100);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 100);
       if (!credits.success) return mcpQuotaExceeded(userId, "search_my_videos");
       const result = await searchMyVideos(channelId, userId, opts);
       logMcpRequest(userId, "search_my_videos", 100, "error" in result ? 400 : 200);
@@ -87,7 +88,8 @@ export function registerAnalyticsTools(server: McpServer) {
     READ,
     async ({ channelId, ...opts }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 100);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 100);
       if (!credits.success) return mcpQuotaExceeded(userId, "search_youtube");
       const result = await searchYouTube(channelId, userId, opts);
       logMcpRequest(userId, "search_youtube", 100, "error" in result ? 400 : 200);

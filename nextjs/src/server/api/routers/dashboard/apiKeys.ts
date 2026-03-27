@@ -4,7 +4,7 @@
  */
 
 import { z } from "zod";
-import { protectedProcedure, router } from "@/server/trpc/init";
+import { orgProcedure, router } from "@/server/trpc/init";
 import { db } from "@/db";
 import { apiKeys, apiRequestLog } from "@/db/schema";
 import { eq, and, desc, sql, gte, lte, count, like, lt, or } from "drizzle-orm";
@@ -12,7 +12,7 @@ import { generateApiKey } from "@/lib/api-keys";
 import { getCredits } from "@/lib/plan-limits";
 
 export const apiKeysRouter = router({
-  list: protectedProcedure.query(async ({ ctx }) => {
+  list: orgProcedure.query(async ({ ctx }) => {
     const keys = await db
       .select({
         id: apiKeys.id,
@@ -24,13 +24,13 @@ export const apiKeysRouter = router({
         createdAt: apiKeys.createdAt,
       })
       .from(apiKeys)
-      .where(eq(apiKeys.userId, ctx.user.id))
+      .where(eq(apiKeys.organizationId, ctx.organizationId))
       .orderBy(desc(apiKeys.createdAt));
 
     return keys;
   }),
 
-  create: protectedProcedure
+  create: orgProcedure
     .input(
       z.object({
         name: z.string().min(1).max(100),
@@ -49,6 +49,7 @@ export const apiKeysRouter = router({
         .insert(apiKeys)
         .values({
           userId: ctx.user.id,
+          organizationId: ctx.organizationId,
           name: input.name,
           keyHash: hash,
           keyPrefix: prefix,
@@ -70,19 +71,19 @@ export const apiKeysRouter = router({
       };
     }),
 
-  revoke: protectedProcedure
+  revoke: orgProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       await db
         .delete(apiKeys)
         .where(
-          and(eq(apiKeys.id, input.id), eq(apiKeys.userId, ctx.user.id))
+          and(eq(apiKeys.id, input.id), eq(apiKeys.organizationId, ctx.organizationId))
         );
 
       return { success: true };
     }),
 
-  getUsage: protectedProcedure
+  getUsage: orgProcedure
     .input(
       z.object({
         startDate: z.string().optional(),
@@ -97,7 +98,7 @@ export const apiKeysRouter = router({
       const end = input.endDate ? new Date(input.endDate) : now;
 
       const filters = [
-        eq(apiRequestLog.userId, ctx.user.id),
+        eq(apiRequestLog.organizationId, ctx.organizationId),
         gte(apiRequestLog.createdAt, start),
         lte(apiRequestLog.createdAt, end),
       ];
@@ -140,7 +141,7 @@ export const apiKeysRouter = router({
       };
     }),
 
-  getDetailedUsage: protectedProcedure
+  getDetailedUsage: orgProcedure
     .input(
       z.object({
         startDate: z.string().optional(),
@@ -155,7 +156,7 @@ export const apiKeysRouter = router({
       const end = input.endDate ? new Date(input.endDate) : now;
 
       const filters = [
-        eq(apiRequestLog.userId, ctx.user.id),
+        eq(apiRequestLog.organizationId, ctx.organizationId),
         gte(apiRequestLog.createdAt, start),
         lte(apiRequestLog.createdAt, end),
       ];
@@ -235,7 +236,7 @@ export const apiKeysRouter = router({
       };
     }),
 
-  getRequestHistory: protectedProcedure
+  getRequestHistory: orgProcedure
     .input(
       z.object({
         cursor: z.string().optional(),
@@ -254,7 +255,7 @@ export const apiKeysRouter = router({
       const end = input.endDate ? new Date(input.endDate) : now;
 
       const filters = [
-        eq(apiRequestLog.userId, ctx.user.id),
+        eq(apiRequestLog.organizationId, ctx.organizationId),
         gte(apiRequestLog.createdAt, start),
         lte(apiRequestLog.createdAt, end),
       ];
@@ -300,8 +301,8 @@ export const apiKeysRouter = router({
       return { items, cursor: nextCursor, hasMore };
     }),
 
-  getCreditBalance: protectedProcedure.query(async ({ ctx }) => {
-    const credits = await getCredits(ctx.user.id);
+  getCreditBalance: orgProcedure.query(async ({ ctx }) => {
+    const credits = await getCredits(ctx.organizationId);
     if (!credits) return null;
     return {
       balance: credits.balance,

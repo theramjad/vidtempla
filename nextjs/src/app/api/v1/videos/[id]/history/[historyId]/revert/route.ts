@@ -12,7 +12,7 @@ export async function POST(
   if (writeCheck) return writeCheck;
 
   const { id, historyId } = await params;
-  const result = await revertDescription(id, historyId, auth.userId);
+  const result = await revertDescription(id, historyId, auth.userId, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, `/v1/videos/${id}/history/${historyId}/revert`, "POST", result.error.status, 0);

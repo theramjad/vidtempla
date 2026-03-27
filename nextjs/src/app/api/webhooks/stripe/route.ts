@@ -129,21 +129,25 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const customerId = session.customer as string;
   const subscriptionId = session.subscription as string;
   const userId = session.metadata?.userId;
+  const organizationId = session.metadata?.organizationId;
 
-  if (!userId) {
-    console.warn(`No userId in checkout session metadata: ${session.id}`);
+  if (!userId && !organizationId) {
+    console.warn(`No userId or organizationId in checkout session metadata: ${session.id}`);
     return;
   }
 
   // Update subscription record with Stripe customer ID and checkout session
+  const whereClause = organizationId
+    ? eq(subscriptions.organizationId, organizationId)
+    : eq(subscriptions.userId, userId!);
   await db.update(subscriptions)
     .set({
       stripeCustomerId: customerId,
       stripeCheckoutSessionId: session.id,
     })
-    .where(eq(subscriptions.userId, userId));
+    .where(whereClause);
 
-  console.log(`Updated subscription for user ${userId} with customer ${customerId}`);
+  console.log(`Updated subscription for org ${organizationId ?? userId} with customer ${customerId}`);
 
   // Fetch and process the subscription details
   if (subscriptionId) {
@@ -174,6 +178,7 @@ async function handleSubscriptionUpdate(subscription: StripeSubscriptionWithPeri
   const [existingSubscription] = await db.select({
     id: subscriptions.id,
     userId: subscriptions.userId,
+    organizationId: subscriptions.organizationId,
   }).from(subscriptions).where(eq(subscriptions.stripeCustomerId, customerId));
 
   if (!existingSubscription) {
@@ -214,7 +219,7 @@ async function handleSubscriptionUpdate(subscription: StripeSubscriptionWithPeri
   const periodStart = updateData.currentPeriodStart ?? new Date();
   const periodEnd = updateData.currentPeriodEnd ?? new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
 
-  await upsertCredits(existingSubscription.userId, allocation, periodStart, periodEnd);
+  await upsertCredits(existingSubscription.organizationId ?? existingSubscription.userId, allocation, periodStart, periodEnd);
 
   console.log(`Updated subscription ${existingSubscription.id} to ${planTier} (${status})`);
 }
@@ -225,7 +230,7 @@ async function handleSubscriptionUpdate(subscription: StripeSubscriptionWithPeri
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log(`Processing subscription.deleted: ${subscription.id}`);
 
-  const [sub] = await db.select({ userId: subscriptions.userId })
+  const [sub] = await db.select({ userId: subscriptions.userId, organizationId: subscriptions.organizationId })
     .from(subscriptions)
     .where(eq(subscriptions.stripeSubscriptionId, subscription.id));
 
@@ -241,7 +246,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     const freeAllocation = PLAN_CONFIG.free.monthlyCredits;
     const now = new Date();
     const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    await upsertCredits(sub.userId, freeAllocation, now, periodEnd);
+    await upsertCredits(sub.organizationId ?? sub.userId, freeAllocation, now, periodEnd);
   }
 
   console.log(`Subscription ${subscription.id} deleted and reverted to free`);

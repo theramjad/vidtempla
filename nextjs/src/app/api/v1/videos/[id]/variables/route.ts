@@ -10,7 +10,7 @@ export async function GET(
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await params;
-  const result = await getVideoVariables(id, auth.userId);
+  const result = await getVideoVariables(id, auth.userId, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, `/v1/videos/${id}/variables`, "GET", result.error.status, 0);
@@ -42,7 +42,7 @@ export async function PUT(
     );
   }
 
-  const result = await updateVideoVariables(id, variables, auth.userId);
+  const result = await updateVideoVariables(id, variables, auth.userId, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, `/v1/videos/${id}/variables`, "PUT", result.error.status, 0);

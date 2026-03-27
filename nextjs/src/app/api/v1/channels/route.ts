@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   const auth = await withApiKey(request);
   if (auth instanceof NextResponse) return auth;
 
-  const result = await listChannels(auth.userId);
+  const result = await listChannels(auth.userId, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, "/v1/channels", "GET", result.error.status, 0);

@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { toMcp, mcpQuotaExceeded, getSessionUserId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
+import { toMcp, mcpQuotaExceeded, getSessionUserId, getSessionOrgId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
 import { consumeCredits } from "@/lib/plan-limits";
 import { listCommentThreads, replyToComment, deleteComment } from "@/lib/services/comments";
 
@@ -18,7 +18,8 @@ export function registerCommentTools(server: McpServer) {
     READ,
     async ({ videoId, channelId, maxResults, order, pageToken }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 1);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 1);
       if (!credits.success) return mcpQuotaExceeded(userId, "list_comment_threads");
       const result = await listCommentThreads(videoId, channelId, userId, { maxResults, order, pageToken });
       logMcpRequest(userId, "list_comment_threads", 1, "error" in result ? 400 : 200);
@@ -37,7 +38,8 @@ export function registerCommentTools(server: McpServer) {
     WRITE,
     async ({ channelId, parentId, text }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 50);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 50);
       if (!credits.success) return mcpQuotaExceeded(userId, "reply_to_comment");
       const result = await replyToComment(channelId, parentId, text, userId);
       logMcpRequest(userId, "reply_to_comment", 50, "error" in result ? 400 : 200);
@@ -55,7 +57,8 @@ export function registerCommentTools(server: McpServer) {
     DESTRUCTIVE,
     async ({ channelId, commentId }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 50);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 50);
       if (!credits.success) return mcpQuotaExceeded(userId, "delete_comment");
       const result = await deleteComment(channelId, commentId, userId);
       logMcpRequest(userId, "delete_comment", 50, "error" in result ? 400 : 200);

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     sort: url.searchParams.get("sort") ?? undefined,
     cursor: url.searchParams.get("cursor") ?? undefined,
     limit: url.searchParams.has("limit") ? parseInt(url.searchParams.get("limit")!) : undefined,
-  });
+  }, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, "/v1/videos", "GET", result.error.status, 0);

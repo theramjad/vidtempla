@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { toMcp, mcpQuotaExceeded, getSessionUserId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
+import { toMcp, mcpQuotaExceeded, getSessionUserId, getSessionOrgId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
 import { consumeCredits } from "@/lib/plan-limits";
 import {
   listVideos,
@@ -30,7 +30,8 @@ export function registerVideoTools(server: McpServer) {
     READ,
     async (args) => {
       const userId = getSessionUserId();
-      const result = await listVideos(userId, args);
+      const orgId = getSessionOrgId();
+      const result = await listVideos(userId, args, orgId);
       logMcpRequest(userId, "list_videos", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -43,9 +44,10 @@ export function registerVideoTools(server: McpServer) {
     READ,
     async ({ id }) => {
       const userId = getSessionUserId();
-      const credits = await consumeCredits(userId, 1);
+      const orgId = getSessionOrgId();
+      const credits = await consumeCredits(orgId, 1);
       if (!credits.success) return mcpQuotaExceeded(userId, "get_video");
-      const result = await getVideo(id, userId);
+      const result = await getVideo(id, userId, orgId);
       logMcpRequest(userId, "get_video", 1, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -64,7 +66,8 @@ export function registerVideoTools(server: McpServer) {
     READ,
     async ({ id, ...opts }) => {
       const userId = getSessionUserId();
-      const result = await getVideoAnalytics(id, userId, opts);
+      const orgId = getSessionOrgId();
+      const result = await getVideoAnalytics(id, userId, opts, orgId);
       logMcpRequest(userId, "get_video_analytics", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -77,7 +80,8 @@ export function registerVideoTools(server: McpServer) {
     READ,
     async ({ id }) => {
       const userId = getSessionUserId();
-      const result = await getVideoRetention(id, userId);
+      const orgId = getSessionOrgId();
+      const result = await getVideoRetention(id, userId, orgId);
       logMcpRequest(userId, "get_video_retention", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -90,7 +94,8 @@ export function registerVideoTools(server: McpServer) {
     READ,
     async ({ id }) => {
       const userId = getSessionUserId();
-      const result = await getVideoVariables(id, userId);
+      const orgId = getSessionOrgId();
+      const result = await getVideoVariables(id, userId, orgId);
       logMcpRequest(userId, "get_video_variables", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -106,7 +111,8 @@ export function registerVideoTools(server: McpServer) {
     WRITE,
     async ({ id, containerId }) => {
       const userId = getSessionUserId();
-      const result = await assignVideo(id, containerId, userId);
+      const orgId = getSessionOrgId();
+      const result = await assignVideo(id, containerId, userId, orgId);
       logMcpRequest(userId, "assign_video", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -128,7 +134,8 @@ export function registerVideoTools(server: McpServer) {
     WRITE,
     async ({ id, variables }) => {
       const userId = getSessionUserId();
-      const result = await updateVideoVariables(id, variables, userId);
+      const orgId = getSessionOrgId();
+      const result = await updateVideoVariables(id, variables, userId, orgId);
       logMcpRequest(userId, "update_video_variables", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -144,7 +151,8 @@ export function registerVideoTools(server: McpServer) {
     READ,
     async ({ id, limit }) => {
       const userId = getSessionUserId();
-      const result = await getDescriptionHistory(id, userId, limit);
+      const orgId = getSessionOrgId();
+      const result = await getDescriptionHistory(id, userId, limit, orgId);
       logMcpRequest(userId, "get_description_history", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -160,7 +168,8 @@ export function registerVideoTools(server: McpServer) {
     DESTRUCTIVE,
     async ({ id, historyId }) => {
       const userId = getSessionUserId();
-      const result = await revertDescription(id, historyId, userId);
+      const orgId = getSessionOrgId();
+      const result = await revertDescription(id, historyId, userId, orgId);
       logMcpRequest(userId, "revert_description", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }

@@ -10,7 +10,7 @@ export async function GET(
   if (auth instanceof NextResponse) return auth;
 
   const { channelId } = await params;
-  const result = await getChannel(channelId, auth.userId);
+  const result = await getChannel(channelId, auth.userId, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, `/v1/channels/${channelId}`, "GET", result.error.status, 1);
