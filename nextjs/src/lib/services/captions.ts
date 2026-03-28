@@ -1,4 +1,4 @@
-import { getChannelTokens, resolveVideo } from "@/lib/api-auth";
+import { getChannelTokens, resolveVideo, videoNotFoundError } from "@/lib/api-auth";
 import {
   listCaptionTracks,
   downloadCaptionTrack,
@@ -24,10 +24,11 @@ export async function listVideoCaptions(
   userId: string
 ): Promise<ServiceResult<CaptionTrackInfo[]>> {
   try {
-    const video = await resolveVideo(videoId, userId);
-    if (!video) {
-      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    const videoResult = await resolveVideo(videoId, userId);
+    if (!videoResult.found) {
+      return { error: videoNotFoundError(videoResult.reason) };
     }
+    const video = videoResult.video;
 
     const tokens = await getChannelTokens(video.channelYoutubeId, userId);
     if ("error" in tokens) {
@@ -73,10 +74,11 @@ export async function getVideoTranscript(
   opts: TranscriptOpts = {}
 ): Promise<ServiceResult<TranscriptResult>> {
   try {
-    const video = await resolveVideo(videoId, userId);
-    if (!video) {
-      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    const videoResult = await resolveVideo(videoId, userId);
+    if (!videoResult.found) {
+      return { error: videoNotFoundError(videoResult.reason) };
     }
+    const video = videoResult.video;
 
     const tokens = await getChannelTokens(video.channelYoutubeId, userId);
     if ("error" in tokens) {
@@ -162,10 +164,11 @@ export async function insertCaption(
   opts: { language: string; name: string; captionData: string; isDraft?: boolean; sync?: boolean }
 ): Promise<ServiceResult<CaptionTrackInfo>> {
   try {
-    const video = await resolveVideo(videoId, userId);
-    if (!video) {
-      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    const videoResult = await resolveVideo(videoId, userId);
+    if (!videoResult.found) {
+      return { error: videoNotFoundError(videoResult.reason) };
     }
+    const video = videoResult.video;
 
     const tokens = await getChannelTokens(video.channelYoutubeId, userId);
     if ("error" in tokens) {
@@ -199,10 +202,11 @@ export async function updateCaption(
   opts: { captionData?: string; isDraft?: boolean }
 ): Promise<ServiceResult<CaptionTrackInfo>> {
   try {
-    const video = await resolveVideo(videoId, userId);
-    if (!video) {
-      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    const videoResult = await resolveVideo(videoId, userId);
+    if (!videoResult.found) {
+      return { error: videoNotFoundError(videoResult.reason) };
     }
+    const video = videoResult.video;
 
     const tokens = await getChannelTokens(video.channelYoutubeId, userId);
     if ("error" in tokens) {
@@ -233,10 +237,11 @@ export async function deleteCaption(
   captionId: string
 ): Promise<ServiceResult<{ deleted: true }>> {
   try {
-    const video = await resolveVideo(videoId, userId);
-    if (!video) {
-      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    const videoResult = await resolveVideo(videoId, userId);
+    if (!videoResult.found) {
+      return { error: videoNotFoundError(videoResult.reason) };
     }
+    const video = videoResult.video;
 
     const tokens = await getChannelTokens(video.channelYoutubeId, userId);
     if ("error" in tokens) {

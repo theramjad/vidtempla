@@ -6,6 +6,7 @@ import {
   logRequest,
   getChannelTokens,
   resolveVideo,
+  videoNotFoundError,
 } from "@/lib/api-auth";
 import { fetchVideoAnalytics } from "@/lib/clients/youtube";
 
@@ -19,15 +20,17 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const video = await resolveVideo(id, auth.userId);
+    const videoResult = await resolveVideo(id, auth.userId);
 
-    if (!video) {
-      logRequest(auth, `/v1/videos/${id}/analytics`, "GET", 404, 0);
+    if (!videoResult.found) {
+      const err = videoNotFoundError(videoResult.reason);
+      logRequest(auth, `/v1/videos/${id}/analytics`, "GET", err.status, 0);
       return NextResponse.json(
-        apiError("VIDEO_NOT_FOUND", "Video not found", "Pass a VidTempla UUID or YouTube video ID (e.g. dQw4w9WgXcQ)", 404),
-        { status: 404 }
+        apiError(err.code, err.message, err.suggestion, err.status),
+        { status: err.status }
       );
     }
+    const video = videoResult.video;
 
     const url = new URL(request.url);
     const now = new Date();

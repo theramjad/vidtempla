@@ -21,7 +21,7 @@ import {
   videoVariables,
   descriptionHistory,
 } from "@/db/schema";
-import { getChannelTokens, getAnyUserToken, resolveVideo } from "@/lib/api-auth";
+import { getChannelTokens, getAnyUserToken, resolveVideo, videoNotFoundError } from "@/lib/api-auth";
 import {
   fetchChannelVideos,
   fetchVideoDetails,
@@ -230,10 +230,11 @@ export async function getVideo(
   organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const resolved = await resolveVideo(id, userId, organizationId);
-    if (!resolved) {
-      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    const result = await resolveVideo(id, userId, organizationId);
+    if (!result.found) {
+      return { error: videoNotFoundError(result.reason) };
     }
+    const resolved = result.video;
 
     const { currentDescription: _cd, ...videoCols } = getTableColumns(youtubeVideos);
     const [video] = await db
@@ -287,10 +288,11 @@ export async function getVideoAnalytics(
   organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const video = await resolveVideo(id, userId, organizationId);
-    if (!video) {
-      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    const videoResult = await resolveVideo(id, userId, organizationId);
+    if (!videoResult.found) {
+      return { error: videoNotFoundError(videoResult.reason) };
     }
+    const video = videoResult.video;
 
     const now = new Date();
     const twentyEightDaysAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
@@ -319,10 +321,11 @@ export async function getVideoRetention(
   organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const video = await resolveVideo(id, userId, organizationId);
-    if (!video) {
-      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    const videoResult = await resolveVideo(id, userId, organizationId);
+    if (!videoResult.found) {
+      return { error: videoNotFoundError(videoResult.reason) };
     }
+    const video = videoResult.video;
 
     const tokens = await getChannelTokens(video.channelYoutubeId, userId, organizationId);
     if ("error" in tokens) {
@@ -350,10 +353,11 @@ export async function getVideoVariables(
   organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const video = await resolveVideo(id, userId, organizationId);
-    if (!video) {
-      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    const videoResult = await resolveVideo(id, userId, organizationId);
+    if (!videoResult.found) {
+      return { error: videoNotFoundError(videoResult.reason) };
     }
+    const video = videoResult.video;
 
     const variables = await db
       .select({
@@ -379,10 +383,11 @@ export async function assignVideo(
   organizationId?: string
 ): Promise<ServiceResult<{ success: true }>> {
   try {
-    const video = await resolveVideo(id, userId, organizationId);
-    if (!video) {
-      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    const videoResult = await resolveVideo(id, userId, organizationId);
+    if (!videoResult.found) {
+      return { error: videoNotFoundError(videoResult.reason) };
     }
+    const video = videoResult.video;
 
     if (video.containerId) {
       return { error: { code: "ALREADY_ASSIGNED", message: "Video is already assigned to a container", suggestion: "Unassign the video first or use a different video", status: 400 } };
@@ -473,10 +478,11 @@ export async function updateVideoVariables(
   organizationId?: string
 ): Promise<ServiceResult<{ success: true }>> {
   try {
-    const video = await resolveVideo(id, userId, organizationId);
-    if (!video) {
-      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    const videoResult = await resolveVideo(id, userId, organizationId);
+    if (!videoResult.found) {
+      return { error: videoNotFoundError(videoResult.reason) };
     }
+    const video = videoResult.video;
 
     for (const variable of variables) {
       await db
@@ -513,10 +519,11 @@ export async function getDescriptionHistory(
   organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const video = await resolveVideo(id, userId, organizationId);
-    if (!video) {
-      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    const videoResult = await resolveVideo(id, userId, organizationId);
+    if (!videoResult.found) {
+      return { error: videoNotFoundError(videoResult.reason) };
     }
+    const video = videoResult.video;
 
     const maxEntries = Math.min(limit ?? 50, 100);
 
@@ -542,10 +549,11 @@ export async function revertDescription(
   organizationId?: string
 ): Promise<ServiceResult<{ success: true; delinkedContainer: boolean; variablesCleared: number }>> {
   try {
-    const video = await resolveVideo(id, userId, organizationId);
-    if (!video) {
-      return { error: { code: "VIDEO_NOT_FOUND", message: "Video not found", suggestion: "Pass a VidTempla UUID or YouTube video ID", status: 404 } };
+    const videoResult = await resolveVideo(id, userId, organizationId);
+    if (!videoResult.found) {
+      return { error: videoNotFoundError(videoResult.reason) };
     }
+    const video = videoResult.video;
 
     // Get the historical description
     const [history] = await db

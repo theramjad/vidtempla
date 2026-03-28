@@ -328,35 +328,69 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 /**
  * Resolves a video by either VidTempla UUID or YouTube video ID.
- * Returns the video row (with videoId and channel.channelId) or null if not found / not owned.
+ * Returns a discriminated result:
+ * - `{ found: true, video }` — owned by the caller
+ * - `{ found: false, reason: "not_owned" }` — exists but on an unconnected channel
+ * - `{ found: false, reason: "not_found" }` — doesn't exist in the DB at all
  */
+export type ResolveVideoResult =
+  | { found: true; video: { id: string; videoId: string; channelId: string; containerId: string | null; channelYoutubeId: string } }
+  | { found: false; reason: "not_owned" | "not_found" };
+
 export async function resolveVideo(
   id: string,
   userId: string,
   organizationId?: string
-) {
+): Promise<ResolveVideoResult> {
   const isUUID = UUID_REGEX.test(id);
+  const idFilter = isUUID ? eq(youtubeVideos.id, id) : eq(youtubeVideos.videoId, id);
 
   const ownerFilter = organizationId
     ? eq(youtubeChannels.organizationId, organizationId)
     : eq(youtubeChannels.userId, userId);
 
+  const selectCols = {
+    id: youtubeVideos.id,
+    videoId: youtubeVideos.videoId,
+    channelId: youtubeVideos.channelId,
+    containerId: youtubeVideos.containerId,
+    channelYoutubeId: youtubeChannels.channelId,
+  };
+
   const [video] = await db
-    .select({
-      id: youtubeVideos.id,
-      videoId: youtubeVideos.videoId,
-      channelId: youtubeVideos.channelId,
-      containerId: youtubeVideos.containerId,
-      channelYoutubeId: youtubeChannels.channelId,
-    })
+    .select(selectCols)
     .from(youtubeVideos)
     .innerJoin(youtubeChannels, eq(youtubeVideos.channelId, youtubeChannels.id))
-    .where(
-      and(
-        isUUID ? eq(youtubeVideos.id, id) : eq(youtubeVideos.videoId, id),
-        ownerFilter
-      )
-    );
+    .where(and(idFilter, ownerFilter));
 
-  return video ?? null;
+  if (video) return { found: true, video };
+
+  // Only on failure path: check if the video exists on any channel
+  const [exists] = await db
+    .select({ id: youtubeVideos.id })
+    .from(youtubeVideos)
+    .where(idFilter)
+    .limit(1);
+
+  return { found: false, reason: exists ? "not_owned" : "not_found" };
+}
+
+/**
+ * Returns a standard error object for resolveVideo failures.
+ */
+export function videoNotFoundError(reason: "not_owned" | "not_found") {
+  if (reason === "not_owned") {
+    return {
+      code: "VIDEO_NOT_OWNED" as const,
+      message: "This video belongs to a channel not connected to your account",
+      suggestion: "Connect the channel that owns this video, or use a third-party transcript service for unowned videos.",
+      status: 403,
+    };
+  }
+  return {
+    code: "VIDEO_NOT_FOUND" as const,
+    message: "Video not found",
+    suggestion: "Check the video ID is correct, or the video may not have been synced yet — try syncing the channel first.",
+    status: 404,
+  };
 }
