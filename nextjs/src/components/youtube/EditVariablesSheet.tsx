@@ -46,6 +46,7 @@ export default function EditVariablesSheet({
 }: EditVariablesSheetProps) {
   const { toast } = useToast();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [formInitialized, setFormInitialized] = useState(false);
   const [formData, setFormData] = useState<
     Record<
       string,
@@ -60,14 +61,22 @@ export default function EditVariablesSheet({
 
   const { data: variablesData, isLoading } = api.dashboard.youtube.videos.getVariables.useQuery(
     { videoId },
-    { enabled: open }
+    { enabled: open, refetchOnWindowFocus: false }
   );
 
   const updateMutation = api.dashboard.youtube.videos.updateVariables.useMutation();
 
-  // Initialize form data when variables are loaded
+  // Reset form state when sheet closes
   useEffect(() => {
-    if (variablesData?.variables) {
+    if (!open) {
+      setFormData({});
+      setFormInitialized(false);
+    }
+  }, [open]);
+
+  // Initialize form data once when variables first load (ignore subsequent refetches)
+  useEffect(() => {
+    if (variablesData?.variables && !formInitialized) {
       const initialData: typeof formData = {};
       variablesData.variables.forEach((variable: VideoVariable) => {
         const key = `${variable.templateId}-${variable.variableName}`;
@@ -79,8 +88,9 @@ export default function EditVariablesSheet({
         };
       });
       setFormData(initialData);
+      setFormInitialized(true);
     }
-  }, [variablesData]);
+  }, [variablesData, formInitialized]);
 
   const handleValueChange = (key: string, value: string) => {
     setFormData((prev) => {
