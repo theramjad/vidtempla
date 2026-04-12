@@ -58,16 +58,17 @@ export function registerTemplateTools(server: McpServer) {
 
   server.tool(
     "update_template",
-    "Update a template's name and/or content. If content changes, affected video descriptions are rebuilt.",
+    "Update a template's name and/or content. If content changes, affected video descriptions are rebuilt. If any affected videos have drift, returns VIDEO_HAS_DRIFT unless force=true.",
     {
       id: z.string().describe("Template UUID"),
       name: z.string().optional().describe("New name"),
       content: z.string().optional().describe("New content"),
+      force: z.boolean().optional().describe("Set true to overwrite drifted YouTube edits on affected videos"),
     },
     WRITE,
-    async ({ id, name, content }) => {
+    async ({ id, name, content, force }) => {
       const userId = getSessionUserId();
-      const result = await updateTemplate(id, userId, { name, content });
+      const result = await updateTemplate(id, userId, { name, content, force });
       logMcpRequest(userId, "update_template", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }

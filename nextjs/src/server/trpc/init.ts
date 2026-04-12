@@ -7,6 +7,18 @@ import { and, eq } from "drizzle-orm";
 
 const t = initTRPC.context<Context>().create({
   transformer: superjson,
+  errorFormatter({ shape, error }) {
+    const cause = error.cause as
+      | { driftMeta?: { driftedVideoIds: string[]; driftDetectedAt: string | null; latestManualEditHistoryId: string | null } }
+      | undefined;
+    return {
+      ...shape,
+      data: {
+        ...shape.data,
+        ...(cause?.driftMeta ? { driftMeta: cause.driftMeta } : {}),
+      },
+    };
+  },
 });
 
 export const router = t.router;

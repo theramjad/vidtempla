@@ -8,6 +8,10 @@
  */
 
 import axios from 'axios';
+import { eq } from 'drizzle-orm';
+import { db } from '@/db';
+import { youtubeChannels } from '@/db/schema';
+import { decrypt, encrypt } from '@/utils/encryption';
 
 const YOUTUBE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const YOUTUBE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -269,6 +273,49 @@ export async function refreshAccessToken(
     }
     throw error;
   }
+}
+
+export async function getChannelAccessToken(channelId: string): Promise<string> {
+  const [channel] = await db
+    .select({
+      id: youtubeChannels.id,
+      channelId: youtubeChannels.channelId,
+      title: youtubeChannels.title,
+      accessTokenEncrypted: youtubeChannels.accessTokenEncrypted,
+      refreshTokenEncrypted: youtubeChannels.refreshTokenEncrypted,
+      tokenExpiresAt: youtubeChannels.tokenExpiresAt,
+    })
+    .from(youtubeChannels)
+    .where(eq(youtubeChannels.id, channelId));
+
+  if (!channel?.accessTokenEncrypted || !channel.refreshTokenEncrypted) {
+    throw new Error('Channel tokens not found');
+  }
+
+  const accessToken = decrypt(channel.accessTokenEncrypted);
+  const expiresAt = channel.tokenExpiresAt ? new Date(channel.tokenExpiresAt) : null;
+  const now = new Date();
+  const bufferTime = 5 * 60 * 1000;
+
+  if (!expiresAt || expiresAt.getTime() - now.getTime() >= bufferTime) {
+    return accessToken;
+  }
+
+  const refreshToken = decrypt(channel.refreshTokenEncrypted);
+  const newTokens = await refreshAccessToken(refreshToken);
+  const newExpiresAt = new Date();
+  newExpiresAt.setSeconds(newExpiresAt.getSeconds() + newTokens.expires_in);
+
+  await db
+    .update(youtubeChannels)
+    .set({
+      accessTokenEncrypted: encrypt(newTokens.access_token),
+      tokenExpiresAt: newExpiresAt,
+      tokenStatus: 'valid',
+    })
+    .where(eq(youtubeChannels.id, channel.id));
+
+  return newTokens.access_token;
 }
 
 /**

@@ -1,15 +1,9 @@
-import { task, AbortTaskRunError, logger } from "@trigger.dev/sdk/v3";
+import { task, logger } from "@trigger.dev/sdk/v3";
 import { db } from "@/db";
-import {
-  youtubeChannels,
-  youtubeVideos,
-  templates,
-  descriptionHistory,
-} from "@/db/schema";
+import { youtubeVideos, templates, descriptionHistory } from "@/db/schema";
 import { eq, inArray, desc } from "drizzle-orm";
-import { decrypt, encrypt } from "@/utils/encryption";
 import {
-  refreshAccessToken,
+  getChannelAccessToken,
   updateVideoDescription,
 } from "@/lib/clients/youtube";
 import { buildDescription } from "@/utils/templateParser";
@@ -18,9 +12,6 @@ interface ChannelData {
   id: string;
   channelId: string | null;
   title: string | null;
-  accessTokenEncrypted: string | null;
-  refreshTokenEncrypted: string | null;
-  tokenExpiresAt: Date | null;
   tokenStatus: string;
 }
 
@@ -30,70 +21,6 @@ interface DescriptionToUpdate {
   channelId: string;
   newDescription: string;
   channel: ChannelData;
-}
-
-async function getValidAccessToken(channel: ChannelData): Promise<string> {
-  if (!channel.accessTokenEncrypted || !channel.refreshTokenEncrypted) {
-    throw new Error("Channel tokens not found");
-  }
-
-  const accessToken = decrypt(channel.accessTokenEncrypted);
-  const expiresAt = channel.tokenExpiresAt
-    ? new Date(channel.tokenExpiresAt)
-    : null;
-  const now = new Date();
-  const bufferTime = 5 * 60 * 1000; // 5 minutes
-
-  if (expiresAt && expiresAt.getTime() - now.getTime() < bufferTime) {
-    const refreshToken = decrypt(channel.refreshTokenEncrypted);
-
-    try {
-      const newTokens = await refreshAccessToken(refreshToken);
-
-      const newExpiresAt = new Date();
-      newExpiresAt.setSeconds(
-        newExpiresAt.getSeconds() + newTokens.expires_in
-      );
-
-      await db
-        .update(youtubeChannels)
-        .set({
-          accessTokenEncrypted: encrypt(newTokens.access_token),
-          tokenExpiresAt: newExpiresAt,
-        })
-        .where(eq(youtubeChannels.id, channel.id));
-
-      return newTokens.access_token;
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-
-      const isTokenError =
-        errorMessage.includes("invalid_grant") ||
-        errorMessage.includes("Token has been expired or revoked") ||
-        errorMessage.includes("status 400");
-
-      if (isTokenError) {
-        await db
-          .update(youtubeChannels)
-          .set({ tokenStatus: "invalid" })
-          .where(eq(youtubeChannels.id, channel.id));
-
-        throw new AbortTaskRunError(
-          `Token invalid for channel ${channel.channelId || "unknown"} (${channel.title || "Unknown"}). ` +
-            `Please re-authenticate. Error: ${errorMessage}`
-        );
-      }
-
-      throw new Error(
-        `Failed to refresh access token for channel ${channel.channelId || "unknown"} (DB ID: ${channel.id}). ` +
-          `Channel: ${channel.title || "Unknown"}. ` +
-          `Error: ${errorMessage}`
-      );
-    }
-  }
-
-  return accessToken;
 }
 
 export const updateVideoDescriptions = task({
@@ -174,7 +101,19 @@ export const updateVideoDescriptions = task({
 
       for (const item of batch) {
         try {
-          const accessToken = await getValidAccessToken(item.channel);
+          const accessToken = await getChannelAccessToken(item.channelId);
+
+          const [videoRow] = await db
+            .select({ driftDetectedAt: youtubeVideos.driftDetectedAt })
+            .from(youtubeVideos)
+            .where(eq(youtubeVideos.id, item.videoId));
+
+          if (videoRow?.driftDetectedAt) {
+            logger.warn("Overwriting drifted description via template push", {
+              videoId: item.videoId,
+              driftDetectedAt: videoRow.driftDetectedAt,
+            });
+          }
 
           await updateVideoDescription(
             item.videoIdYouTube,
@@ -217,7 +156,7 @@ export const updateVideoDescriptions = task({
 
       await db
         .update(youtubeVideos)
-        .set({ currentDescription: description })
+        .set({ currentDescription: description, driftDetectedAt: null })
         .where(eq(youtubeVideos.id, update.videoId));
 
       await db.insert(descriptionHistory).values({
@@ -225,6 +164,7 @@ export const updateVideoDescriptions = task({
         description: description,
         versionNumber: nextVersion,
         createdBy: userId,
+        source: "template_push",
       });
     }
 

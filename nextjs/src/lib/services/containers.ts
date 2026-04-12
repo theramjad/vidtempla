@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { containers, templates, youtubeVideos } from "@/db/schema";
 import { tasks } from "@trigger.dev/sdk/v3";
 import type { ServiceResult, PaginationOpts, PaginationMeta } from "./types";
+import { assertNoDrift } from "./drift";
 
 // ── list_containers ──────────────────────────────────────────
 
@@ -121,7 +122,7 @@ export async function createContainer(
 export async function updateContainer(
   id: string,
   userId: string,
-  data: { name?: string; templateIds?: string[]; separator?: string }
+  data: { name?: string; templateIds?: string[]; separator?: string; force?: boolean }
 ): Promise<ServiceResult<unknown>> {
   try {
     const updateData: { name?: string; templateOrder?: string[]; separator?: string } = {};
@@ -131,6 +132,35 @@ export async function updateContainer(
 
     if (Object.keys(updateData).length === 0) {
       return { error: { code: "EMPTY_UPDATE", message: "At least one field must be provided", suggestion: "Provide name, templateIds, or separator", status: 400 } };
+    }
+
+    let videoIdsToPush: string[] = [];
+    if (data.templateIds !== undefined || data.separator !== undefined) {
+      const videos = await db
+        .select({ id: youtubeVideos.id })
+        .from(youtubeVideos)
+        .where(eq(youtubeVideos.containerId, id));
+      videoIdsToPush = videos.map((v) => v.id);
+
+      if (videoIdsToPush.length > 0) {
+        const blocked = await assertNoDrift(videoIdsToPush, { force: data.force });
+        if (blocked) {
+          return {
+            error: {
+              code: "VIDEO_HAS_DRIFT",
+              message: `${blocked.blocked.driftedVideoIds.length} video(s) in this container were edited on YouTube`,
+              suggestion:
+                "Review drifted videos with list_videos?hasDrift=true, then retry with force: true to overwrite, or resolve_drift per video",
+              status: 409,
+              meta: {
+                driftedVideoIds: blocked.blocked.driftedVideoIds,
+                driftDetectedAt: blocked.blocked.driftDetectedAt,
+                latestManualEditHistoryId: blocked.blocked.latestManualEditHistoryId,
+              },
+            },
+          };
+        }
+      }
     }
 
     const [container] = await db
@@ -143,18 +173,11 @@ export async function updateContainer(
       return { error: { code: "CONTAINER_NOT_FOUND", message: "Container not found", suggestion: "Check the container ID", status: 404 } };
     }
 
-    if (data.templateIds !== undefined || data.separator !== undefined) {
-      const videos = await db
-        .select({ id: youtubeVideos.id })
-        .from(youtubeVideos)
-        .where(eq(youtubeVideos.containerId, id));
-
-      if (videos.length > 0) {
-        await tasks.trigger("youtube-update-video-descriptions", {
-          videoIds: videos.map((v) => v.id),
-          userId,
-        });
-      }
+    if (videoIdsToPush.length > 0) {
+      await tasks.trigger("youtube-update-video-descriptions", {
+        videoIds: videoIdsToPush,
+        userId,
+      });
     }
 
     return { data: container };

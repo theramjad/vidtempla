@@ -22,8 +22,18 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ChevronDown } from 'lucide-react';
+import { Loader2, ChevronDown, AlertTriangle } from 'lucide-react';
 import { buildDescription } from '@/utils/templateParser';
 
 type VideoVariableData = RouterOutputs['dashboard']['youtube']['videos']['getVariables'];
@@ -47,6 +57,8 @@ export default function EditVariablesSheet({
   const { toast } = useToast();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [formInitialized, setFormInitialized] = useState(false);
+  const [driftDialogOpen, setDriftDialogOpen] = useState(false);
+  const [driftInfo, setDriftInfo] = useState<{ driftDetectedAt?: string } | null>(null);
   const [formData, setFormData] = useState<
     Record<
       string,
@@ -65,6 +77,7 @@ export default function EditVariablesSheet({
   );
 
   const updateMutation = api.dashboard.youtube.videos.updateVariables.useMutation();
+  const resolveDriftMutation = api.dashboard.youtube.videos.resolveDrift.useMutation();
 
   // Reset form state when sheet closes
   useEffect(() => {
@@ -105,31 +118,80 @@ export default function EditVariablesSheet({
     });
   };
 
+  const saveVariables = async (force?: boolean) => {
+    const variablesArray = Object.values(formData).map((v) => ({
+      templateId: v.templateId,
+      name: v.name,
+      value: v.value,
+    }));
+
+    await updateMutation.mutateAsync({
+      videoId,
+      variables: variablesArray,
+      force,
+    });
+
+    toast({
+      title: 'Variables saved and update queued',
+      description: 'Video variables have been saved and YouTube update is in progress.',
+    });
+
+    setDriftDialogOpen(false);
+    onSuccess?.();
+    onOpenChange(false);
+  };
+
   const handleSave = async () => {
     try {
-      const variablesArray = Object.values(formData).map((v) => ({
-        templateId: v.templateId,
-        name: v.name,
-        value: v.value,
-      }));
-
-      await updateMutation.mutateAsync({
-        videoId,
-        variables: variablesArray,
-      });
-
+      await saveVariables();
+    } catch (error: unknown) {
+      // Check for drift error from tRPC errorFormatter
+      const trpcError = error as { data?: { driftMeta?: { driftDetectedAt?: string } }; message?: string };
+      if (trpcError?.data?.driftMeta || trpcError?.message?.includes('edited on YouTube')) {
+        setDriftInfo({
+          driftDetectedAt: trpcError.data?.driftMeta?.driftDetectedAt ?? undefined,
+        });
+        setDriftDialogOpen(true);
+        return;
+      }
       toast({
-        title: 'Variables saved and update queued',
-        description: 'Video variables have been saved and YouTube update is in progress.',
+        title: 'Error',
+        description:
+          error instanceof Error ? error.message : 'Failed to update variables',
+        variant: 'destructive',
       });
+    }
+  };
 
+  const handleForceOverwrite = async () => {
+    try {
+      await saveVariables(true);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to save',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleKeepYouTubeEdit = async () => {
+    try {
+      await resolveDriftMutation.mutateAsync({
+        videoId,
+        strategy: 'keep_youtube_edit',
+      });
+      toast({
+        title: 'YouTube edit kept',
+        description: 'Video delinked from container. Your variable changes were discarded.',
+      });
+      setDriftDialogOpen(false);
       onSuccess?.();
       onOpenChange(false);
     } catch (error) {
       toast({
         title: 'Error',
-        description:
-          error instanceof Error ? error.message : 'Failed to update variables',
+        description: error instanceof Error ? error.message : 'Failed to resolve drift',
         variant: 'destructive',
       });
     }
@@ -315,6 +377,47 @@ export default function EditVariablesSheet({
           </div>
         </div>
       </SheetContent>
+
+      {/* Drift confirmation dialog */}
+      <AlertDialog open={driftDialogOpen} onOpenChange={setDriftDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              This video was edited on YouTube
+              {driftInfo?.driftDetectedAt && (
+                <span className="text-sm font-normal text-muted-foreground">
+                  on {new Date(driftInfo.driftDetectedAt).toLocaleDateString()}
+                </span>
+              )}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                The video description was changed directly on YouTube Studio.
+                Saving will overwrite that edit with the template output.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={handleKeepYouTubeEdit}
+              disabled={resolveDriftMutation.isPending}
+            >
+              {resolveDriftMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Keep YouTube edit
+            </Button>
+            <Button
+              onClick={handleForceOverwrite}
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save and overwrite edit
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }

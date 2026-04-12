@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { db } from "@/db";
 import { apiRequestLog } from "@/db/schema";
+import type { JsonValue } from "@/lib/services/types";
 
 const sessionStore = new AsyncLocalStorage<{ userId: string; organizationId: string }>();
 
@@ -21,7 +22,7 @@ export function getSessionOrgId(): string {
 /**
  * Wraps data as MCP tool result content.
  */
-export function mcpJson(data: unknown) {
+export function mcpJson<T>(data: T) {
   return {
     content: [
       { type: "text" as const, text: JSON.stringify(data, null, 2) },
@@ -62,8 +63,8 @@ export function logMcpRequest(
 /**
  * Converts a service result (data or error) to MCP tool result format.
  */
-export function toMcp(result: { data: unknown } | { error: { code: string; message: string; suggestion: string } }) {
-  if ("error" in result) return mcpError(result.error.code, result.error.message, result.error.suggestion);
+export function toMcp<T>(result: { data: T } | { error: { code: string; message: string; suggestion: string; meta?: Record<string, JsonValue> } }) {
+  if ("error" in result) return mcpError(result.error.code, result.error.message, result.error.suggestion, result.error.meta);
   return mcpJson(result.data);
 }
 
@@ -75,14 +76,14 @@ export function mcpQuotaExceeded(userId: string, toolName: string) {
   return mcpError("QUOTA_EXCEEDED", "Insufficient credits", "Upgrade your plan or wait for the next billing cycle");
 }
 
-export function mcpError(code: string, message: string, suggestion?: string) {
+export function mcpError(code: string, message: string, suggestion?: string, meta?: Record<string, JsonValue>) {
   return {
     isError: true,
     content: [
       {
         type: "text" as const,
         text: JSON.stringify(
-          { error: { code, message, suggestion } },
+          { error: { code, message, suggestion, ...(meta ? { meta } : {}) } },
           null,
           2
         ),

@@ -4,6 +4,7 @@ import { templates, containers, youtubeVideos } from "@/db/schema";
 import { parseVariables } from "@/utils/templateParser";
 import { tasks } from "@trigger.dev/sdk/v3";
 import type { ServiceResult, PaginationOpts, PaginationMeta } from "./types";
+import { assertNoDrift } from "./drift";
 
 // ── list_templates ───────────────────────────────────────────
 
@@ -99,7 +100,7 @@ export async function createTemplate(
 export async function updateTemplate(
   id: string,
   userId: string,
-  data: { name?: string; content?: string }
+  data: { name?: string; content?: string; force?: boolean }
 ): Promise<ServiceResult<unknown>> {
   try {
     const updateData: { name?: string; content?: string } = {};
@@ -110,16 +111,7 @@ export async function updateTemplate(
       return { error: { code: "EMPTY_UPDATE", message: "At least one field (name or content) must be provided", suggestion: "Provide name and/or content", status: 400 } };
     }
 
-    const [template] = await db
-      .update(templates)
-      .set(updateData)
-      .where(and(eq(templates.id, id), eq(templates.userId, userId)))
-      .returning();
-
-    if (!template) {
-      return { error: { code: "TEMPLATE_NOT_FOUND", message: "Template not found", suggestion: "Check the template ID", status: 404 } };
-    }
-
+    let videoIdsToPush: string[] = [];
     if (data.content !== undefined) {
       const allContainers = await db
         .select({ id: containers.id, templateOrder: containers.templateOrder })
@@ -136,14 +128,45 @@ export async function updateTemplate(
           .select({ id: youtubeVideos.id })
           .from(youtubeVideos)
           .where(inArray(youtubeVideos.containerId, containerIds));
+        videoIdsToPush = videos.map((v) => v.id);
 
-        if (videos.length > 0) {
-          await tasks.trigger("youtube-update-video-descriptions", {
-            videoIds: videos.map((v) => v.id),
-            userId,
-          });
+        if (videoIdsToPush.length > 0) {
+          const blocked = await assertNoDrift(videoIdsToPush, { force: data.force });
+          if (blocked) {
+            return {
+              error: {
+                code: "VIDEO_HAS_DRIFT",
+                message: `${blocked.blocked.driftedVideoIds.length} video(s) using this template were edited on YouTube`,
+                suggestion:
+                  "Review drifted videos with list_videos?hasDrift=true, then retry with force: true to overwrite, or resolve_drift per video",
+                status: 409,
+                meta: {
+                  driftedVideoIds: blocked.blocked.driftedVideoIds,
+                  driftDetectedAt: blocked.blocked.driftDetectedAt,
+                  latestManualEditHistoryId: blocked.blocked.latestManualEditHistoryId,
+                },
+              },
+            };
+          }
         }
       }
+    }
+
+    const [template] = await db
+      .update(templates)
+      .set(updateData)
+      .where(and(eq(templates.id, id), eq(templates.userId, userId)))
+      .returning();
+
+    if (!template) {
+      return { error: { code: "TEMPLATE_NOT_FOUND", message: "Template not found", suggestion: "Check the template ID", status: 404 } };
+    }
+
+    if (videoIdsToPush.length > 0) {
+      await tasks.trigger("youtube-update-video-descriptions", {
+        videoIds: videoIdsToPush,
+        userId,
+      });
     }
 
     return { data: { ...template, variables: parseVariables(template.content) } };

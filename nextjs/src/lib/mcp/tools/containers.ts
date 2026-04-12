@@ -58,17 +58,18 @@ export function registerContainerTools(server: McpServer) {
 
   server.tool(
     "update_container",
-    "Update a container's name, templates, or separator. Changes trigger video description rebuilds.",
+    "Update a container's name, templates, or separator. Changes trigger video description rebuilds. If any videos in this container have drift, returns VIDEO_HAS_DRIFT unless force=true.",
     {
       id: z.string().describe("Container UUID"),
       name: z.string().optional().describe("New name"),
       templateIds: z.array(z.string()).optional().describe("New ordered array of template UUIDs"),
       separator: z.string().optional().describe("New separator text"),
+      force: z.boolean().optional().describe("Set true to overwrite drifted YouTube edits on videos in this container"),
     },
     WRITE,
-    async ({ id, name, templateIds, separator }) => {
+    async ({ id, name, templateIds, separator, force }) => {
       const userId = getSessionUserId();
-      const result = await updateContainer(id, userId, { name, templateIds, separator });
+      const result = await updateContainer(id, userId, { name, templateIds, separator, force });
       logMcpRequest(userId, "update_container", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }

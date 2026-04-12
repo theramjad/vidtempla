@@ -152,6 +152,10 @@ export const youtubeChannels = pgTable("youtube_channels", {
     mode: "date",
     withTimezone: true,
   }),
+  driftBaselinedAt: timestamp("drift_baselined_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -206,6 +210,10 @@ export const youtubeVideos = pgTable("youtube_videos", {
   containerId: uuid("container_id").references(() => containers.id, {
     onDelete: "set null",
   }),
+  driftDetectedAt: timestamp("drift_detected_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
   publishedAt: timestamp("published_at", {
     mode: "date",
     withTimezone: true,
@@ -246,6 +254,12 @@ export const videoVariables = pgTable(
   })
 );
 
+export type HistorySource =
+  | "initial_sync"
+  | "template_push"
+  | "manual_youtube_edit"
+  | "revert";
+
 export const descriptionHistory = pgTable("description_history", {
   id: uuid("id").defaultRandom().primaryKey(),
   videoId: uuid("video_id")
@@ -256,6 +270,7 @@ export const descriptionHistory = pgTable("description_history", {
   createdBy: uuid("created_by").references(() => user.id, {
     onDelete: "set null",
   }),
+  source: text("source").$type<HistorySource | null>(),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -37,11 +37,12 @@ export async function PATCH(
     name: body.name,
     templateIds: body.templateIds,
     separator: body.separator,
+    force: body.force,
   });
 
   if ("error" in result) {
     logRequest(auth, `/v1/containers/${id}`, "PATCH", result.error.status, 0);
-    return NextResponse.json(apiError(result.error.code, result.error.message, result.error.suggestion, result.error.status), { status: result.error.status });
+    return NextResponse.json(apiError(result.error.code, result.error.message, result.error.suggestion, result.error.status, result.error.meta), { status: result.error.status });
   }
 
   logRequest(auth, `/v1/containers/${id}`, "PATCH", 200, 0);

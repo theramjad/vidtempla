@@ -15,8 +15,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, GripVertical, ArrowUp, ArrowDown, X } from 'lucide-react';
+import { Loader2, GripVertical, ArrowUp, ArrowDown, X, AlertTriangle } from 'lucide-react';
 import UpdateImpactDialog from './UpdateImpactDialog';
 
 interface EditContainerModalProps {
@@ -44,6 +54,10 @@ export default function EditContainerModal({
   // Impact dialog state
   const [showImpactDialog, setShowImpactDialog] = useState(false);
   const [affectedVideoCount, setAffectedVideoCount] = useState(0);
+
+  // Drift dialog state
+  const [showDriftDialog, setShowDriftDialog] = useState(false);
+  const [driftedCount, setDriftedCount] = useState(0);
 
   const { data: container } = api.dashboard.youtube.containers.list.useQuery(undefined, {
     enabled: open,
@@ -127,13 +141,14 @@ export default function EditContainerModal({
     }
   };
 
-  const performUpdate = async () => {
+  const performUpdate = async (force?: boolean) => {
     try {
       await updateMutation.mutateAsync({
         id: containerId,
         name,
         templateIds,
         separator,
+        force,
       });
 
       const hasChanges = hasDescriptionChanges();
@@ -144,9 +159,17 @@ export default function EditContainerModal({
           : 'Container has been updated successfully.',
       });
 
+      setShowDriftDialog(false);
       onSuccess?.();
       onOpenChange(false);
-    } catch (error) {
+    } catch (error: unknown) {
+      const trpcError = error as { data?: { driftMeta?: { driftedVideoIds?: string[] } }; message?: string };
+      if (trpcError?.data?.driftMeta?.driftedVideoIds || trpcError?.message?.includes('edited on YouTube')) {
+        const count = trpcError.data?.driftMeta?.driftedVideoIds?.length ?? 0;
+        setDriftedCount(count);
+        setShowDriftDialog(true);
+        return;
+      }
       toast({
         title: 'Error',
         description:
@@ -325,10 +348,36 @@ export default function EditContainerModal({
       <UpdateImpactDialog
         open={showImpactDialog}
         onOpenChange={setShowImpactDialog}
-        onConfirm={performUpdate}
+        onConfirm={() => performUpdate()}
         updateType="container"
         videoCount={affectedVideoCount}
       />
+
+      {/* Bulk drift confirmation */}
+      <AlertDialog open={showDriftDialog} onOpenChange={setShowDriftDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              Videos edited on YouTube
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                {driftedCount} of {affectedVideoCount} video{affectedVideoCount !== 1 ? 's' : ''} in this
+                container {driftedCount === 1 ? 'has' : 'have'} been edited on YouTube Studio.
+              </p>
+              <p>Saving will overwrite those edits. They will be preserved in version history.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => performUpdate(true)} disabled={updateMutation.isPending}>
+              {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Overwrite all
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

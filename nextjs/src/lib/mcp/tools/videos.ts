@@ -12,6 +12,8 @@ import {
   updateVideoVariables,
   getDescriptionHistory,
   revertDescription,
+  checkDrift,
+  resolveDrift,
 } from "@/lib/services/videos";
 
 export function registerVideoTools(server: McpServer) {
@@ -23,6 +25,7 @@ export function registerVideoTools(server: McpServer) {
       containerId: z.string().optional().describe("Filter by container UUID"),
       search: z.string().optional().describe("Search by video title"),
       unassigned: z.boolean().optional().describe("Only show unassigned videos"),
+      hasDrift: z.boolean().optional().describe("Owned channels only: true for drifted videos, false for non-drifted videos"),
       sort: z.string().optional().describe("Sort field:direction, e.g. publishedAt:desc (default) or title:asc"),
       cursor: z.string().optional().describe("Pagination cursor from previous response"),
       limit: z.number().optional().describe("Results per page (max 100, default 50)"),
@@ -41,7 +44,7 @@ export function registerVideoTools(server: McpServer) {
 
   server.tool(
     "get_video",
-    "Get video details including live YouTube stats (accepts VidTempla UUID or YouTube video ID)",
+    "Get video details including currentDescription and driftDetectedAt (accepts VidTempla UUID or YouTube video ID)",
     { id: z.string().describe("VidTempla UUID or YouTube video ID (e.g. dQw4w9WgXcQ)") },
     READ,
     async ({ id }) => {
@@ -122,7 +125,7 @@ export function registerVideoTools(server: McpServer) {
 
   server.tool(
     "update_video_variables",
-    "Update template variable values for a video and trigger description rebuild",
+    "Update template variable values for a video and trigger description rebuild. If the video has drift, returns VIDEO_HAS_DRIFT unless force=true.",
     {
       id: z.string().describe("VidTempla UUID or YouTube video ID"),
       variables: z.array(
@@ -132,12 +135,13 @@ export function registerVideoTools(server: McpServer) {
           value: z.string().describe("Variable value"),
         })
       ).describe("Array of variables to update"),
+      force: z.boolean().optional().describe("Set true to overwrite a drifted YouTube edit"),
     },
     WRITE,
-    async ({ id, variables }) => {
+    async ({ id, variables, force }) => {
       const userId = getSessionUserId();
       const orgId = getSessionOrgId();
-      const result = await updateVideoVariables(id, variables, userId, orgId);
+      const result = await updateVideoVariables(id, variables, userId, orgId, { force });
       logMcpRequest(userId, "update_video_variables", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -156,6 +160,39 @@ export function registerVideoTools(server: McpServer) {
       const orgId = getSessionOrgId();
       const result = await getDescriptionHistory(id, userId, limit, orgId);
       logMcpRequest(userId, "get_description_history", 0, "error" in result ? 400 : 200);
+      return toMcp(result);
+    }
+  );
+
+  server.tool(
+    "check_drift",
+    "Check a video's live YouTube description against VidTempla's stored currentDescription. Costs 1 YouTube quota unit.",
+    { id: z.string().describe("VidTempla UUID or YouTube video ID") },
+    READ,
+    async ({ id }) => {
+      const userId = getSessionUserId();
+      const orgId = getSessionOrgId();
+      const result = await checkDrift(id, userId, orgId);
+      logMcpRequest(userId, "check_drift", 1, "error" in result ? 400 : 200);
+      return toMcp(result);
+    }
+  );
+
+  server.tool(
+    "resolve_drift",
+    "Resolve description drift by keeping the YouTube edit, reapplying the template, or reverting to a historical version.",
+    {
+      id: z.string().describe("VidTempla UUID or YouTube video ID"),
+      strategy: z.enum(["keep_youtube_edit", "reapply_template", "revert_to_version"]),
+      historyId: z.string().optional().describe("Required for revert_to_version"),
+      force: z.boolean().optional(),
+    },
+    WRITE,
+    async ({ id, ...input }) => {
+      const userId = getSessionUserId();
+      const orgId = getSessionOrgId();
+      const result = await resolveDrift(id, userId, orgId, input);
+      logMcpRequest(userId, "resolve_drift", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
   );

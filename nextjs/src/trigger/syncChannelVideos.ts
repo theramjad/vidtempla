@@ -5,7 +5,7 @@ import {
   youtubeVideos,
   descriptionHistory,
 } from "@/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { decrypt, encrypt } from "@/utils/encryption";
 import {
   refreshAccessToken,
@@ -13,6 +13,7 @@ import {
   fetchChannelInfo,
   getUploadsPlaylistId,
 } from "@/lib/clients/youtube";
+import { detectAndRecordDrift } from "@/lib/services/drift";
 
 export const syncChannelVideos = task({
   id: "youtube-sync-channel-videos",
@@ -177,21 +178,25 @@ export const syncChannelVideos = task({
 
     // Sync videos to database
     const videoIds = allVideos.map((v) => v.id);
+    const isBaseline = channel.driftBaselinedAt === null;
 
     const existingVideos = await db
-      .select({ videoId: youtubeVideos.videoId })
+      .select({
+        id: youtubeVideos.id,
+        videoId: youtubeVideos.videoId,
+      })
       .from(youtubeVideos)
       .where(eq(youtubeVideos.channelId, channelId));
 
-    const existingVideoIds = new Set(existingVideos.map((v) => v.videoId));
+    const existingVideoMap = new Map(existingVideos.map((v) => [v.videoId, v]));
 
     let newVideosAdded = 0;
 
     for (const ytVideo of allVideos) {
       const videoId = ytVideo.id;
-      const isNewVideo = !existingVideoIds.has(videoId);
+      const existingVideo = existingVideoMap.get(videoId);
 
-      if (isNewVideo) {
+      if (!existingVideo) {
         const [insertedVideo] = await db
           .insert(youtubeVideos)
           .values({
@@ -210,26 +215,35 @@ export const syncChannelVideos = task({
             description: ytVideo.snippet.description || "",
             versionNumber: 1,
             createdBy: userId,
+            source: "initial_sync",
           });
         }
-      } else {
+        continue;
+      }
+
+      await db
+        .update(youtubeVideos)
+        .set({
+          title: ytVideo.snippet.title,
+          publishedAt: new Date(ytVideo.snippet.publishedAt),
+          updatedAt: new Date(),
+        })
+        .where(eq(youtubeVideos.id, existingVideo.id));
+
+      if (isBaseline) {
         await db
           .update(youtubeVideos)
-          .set({
-            title: ytVideo.snippet.title,
-            publishedAt: new Date(ytVideo.snippet.publishedAt),
-          })
-          .where(
-            and(
-              eq(youtubeVideos.videoId, videoId),
-              eq(youtubeVideos.channelId, channelId)
-            )
-          );
+          .set({ currentDescription: ytVideo.snippet.description, updatedAt: new Date() })
+          .where(eq(youtubeVideos.id, existingVideo.id));
+      } else {
+        await db.transaction(async (tx) => {
+          await detectAndRecordDrift(existingVideo.id, ytVideo.snippet.description, userId, tx);
+        });
       }
     }
 
     // Detect and delete videos that no longer exist on YouTube
-    const videosToDelete = Array.from(existingVideoIds).filter(
+    const videosToDelete = Array.from(existingVideoMap.keys()).filter(
       (id) => !videoIds.includes(id)
     );
 
@@ -240,6 +254,18 @@ export const syncChannelVideos = task({
           and(
             inArray(youtubeVideos.videoId, videosToDelete),
             eq(youtubeVideos.channelId, channelId)
+          )
+        );
+    }
+
+    if (isBaseline) {
+      await db
+        .update(youtubeChannels)
+        .set({ driftBaselinedAt: new Date() })
+        .where(
+          and(
+            eq(youtubeChannels.id, channelId),
+            sql`${youtubeChannels.driftBaselinedAt} IS NULL`
           )
         );
     }

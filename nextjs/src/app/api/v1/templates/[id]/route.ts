@@ -36,11 +36,12 @@ export async function PATCH(
   const result = await updateTemplate(id, auth.userId, {
     name: body.name,
     content: body.content,
+    force: body.force,
   });
 
   if ("error" in result) {
     logRequest(auth, `/v1/templates/${id}`, "PATCH", result.error.status, 0);
-    return NextResponse.json(apiError(result.error.code, result.error.message, result.error.suggestion, result.error.status), { status: result.error.status });
+    return NextResponse.json(apiError(result.error.code, result.error.message, result.error.suggestion, result.error.status, result.error.meta), { status: result.error.status });
   }
 
   logRequest(auth, `/v1/templates/${id}`, "PATCH", 200, 0);

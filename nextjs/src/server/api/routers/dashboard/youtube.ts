@@ -21,6 +21,16 @@ import { youtubeChannels, containers, templates, youtubeVideos, videoVariables, 
 import { eq, and, desc, asc, sql, count, isNull, ilike, inArray, getTableColumns } from 'drizzle-orm';
 import { checkVideoLimit, checkChannelLimit } from '@/lib/plan-limits';
 import { router } from '@/server/trpc/init';
+import {
+  listVideos as listVideosService,
+  getVideo as getVideoService,
+  updateVideoVariables as updateVideoVariablesService,
+  revertDescription as revertDescriptionService,
+  pushVideoDescriptions,
+  checkDrift as checkDriftService,
+  resolveDrift as resolveDriftService,
+} from '@/lib/services/videos';
+import { assertNoDrift } from '@/lib/services/drift';
 
 /** Verify a video belongs to the given org (via its channel). Throws NOT_FOUND if not. */
 async function verifyVideoOwnership(videoId: string, organizationId: string) {
@@ -41,6 +51,29 @@ async function verifyChannelOwnership(channelId: string, organizationId: string)
     .where(and(eq(youtubeChannels.id, channelId), eq(youtubeChannels.organizationId, organizationId)));
   if (!channel) throw new TRPCError({ code: "NOT_FOUND", message: "Channel not found" });
   return channel;
+}
+
+function throwServiceError(error: { code: string; message: string; status: number; meta?: Record<string, unknown> }): never {
+  const driftMeta =
+    error.code === 'VIDEO_HAS_DRIFT' && error.meta
+      ? {
+          driftedVideoIds: error.meta.driftedVideoIds,
+          driftDetectedAt: error.meta.driftDetectedAt,
+          latestManualEditHistoryId: error.meta.latestManualEditHistoryId,
+        }
+      : undefined;
+  throw new TRPCError({
+    code:
+      error.status === 404
+        ? 'NOT_FOUND'
+        : error.status === 403
+          ? 'FORBIDDEN'
+          : error.status === 409
+            ? 'CONFLICT'
+            : 'BAD_REQUEST',
+    message: error.message,
+    ...(driftMeta ? { cause: { driftMeta } } : {}),
+  });
 }
 
 export const youtubeRouter = router({
@@ -137,6 +170,7 @@ export const youtubeRouter = router({
           name: z.string().min(1).optional(),
           templateIds: z.array(z.string().uuid()).optional(),
           separator: z.string().optional(),
+          force: z.boolean().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -149,26 +183,44 @@ export const youtubeRouter = router({
         if (input.templateIds) updateData.templateOrder = input.templateIds;
         if (input.separator !== undefined) updateData.separator = input.separator;
 
+        // Drift gate: check affected videos BEFORE mutating
+        let videoIdsToPush: string[] = [];
+        if (input.templateIds !== undefined || input.separator !== undefined) {
+          const videos = await db
+            .select({ id: youtubeVideos.id })
+            .from(youtubeVideos)
+            .innerJoin(containers, eq(youtubeVideos.containerId, containers.id))
+            .where(and(eq(containers.id, input.id), eq(containers.organizationId, ctx.organizationId)));
+          videoIdsToPush = videos.map((v) => v.id);
+
+          if (videoIdsToPush.length > 0) {
+            const blocked = await assertNoDrift(videoIdsToPush, { force: input.force });
+            if (blocked) {
+              throwServiceError({
+                code: 'VIDEO_HAS_DRIFT',
+                message: `${blocked.blocked.driftedVideoIds.length} video(s) in this container were edited on YouTube`,
+                status: 409,
+                meta: {
+                  driftedVideoIds: blocked.blocked.driftedVideoIds,
+                  driftDetectedAt: blocked.blocked.driftDetectedAt,
+                  latestManualEditHistoryId: blocked.blocked.latestManualEditHistoryId,
+                },
+              });
+            }
+          }
+        }
+
         const [data] = await db
           .update(containers)
           .set(updateData)
           .where(and(eq(containers.id, input.id), eq(containers.organizationId, ctx.organizationId)))
           .returning();
 
-        // Trigger task to update all videos in this container
-        // Only trigger if template_order or separator changed (affects description)
-        if (input.templateIds !== undefined || input.separator !== undefined) {
-          const videos = await db
-            .select({ id: youtubeVideos.id })
-            .from(youtubeVideos)
-            .where(eq(youtubeVideos.containerId, input.id));
-
-          if (videos && videos.length > 0) {
-            await tasks.trigger("youtube-update-video-descriptions", {
-              videoIds: videos.map((v) => v.id),
-              userId: ctx.user.id,
-            });
-          }
+        if (videoIdsToPush.length > 0) {
+          await tasks.trigger("youtube-update-video-descriptions", {
+            videoIds: videoIdsToPush,
+            userId: ctx.user.id,
+          });
         }
 
         return data;
@@ -248,6 +300,7 @@ export const youtubeRouter = router({
           id: z.string().uuid(),
           name: z.string().min(1).optional(),
           content: z.string().optional(),
+          force: z.boolean().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -258,16 +311,9 @@ export const youtubeRouter = router({
         if (input.name) updateData.name = input.name;
         if (input.content !== undefined) updateData.content = input.content;
 
-        const [data] = await db
-          .update(templates)
-          .set(updateData)
-          .where(and(eq(templates.id, input.id), eq(templates.organizationId, ctx.organizationId)))
-          .returning();
-
-        // Trigger task to update all videos using this template
-        // Only trigger if content changed (affects description)
+        // Drift gate: check affected videos BEFORE mutating
+        let videoIdsToPush: string[] = [];
         if (input.content !== undefined) {
-          // Find all containers that use this template
           const allContainers = await db
             .select({ id: containers.id, templateOrder: containers.templateOrder })
             .from(containers)
@@ -276,22 +322,43 @@ export const youtubeRouter = router({
             Array.isArray(c.templateOrder) && c.templateOrder.includes(input.id)
           );
 
-          if (containersData && containersData.length > 0) {
+          if (containersData.length > 0) {
             const containerIds = containersData.map((c) => c.id);
-
-            // Get all videos from these containers
             const videos = await db
               .select({ id: youtubeVideos.id })
               .from(youtubeVideos)
               .where(inArray(youtubeVideos.containerId, containerIds));
+            videoIdsToPush = videos.map((v) => v.id);
 
-            if (videos && videos.length > 0) {
-              await tasks.trigger("youtube-update-video-descriptions", {
-                videoIds: videos.map((v) => v.id),
-                userId: ctx.user.id,
-              });
+            if (videoIdsToPush.length > 0) {
+              const blocked = await assertNoDrift(videoIdsToPush, { force: input.force });
+              if (blocked) {
+                throwServiceError({
+                  code: 'VIDEO_HAS_DRIFT',
+                  message: `${blocked.blocked.driftedVideoIds.length} video(s) using this template were edited on YouTube`,
+                  status: 409,
+                  meta: {
+                    driftedVideoIds: blocked.blocked.driftedVideoIds,
+                    driftDetectedAt: blocked.blocked.driftDetectedAt,
+                    latestManualEditHistoryId: blocked.blocked.latestManualEditHistoryId,
+                  },
+                });
+              }
             }
           }
+        }
+
+        const [data] = await db
+          .update(templates)
+          .set(updateData)
+          .where(and(eq(templates.id, input.id), eq(templates.organizationId, ctx.organizationId)))
+          .returning();
+
+        if (videoIdsToPush.length > 0) {
+          await tasks.trigger("youtube-update-video-descriptions", {
+            videoIds: videoIdsToPush,
+            userId: ctx.user.id,
+          });
         }
 
         return data;
@@ -371,47 +438,46 @@ export const youtubeRouter = router({
     list: orgProcedure
       .input(
         z.object({
-          channelId: z.union([z.string().uuid(), z.literal('')]).optional(),
+          channelId: z.string().optional(),
           containerId: z.union([z.string().uuid(), z.literal('')]).optional(),
           search: z.string().optional(),
+          hasDrift: z.boolean().optional(),
         })
       )
       .query(async ({ ctx, input }) => {
-        const filters = [eq(youtubeChannels.organizationId, ctx.organizationId)];
-
+        let channelYoutubeId: string | undefined;
         if (input.channelId && input.channelId !== '') {
-          filters.push(eq(youtubeVideos.channelId, input.channelId));
+          const [channel] = await db
+            .select({ channelId: youtubeChannels.channelId })
+            .from(youtubeChannels)
+            .where(and(eq(youtubeChannels.id, input.channelId), eq(youtubeChannels.organizationId, ctx.organizationId)));
+          channelYoutubeId = channel?.channelId;
         }
 
-        if (input.containerId && input.containerId !== '') {
-          filters.push(eq(youtubeVideos.containerId, input.containerId));
+        const result = await listVideosService(
+          ctx.user.id,
+          {
+            channelId: channelYoutubeId,
+            containerId: input.containerId === '' ? undefined : input.containerId,
+            search: input.search,
+            hasDrift: input.hasDrift,
+          },
+          ctx.organizationId
+        );
+        if ('error' in result) {
+          throwServiceError(result.error);
         }
+        return result.data.data;
+      }),
 
-        if (input.search) {
-          filters.push(ilike(youtubeVideos.title, `%${input.search}%`));
+    get: orgProcedure
+      .input(z.object({ videoId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        const result = await getVideoService(input.videoId, ctx.user.id, ctx.organizationId);
+        if ('error' in result) {
+          throwServiceError(result.error);
         }
-
-        const results = await db
-          .select({
-            ...getTableColumns(youtubeVideos),
-            channel: {
-              id: youtubeChannels.id,
-              title: youtubeChannels.title,
-              userId: youtubeChannels.userId,
-              channelId: youtubeChannels.channelId,
-            },
-            container: {
-              id: containers.id,
-              name: containers.name,
-            },
-          })
-          .from(youtubeVideos)
-          .innerJoin(youtubeChannels, eq(youtubeVideos.channelId, youtubeChannels.id))
-          .leftJoin(containers, eq(youtubeVideos.containerId, containers.id))
-          .where(and(...filters))
-          .orderBy(desc(youtubeVideos.publishedAt));
-
-        return results;
+        return result.data;
       }),
 
     unassigned: orgProcedure.query(async ({ ctx }) => {
@@ -499,10 +565,10 @@ export const youtubeRouter = router({
           });
         }
 
-        // Assign video to container
+        // Assign video to container (clear drift since we're entering template management)
         await db
           .update(youtubeVideos)
-          .set({ containerId: input.containerId })
+          .set({ containerId: input.containerId, driftDetectedAt: null })
           .where(eq(youtubeVideos.id, input.videoId));
 
         // Initialize variables for all templates in the container
@@ -592,34 +658,21 @@ export const youtubeRouter = router({
               value: z.string(),
             })
           ),
+          force: z.boolean().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await verifyVideoOwnership(input.videoId, ctx.organizationId);
-        // Upsert all variables
-        for (const variable of input.variables) {
-          await db
-            .insert(videoVariables)
-            .values({
-              videoId: input.videoId,
-              templateId: variable.templateId,
-              variableName: variable.name,
-              variableValue: variable.value,
-            })
-            .onConflictDoUpdate({
-              target: [videoVariables.videoId, videoVariables.templateId, videoVariables.variableName],
-              set: {
-                variableValue: variable.value,
-              },
-            });
+        const result = await updateVideoVariablesService(
+          input.videoId,
+          input.variables,
+          ctx.user.id,
+          ctx.organizationId,
+          { force: input.force }
+        );
+        if ('error' in result) {
+          throwServiceError(result.error);
         }
-
-        await tasks.trigger("youtube-update-video-descriptions", {
-          videoIds: [input.videoId],
-          userId: ctx.user.id,
-        });
-
-        return { success: true };
+        return result.data;
       }),
 
     getHistory: orgProcedure
@@ -643,90 +696,65 @@ export const youtubeRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await verifyVideoOwnership(input.videoId, ctx.organizationId);
-        // Get the historical description
-        const [history] = await db
-          .select({ description: descriptionHistory.description })
-          .from(descriptionHistory)
-          .where(
-            and(
-              eq(descriptionHistory.id, input.historyId),
-              eq(descriptionHistory.videoId, input.videoId)
-            )
-          );
-
-        if (!history) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'History entry not found',
-          });
+        const result = await revertDescriptionService(
+          input.videoId,
+          input.historyId,
+          ctx.user.id,
+          ctx.organizationId
+        );
+        if ('error' in result) {
+          throwServiceError(result.error);
         }
+        return result.data;
+      }),
 
-        // Get current video state (for return metadata)
-        const [video] = await db
-          .select({ containerId: youtubeVideos.containerId })
-          .from(youtubeVideos)
-          .where(eq(youtubeVideos.id, input.videoId));
-
-        const variables = await db
-          .select({ id: videoVariables.id })
-          .from(videoVariables)
-          .where(eq(videoVariables.videoId, input.videoId));
-
-        const hadContainer = !!video?.containerId;
-        const variableCount = variables?.length || 0;
-
-        // DELINK: Set container_id to NULL if video is currently in a container
-        if (hadContainer) {
-          await db
-            .update(youtubeVideos)
-            .set({ containerId: null })
-            .where(eq(youtubeVideos.id, input.videoId));
+    checkDrift: orgProcedure
+      .input(z.object({ videoId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        const result = await checkDriftService(input.videoId, ctx.user.id, ctx.organizationId);
+        if ('error' in result) {
+          throwServiceError(result.error);
         }
+        return result.data;
+      }),
 
-        // CLEAR VARIABLES: Delete all video_variables for this video
-        if (variableCount > 0) {
-          await db
-            .delete(videoVariables)
-            .where(eq(videoVariables.videoId, input.videoId));
-        }
-
-        // Update video's current description
-        await db
-          .update(youtubeVideos)
-          .set({ currentDescription: history.description })
-          .where(eq(youtubeVideos.id, input.videoId));
-
-        // Trigger task to update on YouTube
-        await tasks.trigger("youtube-update-video-descriptions", {
-          videoIds: [input.videoId],
-          userId: ctx.user.id,
+    resolveDrift: orgProcedure
+      .input(
+        z.object({
+          videoId: z.string(),
+          strategy: z.enum(['keep_youtube_edit', 'reapply_template', 'revert_to_version']),
+          historyId: z.string().uuid().optional(),
+          force: z.boolean().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const result = await resolveDriftService(input.videoId, ctx.user.id, ctx.organizationId, {
+          strategy: input.strategy,
+          historyId: input.historyId,
+          force: input.force,
         });
-
-        return {
-          success: true,
-          delinkedContainer: hadContainer,
-          variablesCleared: variableCount,
-        };
+        if ('error' in result) {
+          throwServiceError(result.error);
+        }
+        return result.data;
       }),
 
     updateToYouTube: orgProcedure
       .input(
         z.object({
           videoIds: z.array(z.string().uuid()),
+          force: z.boolean().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
-        // Verify all videos belong to this org
         for (const videoId of input.videoIds) {
           await verifyVideoOwnership(videoId, ctx.organizationId);
         }
-        await tasks.trigger("youtube-update-video-descriptions", {
-          videoIds: input.videoIds,
-          userId: ctx.user.id,
-        });
-
-        return { success: true };
+        const result = await pushVideoDescriptions(input.videoIds, ctx.user.id, { force: input.force });
+        if ('error' in result) {
+          throwServiceError(result.error);
+        }
+        return result.data;
       }),
   }),
 });

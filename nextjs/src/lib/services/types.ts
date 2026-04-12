@@ -1,7 +1,23 @@
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
 /** All service functions return this discriminated union. */
 export type ServiceResult<T> =
   | { data: T }
-  | { error: { code: string; message: string; suggestion: string; status: number } };
+  | {
+      error: {
+        code: string;
+        message: string;
+        suggestion: string;
+        status: number;
+        meta?: Record<string, JsonValue>;
+      };
+    };
 
 /** Pagination options shared across list endpoints. */
 export interface PaginationOpts {

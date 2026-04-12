@@ -132,7 +132,8 @@ export function apiError(
   code: string,
   message: string,
   suggestion?: string,
-  status: number = 400
+  status: number = 400,
+  meta?: Record<string, unknown>
 ) {
   return {
     data: null,
@@ -141,6 +142,7 @@ export function apiError(
       message,
       suggestion,
       status,
+      ...(meta ? { meta } : {}),
     },
   };
 }

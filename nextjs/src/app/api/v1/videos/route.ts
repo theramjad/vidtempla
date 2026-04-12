@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const hasDriftParam = url.searchParams.get("hasDrift");
   const result = await listVideos(auth.userId, {
     channelId,
     containerId: url.searchParams.get("containerId") ?? undefined,
@@ -35,11 +36,12 @@ export async function GET(request: NextRequest) {
     sort: url.searchParams.get("sort") ?? undefined,
     cursor: url.searchParams.get("cursor") ?? undefined,
     limit: url.searchParams.has("limit") ? parseInt(url.searchParams.get("limit")!) : undefined,
+    hasDrift: hasDriftParam === null ? undefined : hasDriftParam === "true",
   }, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, "/v1/videos", "GET", result.error.status, 2);
-    return NextResponse.json(apiError(result.error.code, result.error.message, result.error.suggestion, result.error.status), { status: result.error.status });
+    return NextResponse.json(apiError(result.error.code, result.error.message, result.error.suggestion, result.error.status, result.error.meta), { status: result.error.status });
   }
 
   logRequest(auth, "/v1/videos", "GET", 200, 2);

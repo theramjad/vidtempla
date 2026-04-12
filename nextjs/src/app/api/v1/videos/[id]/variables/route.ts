@@ -32,7 +32,7 @@ export async function PUT(
 
   const { id } = await params;
   const body = await request.json();
-  const { variables } = body;
+  const { variables, force } = body;
 
   if (!Array.isArray(variables)) {
     logRequest(auth, `/v1/videos/${id}/variables`, "PUT", 400, 0);
@@ -42,11 +42,11 @@ export async function PUT(
     );
   }
 
-  const result = await updateVideoVariables(id, variables, auth.userId, auth.organizationId);
+  const result = await updateVideoVariables(id, variables, auth.userId, auth.organizationId, { force });
 
   if ("error" in result) {
     logRequest(auth, `/v1/videos/${id}/variables`, "PUT", result.error.status, 0);
-    return NextResponse.json(apiError(result.error.code, result.error.message, result.error.suggestion, result.error.status), { status: result.error.status });
+    return NextResponse.json(apiError(result.error.code, result.error.message, result.error.suggestion, result.error.status, result.error.meta), { status: result.error.status });
   }
 
   logRequest(auth, `/v1/videos/${id}/variables`, "PUT", 200, 0);

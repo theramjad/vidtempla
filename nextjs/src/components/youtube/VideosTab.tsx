@@ -32,15 +32,29 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Play, Edit, History } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Loader2, Play, Edit, History, AlertTriangle } from 'lucide-react';
 import EditVariablesSheet from './EditVariablesSheet';
 import HistoryDrawer from './HistoryDrawer';
 
 type VideoWithRelations = RouterOutputs['dashboard']['youtube']['videos']['list'][number];
 
+type DriftFilter = 'all' | 'drifted' | 'clean';
+
 export default function VideosTab() {
   const { toast } = useToast();
-  const [filters, setFilters] = useState({ channelId: 'all', containerId: 'all', search: '' });
+  const [filters, setFilters] = useState<{ channelId: string; containerId: string; search: string; drift: DriftFilter }>({
+    channelId: 'all',
+    containerId: 'all',
+    search: '',
+    drift: 'all',
+  });
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [editVariablesOpen, setEditVariablesOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -55,6 +69,8 @@ export default function VideosTab() {
     channelId: filters.channelId === 'all' ? '' : filters.channelId,
     containerId: filters.containerId === 'all' ? '' : filters.containerId,
     search: filters.search,
+    hasDrift:
+      filters.drift === 'drifted' ? true : filters.drift === 'clean' ? false : undefined,
   };
   const { data: videos, isLoading, refetch } = api.dashboard.youtube.videos.list.useQuery(apiFilters);
   const assignMutation = api.dashboard.youtube.videos.assignToContainer.useMutation();
@@ -110,7 +126,7 @@ export default function VideosTab() {
       <CardContent className="p-0">
         <div className="space-y-4">
           {/* Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 pb-0">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-6 pb-0">
             <div>
               <Label htmlFor="channel-filter">Channel</Label>
               <Select
@@ -152,6 +168,23 @@ export default function VideosTab() {
             </div>
 
             <div>
+              <Label htmlFor="drift-filter">Drift</Label>
+              <Select
+                value={filters.drift}
+                onValueChange={(value) => setFilters({ ...filters, drift: value as DriftFilter })}
+              >
+                <SelectTrigger id="drift-filter">
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="drifted">Drifted only</SelectItem>
+                  <SelectItem value="clean">Not drifted</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
               <Label htmlFor="search">Search</Label>
               <Input
                 id="search"
@@ -170,7 +203,9 @@ export default function VideosTab() {
           ) : !videos || videos.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground">
-                No videos found. Sync your channel to import videos.
+                {filters.drift === 'drifted'
+                  ? 'No drift detected. All videos match what VidTempla last pushed.'
+                  : 'No videos found. Sync your channel to import videos.'}
               </p>
             </div>
           ) : (
@@ -186,8 +221,13 @@ export default function VideosTab() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {videos.map((video) => (
-                  <TableRow key={video.id}>
+                {(videos as VideoWithRelations[]).map((video) => {
+                  const drifted = video.driftDetectedAt != null;
+                  return (
+                  <TableRow
+                    key={video.id}
+                    className={drifted ? 'bg-yellow-500/5' : undefined}
+                  >
                     <TableCell>
                       <a
                         href={`https://youtube.com/watch?v=${video.videoId}`}
@@ -203,15 +243,39 @@ export default function VideosTab() {
                       </a>
                     </TableCell>
                     <TableCell>
-                      <a
-                        href={`https://youtube.com/watch?v=${video.videoId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 hover:underline"
-                      >
-                        <Play className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{video.title}</span>
-                      </a>
+                      <div className="flex flex-col gap-1.5">
+                        <a
+                          href={`https://youtube.com/watch?v=${video.videoId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 hover:underline"
+                        >
+                          <Play className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">{video.title}</span>
+                        </a>
+                        {drifted && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge
+                                  variant="outline"
+                                  className="w-fit border-yellow-600/40 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400"
+                                >
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  Edited on YouTube
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Description was edited outside VidTempla on{' '}
+                                {video.driftDetectedAt
+                                  ? new Date(video.driftDetectedAt).toLocaleString()
+                                  : 'an unknown date'}
+                                . Click History to review.
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {video.channel?.channelId ? (
@@ -274,7 +338,8 @@ export default function VideosTab() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           )}
