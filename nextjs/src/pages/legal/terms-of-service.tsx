@@ -153,9 +153,7 @@ export default function TermsOfService() {
         While we maintain regular backups, you are responsible for:
       </p>
       <ul>
-        <li>Maintaining backups of your original video descriptions</li>
         <li>Reviewing changes before applying updates</li>
-        <li>Using version control features to track changes</li>
       </ul>
       <p>
         We are not liable for data loss resulting from your use of automatic update features or
@@ -190,7 +188,7 @@ export default function TermsOfService() {
       </ul>
       <p>
         Our total liability for any claim shall not exceed the amount you paid us in the 12 months
-        preceding the claim, or $100, whichever is greater.
+        preceding the claim.
       </p>
 
       <h2>Indemnification</h2>
