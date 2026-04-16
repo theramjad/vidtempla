@@ -56,7 +56,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.4",
-    "drizzle-orm": "^0.45.1",
+    "drizzle-orm": "^0.45.2",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.453.0",
     "luxon": "^3.5.0",
