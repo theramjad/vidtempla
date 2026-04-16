@@ -3,7 +3,7 @@ import { withApiKey, apiSuccess, apiError, logRequest } from "@/lib/api-auth";
 import { searchYouTube } from "@/lib/services/analytics";
 
 /**
- * GET /api/v1/youtube/search?channelId=...&q=...&type=video&sort=relevance&maxResults=10&pageToken=...&filterChannelId=...
+ * GET /api/v1/youtube/search?channelId=...&q=...&type=video&sort=relevance&maxResults=10&pageToken=...&filterChannelId=...&publishedAfter=...&publishedBefore=...&regionCode=...&relevanceLanguage=...&videoCategoryId=...&videoDuration=...&eventType=...
  * Search all of YouTube (public search, not channel-scoped)
  * Quota cost: 100 units
  */
@@ -38,6 +38,13 @@ export async function GET(request: NextRequest) {
     maxResults: url.searchParams.has("maxResults") ? parseInt(url.searchParams.get("maxResults")!) : undefined,
     pageToken: url.searchParams.get("pageToken") ?? undefined,
     filterChannelId: url.searchParams.get("filterChannelId") ?? undefined,
+    publishedAfter: url.searchParams.get("publishedAfter") ?? undefined,
+    publishedBefore: url.searchParams.get("publishedBefore") ?? undefined,
+    regionCode: url.searchParams.get("regionCode") ?? undefined,
+    relevanceLanguage: url.searchParams.get("relevanceLanguage") ?? undefined,
+    videoCategoryId: url.searchParams.get("videoCategoryId") ?? undefined,
+    videoDuration: url.searchParams.get("videoDuration") ?? undefined,
+    eventType: url.searchParams.get("eventType") ?? undefined,
   });
 
   if ("error" in result) {
