@@ -84,6 +84,13 @@ export function registerAnalyticsTools(server: McpServer) {
       maxResults: z.number().optional().describe("Max results (default 10, max 50)"),
       pageToken: z.string().optional().describe("Page token for pagination"),
       filterChannelId: z.string().optional().describe("Filter results to a specific channel ID"),
+      publishedAfter: z.string().optional().describe("ISO 8601 datetime — only return results after this date (e.g. 2026-04-09T00:00:00Z)"),
+      publishedBefore: z.string().optional().describe("ISO 8601 datetime — only return results before this date"),
+      regionCode: z.string().optional().describe("ISO 3166-1 alpha-2 country code (e.g. US, GB, DE)"),
+      relevanceLanguage: z.string().optional().describe("BCP-47 language code to bias results (e.g. en, es, fr)"),
+      videoCategoryId: z.string().optional().describe("YouTube category ID (e.g. 28=Science&Tech, 22=People&Blogs). Requires type=video"),
+      videoDuration: z.string().optional().describe("Filter by duration: short (<4min), medium (4-20min), long (>20min). Requires type=video"),
+      eventType: z.string().optional().describe("Filter livestream status: completed, live, upcoming. Requires type=video"),
     },
     READ,
     async ({ channelId, ...opts }) => {

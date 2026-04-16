@@ -161,6 +161,13 @@ export interface SearchYouTubeOpts {
   maxResults?: number;
   pageToken?: string;
   filterChannelId?: string;
+  publishedAfter?: string;
+  publishedBefore?: string;
+  regionCode?: string;
+  relevanceLanguage?: string;
+  videoCategoryId?: string;
+  videoDuration?: string;
+  eventType?: string;
 }
 
 export async function searchYouTube(
@@ -185,6 +192,13 @@ export async function searchYouTube(
     };
     if (opts.pageToken) params.pageToken = opts.pageToken;
     if (opts.filterChannelId) params.channelId = opts.filterChannelId;
+    if (opts.publishedAfter) params.publishedAfter = opts.publishedAfter;
+    if (opts.publishedBefore) params.publishedBefore = opts.publishedBefore;
+    if (opts.regionCode) params.regionCode = opts.regionCode;
+    if (opts.relevanceLanguage) params.relevanceLanguage = opts.relevanceLanguage;
+    if (opts.videoCategoryId) params.videoCategoryId = opts.videoCategoryId;
+    if (opts.videoDuration) params.videoDuration = opts.videoDuration;
+    if (opts.eventType) params.eventType = opts.eventType;
 
     const response = await axios.get(`${YOUTUBE_API_BASE}/search`, {
       params,
