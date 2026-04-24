@@ -467,6 +467,7 @@ export async function updateVideoDescription(
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      signal: AbortSignal.timeout(15_000),
     }
   );
 
@@ -498,6 +499,7 @@ export async function updateVideoDescription(
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
+      signal: AbortSignal.timeout(15_000),
     }
   );
 }

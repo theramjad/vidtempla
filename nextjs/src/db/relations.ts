@@ -9,6 +9,7 @@ import {
   templates,
   youtubeVideos,
   videoVariables,
+  videoVariableEvents,
   descriptionHistory,
   subscriptions,
   webhookEvents,
@@ -71,6 +72,7 @@ export const templatesRelations = relations(templates, ({ one, many }) => ({
     references: [user.id],
   }),
   videoVariables: many(videoVariables),
+  videoVariableEvents: many(videoVariableEvents),
 }));
 
 // YouTube Videos relations
@@ -86,6 +88,7 @@ export const youtubeVideosRelations = relations(
       references: [containers.id],
     }),
     videoVariables: many(videoVariables),
+    videoVariableEvents: many(videoVariableEvents),
     descriptionHistory: many(descriptionHistory),
   })
 );
@@ -101,6 +104,25 @@ export const videoVariablesRelations = relations(videoVariables, ({ one }) => ({
     references: [templates.id],
   }),
 }));
+
+// Video Variable Events relations
+export const videoVariableEventsRelations = relations(
+  videoVariableEvents,
+  ({ one }) => ({
+    youtubeVideo: one(youtubeVideos, {
+      fields: [videoVariableEvents.videoId],
+      references: [youtubeVideos.id],
+    }),
+    template: one(templates, {
+      fields: [videoVariableEvents.templateId],
+      references: [templates.id],
+    }),
+    changedByUser: one(user, {
+      fields: [videoVariableEvents.changedBy],
+      references: [user.id],
+    }),
+  })
+);
 
 // Description History relations
 export const descriptionHistoryRelations = relations(

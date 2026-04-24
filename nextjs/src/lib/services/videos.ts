@@ -20,6 +20,7 @@ import {
   containers,
   templates,
   videoVariables,
+  videoVariableEvents,
   descriptionHistory,
 } from "@/db/schema";
 import {
@@ -40,7 +41,8 @@ import {
 import { parseUserVariables, buildDescription } from "@/utils/templateParser";
 import { checkVideoLimit } from "@/lib/plan-limits";
 import { tasks } from "@trigger.dev/sdk/v3";
-import type { ServiceResult, PaginationMeta, JsonValue } from "./types";
+import type { PushPayload } from "@/trigger/updateVideoDescriptions";
+import type { ServiceResult, PaginationMeta } from "./types";
 import { assertNoDrift, detectAndRecordDrift } from "./drift";
 
 export interface ListVideosOpts {
@@ -104,6 +106,7 @@ async function syncOwnedChannelVideos(
               videoId: inserted.id,
               description: v.snippet.description,
               versionNumber: 1,
+              renderSnapshot: null,
               createdBy: userId,
               source: "initial_sync",
             });
@@ -145,8 +148,9 @@ async function syncOwnedChannelVideos(
           )
         );
     }
-  } catch {
+  } catch (err) {
     // YouTube sync failed — fall through to DB query with stale data
+    console.warn("[videos] syncOwnedChannelVideos failed (serving stale data):", err);
   }
 
   return true;
@@ -319,7 +323,8 @@ export async function listVideos(
         source: "db",
       },
     };
-  } catch {
+  } catch (err) {
+    console.error("[videos] listVideos failed:", err);
     return {
       error: {
         code: "INTERNAL_ERROR",
@@ -374,13 +379,15 @@ export async function getVideo(
       try {
         const details = await fetchVideoDetails(tokens.accessToken, [video.videoId]);
         youtubeData = details[0] ?? null;
-      } catch {
+      } catch (err) {
         // ignore live fetch failure
+        console.warn("[videos] getVideo live fetchVideoDetails failed:", err);
       }
     }
 
     return { data: { ...video, youtube: youtubeData } };
-  } catch {
+  } catch (err) {
+    console.error("[videos] getVideo failed:", err);
     return {
       error: {
         code: "INTERNAL_ERROR",
@@ -431,7 +438,8 @@ export async function getVideoAnalytics(
 
     const data = await fetchVideoAnalytics(tokens.accessToken, video.videoId, metrics, dimensions, startDate, endDate);
     return { data };
-  } catch {
+  } catch (err) {
+    console.error("[videos] getVideoAnalytics failed:", err);
     return {
       error: {
         code: "ANALYTICS_ERROR",
@@ -473,7 +481,8 @@ export async function getVideoRetention(
     }));
 
     return { data: retentionCurve };
-  } catch {
+  } catch (err) {
+    console.error("[videos] getVideoRetention failed:", err);
     return {
       error: {
         code: "ANALYTICS_ERROR",
@@ -518,7 +527,8 @@ export async function getVideoVariables(
       .where(eq(youtubeVideos.id, video.id));
 
     return { data: { variables, video: videoData || null } };
-  } catch {
+  } catch (err) {
+    console.error("[videos] getVideoVariables failed:", err);
     return {
       error: {
         code: "INTERNAL_ERROR",
@@ -596,42 +606,71 @@ export async function assignVideo(
       };
     }
 
-    await db
-      .update(youtubeVideos)
-      .set({ containerId, driftDetectedAt: null })
-      .where(eq(youtubeVideos.id, video.id));
+    const templatesData =
+      container.templateOrder && container.templateOrder.length > 0
+        ? await db
+            .select({ id: templates.id, content: templates.content })
+            .from(templates)
+            .where(inArray(templates.id, container.templateOrder))
+        : [];
 
-    if (container.templateOrder && container.templateOrder.length > 0) {
-      const templatesData = await db
-        .select({ id: templates.id, content: templates.content })
-        .from(templates)
-        .where(inArray(templates.id, container.templateOrder));
-
-      const variablesToCreate: Array<{
-        videoId: string;
-        templateId: string;
-        variableName: string;
-        variableValue: string;
-      }> = [];
-
-      for (const template of templatesData) {
-        for (const varName of parseUserVariables(template.content)) {
-          variablesToCreate.push({
-            videoId: video.id,
-            templateId: template.id,
-            variableName: varName,
-            variableValue: "",
-          });
-        }
-      }
-
-      if (variablesToCreate.length > 0) {
-        await db.insert(videoVariables).values(variablesToCreate);
+    const variablesToCreate: Array<{
+      videoId: string;
+      templateId: string;
+      variableName: string;
+      variableValue: string;
+    }> = [];
+    const eventsToRecord: Array<{
+      videoId: string;
+      templateId: string;
+      variableName: string;
+    }> = [];
+    for (const template of templatesData) {
+      for (const varName of parseUserVariables(template.content)) {
+        variablesToCreate.push({
+          videoId: video.id,
+          templateId: template.id,
+          variableName: varName,
+          variableValue: "",
+        });
+        eventsToRecord.push({
+          videoId: video.id,
+          templateId: template.id,
+          variableName: varName,
+        });
       }
     }
 
+    await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select 1 from youtube_videos where id = ${video.id} for update`
+      );
+
+      await tx
+        .update(youtubeVideos)
+        .set({ containerId, driftDetectedAt: null })
+        .where(eq(youtubeVideos.id, video.id));
+
+      if (variablesToCreate.length > 0) {
+        await tx.insert(videoVariables).values(variablesToCreate);
+        await tx.insert(videoVariableEvents).values(
+          eventsToRecord.map((e) => ({
+            videoId: e.videoId,
+            templateId: e.templateId,
+            variableName: e.variableName,
+            oldValue: null,
+            newValue: "",
+            changeType: "assignment_init" as const,
+            changedBy: userId,
+            organizationId: organizationId ?? null,
+          }))
+        );
+      }
+    });
+
     return { data: { success: true } };
-  } catch {
+  } catch (err) {
+    console.error("[videos] assignVideo failed:", err);
     return {
       error: {
         code: "INTERNAL_ERROR",
@@ -647,6 +686,95 @@ export interface VariableUpdate {
   templateId: string;
   name: string;
   value: string;
+}
+
+/**
+ * Builds a frozen render payload for a single video under a per-video lock.
+ * Bumps renderVersion inside the lock so any stale payload enqueued earlier
+ * (with a smaller stamp) will be discarded by the worker.
+ * Returns null if the video has nothing to render or if the rendered description
+ * matches what's already on the video (no-op).
+ */
+async function buildPushPayload(
+  tx: any,
+  videoId: string,
+  userId: string
+): Promise<PushPayload | null> {
+  await tx.execute(
+    sql`select 1 from youtube_videos where id = ${videoId} for update`
+  );
+
+  const rows = await tx.query.youtubeVideos.findMany({
+    where: eq(youtubeVideos.id, videoId),
+    with: {
+      youtubeChannel: true,
+      container: true,
+      videoVariables: true,
+    },
+    limit: 1,
+  });
+  const video = rows[0];
+  if (!video) return null;
+
+  if (!video.container || !video.container.templateOrder?.length) {
+    return null;
+  }
+
+  const templatesList = await tx
+    .select({ id: templates.id, content: templates.content })
+    .from(templates)
+    .where(inArray(templates.id, video.container.templateOrder));
+
+  if (templatesList.length === 0) return null;
+
+  const orderedTemplates = video.container.templateOrder
+    .map((templateId: string) =>
+      templatesList.find((t: { id: string }) => t.id === templateId)
+    )
+    .filter((t: unknown): t is { id: string; content: string } => Boolean(t));
+
+  const flatSnapshot: Record<string, string> = {};
+  const perTemplateSnapshot: Record<string, Record<string, string>> = {};
+  for (const v of video.videoVariables ?? []) {
+    const value = v.variableValue ?? "";
+    flatSnapshot[v.variableName] = value;
+    if (!perTemplateSnapshot[v.templateId]) {
+      perTemplateSnapshot[v.templateId] = {};
+    }
+    perTemplateSnapshot[v.templateId]![v.variableName] = value;
+  }
+
+  const newDescription = buildDescription(
+    orderedTemplates,
+    flatSnapshot,
+    video.container.separator,
+    video.videoId
+  );
+
+  if (newDescription === video.currentDescription) {
+    return null;
+  }
+
+  const bumpedRows = await tx.execute(sql<{
+    renderVersion: number;
+  }>`
+    update youtube_videos
+    set render_version = render_version + 1
+    where id = ${videoId}
+    returning render_version as "renderVersion"
+  `);
+  const renderVersion = Number(bumpedRows[0]?.renderVersion ?? 0);
+
+  return {
+    videoId: video.id,
+    videoIdYouTube: video.videoId,
+    channelId: video.channelId,
+    newDescription,
+    renderSnapshot: perTemplateSnapshot,
+    renderVersion,
+    userId,
+    organizationId: video.youtubeChannel?.organizationId ?? null,
+  };
 }
 
 export async function pushVideoDescriptions(
@@ -672,7 +800,20 @@ export async function pushVideoDescriptions(
     };
   }
 
-  await tasks.trigger("youtube-update-video-descriptions", { videoIds, userId });
+  const payloads: PushPayload[] = [];
+  for (const videoId of videoIds) {
+    const payload = await db.transaction(async (tx) =>
+      buildPushPayload(tx, videoId, userId)
+    );
+    if (payload) payloads.push(payload);
+  }
+
+  for (const payload of payloads) {
+    await tasks.trigger("youtube-update-video-descriptions", payload, {
+      concurrencyKey: payload.videoId,
+    });
+  }
+
   return { data: { success: true } };
 }
 
@@ -706,23 +847,77 @@ export async function updateVideoVariables(
       };
     }
 
-    for (const variable of variables) {
-      await db
-        .insert(videoVariables)
-        .values({
+    const payload = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select 1 from youtube_videos where id = ${video.id} for update`
+      );
+
+      const existing = await tx
+        .select({
+          templateId: videoVariables.templateId,
+          variableName: videoVariables.variableName,
+          variableValue: videoVariables.variableValue,
+        })
+        .from(videoVariables)
+        .where(eq(videoVariables.videoId, video.id));
+      const existingMap = new Map(
+        existing.map((e) => [
+          `${e.templateId}::${e.variableName}`,
+          e.variableValue ?? "",
+        ])
+      );
+
+      const events: Array<typeof videoVariableEvents.$inferInsert> = [];
+      for (const variable of variables) {
+        const key = `${variable.templateId}::${variable.name}`;
+        const prior = existingMap.get(key);
+        if (prior === variable.value) continue;
+
+        await tx
+          .insert(videoVariables)
+          .values({
+            videoId: video.id,
+            templateId: variable.templateId,
+            variableName: variable.name,
+            variableValue: variable.value,
+          })
+          .onConflictDoUpdate({
+            target: [
+              videoVariables.videoId,
+              videoVariables.templateId,
+              videoVariables.variableName,
+            ],
+            set: { variableValue: variable.value },
+          });
+
+        events.push({
           videoId: video.id,
           templateId: variable.templateId,
           variableName: variable.name,
-          variableValue: variable.value,
-        })
-        .onConflictDoUpdate({
-          target: [videoVariables.videoId, videoVariables.templateId, videoVariables.variableName],
-          set: { variableValue: variable.value },
+          oldValue: prior === undefined ? null : prior,
+          newValue: variable.value,
+          changeType: prior === undefined ? "create" : "update",
+          changedBy: userId,
+          organizationId: organizationId ?? null,
         });
+      }
+
+      if (events.length > 0) {
+        await tx.insert(videoVariableEvents).values(events);
+      }
+
+      return buildPushPayload(tx, video.id, userId);
+    });
+
+    if (payload) {
+      await tasks.trigger("youtube-update-video-descriptions", payload, {
+        concurrencyKey: payload.videoId,
+      });
     }
 
-    return await pushVideoDescriptions([video.id], userId, opts);
-  } catch {
+    return { data: { success: true } };
+  } catch (err) {
+    console.error("[videos] updateVariables failed:", err);
     return {
       error: {
         code: "INTERNAL_ERROR",
@@ -754,7 +949,8 @@ export async function getDescriptionHistory(
       .limit(maxEntries);
 
     return { data: history };
-  } catch {
+  } catch (err) {
+    console.error("[videos] getDescriptionHistory failed:", err);
     return {
       error: {
         code: "INTERNAL_ERROR",
@@ -802,7 +998,8 @@ export async function checkDrift(
         driftDetectedAt: storedVideo.driftDetectedAt,
       },
     };
-  } catch {
+  } catch (err) {
+    console.error("[videos] checkDrift failed:", err);
     return {
       error: {
         code: "INTERNAL_ERROR",
@@ -846,53 +1043,75 @@ export async function revertDescription(
       .from(youtubeVideos)
       .where(eq(youtubeVideos.id, video.id));
 
-    const existingVars = await db
-      .select({ id: videoVariables.id })
-      .from(videoVariables)
-      .where(eq(videoVariables.videoId, video.id));
+    if (!currentVideo) return { error: videoNotFoundError("not_owned") };
 
-    const hadContainer = !!currentVideo?.containerId;
-    const variableCount = existingVars.length;
+    const accessToken = await getChannelAccessToken(currentVideo.channelId);
 
-    const latestHistory = await db
-      .select({ versionNumber: descriptionHistory.versionNumber })
-      .from(descriptionHistory)
-      .where(eq(descriptionHistory.videoId, video.id))
-      .orderBy(desc(descriptionHistory.versionNumber))
-      .limit(1);
+    const { hadContainer, variableCount } = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select 1 from youtube_videos where id = ${video.id} for update`
+      );
 
-    const accessToken = await getChannelAccessToken(currentVideo!.channelId);
-    await updateVideoDescription(currentVideo!.videoId, history.description, accessToken);
+      const existingVars = await tx
+        .select({
+          templateId: videoVariables.templateId,
+          variableName: videoVariables.variableName,
+          variableValue: videoVariables.variableValue,
+        })
+        .from(videoVariables)
+        .where(eq(videoVariables.videoId, video.id));
 
-    await db.transaction(async (tx) => {
-      if (hadContainer) {
-        await tx
-          .update(youtubeVideos)
-          .set({ containerId: null, driftDetectedAt: null })
-          .where(eq(youtubeVideos.id, video.id));
-      } else {
-        await tx
-          .update(youtubeVideos)
-          .set({ driftDetectedAt: null })
-          .where(eq(youtubeVideos.id, video.id));
-      }
+      const hadContainer = !!currentVideo.containerId;
+      const variableCount = existingVars.length;
+
+      await updateVideoDescription(
+        currentVideo.videoId,
+        history.description,
+        accessToken
+      );
 
       if (variableCount > 0) {
+        await tx.insert(videoVariableEvents).values(
+          existingVars.map((v) => ({
+            videoId: video.id,
+            templateId: v.templateId,
+            variableName: v.variableName,
+            oldValue: v.variableValue ?? "",
+            newValue: null,
+            changeType: "revert_clear" as const,
+            changedBy: userId,
+            organizationId: organizationId ?? null,
+          }))
+        );
         await tx.delete(videoVariables).where(eq(videoVariables.videoId, video.id));
       }
 
       await tx
         .update(youtubeVideos)
-        .set({ currentDescription: history.description, driftDetectedAt: null })
+        .set({
+          currentDescription: history.description,
+          driftDetectedAt: null,
+          renderVersion: sql`${youtubeVideos.renderVersion} + 1`,
+          ...(hadContainer ? { containerId: null } : {}),
+        })
         .where(eq(youtubeVideos.id, video.id));
+
+      const nextVersionRows = await tx.execute(sql<{ next: number }>`
+        select coalesce(max(version_number), 0) + 1 as next
+        from description_history where video_id = ${video.id}
+      `);
+      const nextVersion = Number(nextVersionRows[0]?.next ?? 1);
 
       await tx.insert(descriptionHistory).values({
         videoId: video.id,
         description: history.description,
-        versionNumber: (latestHistory[0]?.versionNumber ?? 0) + 1,
+        versionNumber: nextVersion,
+        renderSnapshot: null,
         createdBy: userId,
         source: "revert",
       });
+
+      return { hadContainer, variableCount };
     });
 
     return {
@@ -902,7 +1121,8 @@ export async function revertDescription(
         variablesCleared: variableCount,
       },
     };
-  } catch {
+  } catch (err) {
+    console.error("[videos] revertDescription failed:", err);
     return {
       error: {
         code: "INTERNAL_ERROR",
@@ -948,26 +1168,53 @@ export async function resolveDrift(
     if (!videoRow) return { error: videoNotFoundError("not_owned") };
 
     if (input.strategy === "keep_youtube_edit") {
-      const existingVars = await db
-        .select({ id: videoVariables.id })
-        .from(videoVariables)
-        .where(eq(videoVariables.videoId, video.id));
+      const variablesCleared = await db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select 1 from youtube_videos where id = ${video.id} for update`
+        );
 
-      await db.transaction(async (tx) => {
+        const existingVars = await tx
+          .select({
+            templateId: videoVariables.templateId,
+            variableName: videoVariables.variableName,
+            variableValue: videoVariables.variableValue,
+          })
+          .from(videoVariables)
+          .where(eq(videoVariables.videoId, video.id));
+
         await tx
           .update(youtubeVideos)
-          .set({ containerId: null, driftDetectedAt: null })
+          .set({
+            containerId: null,
+            driftDetectedAt: null,
+            renderVersion: sql`${youtubeVideos.renderVersion} + 1`,
+          })
           .where(eq(youtubeVideos.id, video.id));
+
         if (existingVars.length > 0) {
+          await tx.insert(videoVariableEvents).values(
+            existingVars.map((v) => ({
+              videoId: video.id,
+              templateId: v.templateId,
+              variableName: v.variableName,
+              oldValue: v.variableValue ?? "",
+              newValue: null,
+              changeType: "drift_clear" as const,
+              changedBy: userId,
+              organizationId: organizationId ?? null,
+            }))
+          );
           await tx.delete(videoVariables).where(eq(videoVariables.videoId, video.id));
         }
+
+        return existingVars.length;
       });
 
       return {
         data: {
           success: true,
           delinkedContainer: true,
-          variablesCleared: existingVars.length,
+          variablesCleared,
         },
       };
     }
@@ -983,53 +1230,20 @@ export async function resolveDrift(
       };
     }
 
-    const templatesList = await db
-      .select({ id: templates.id, content: templates.content })
-      .from(templates)
-      .where(inArray(templates.id, videoRow.container.templateOrder));
-
-    const orderedTemplates = videoRow.container.templateOrder
-      .map((templateId) => templatesList.find((t) => t.id === templateId))
-      .filter((t): t is { id: string; content: string } => Boolean(t));
-
-    const variablesMap: Record<string, string> = {};
-    for (const v of videoRow.videoVariables) {
-      variablesMap[v.variableName] = v.variableValue || "";
-    }
-
-    const description = buildDescription(
-      orderedTemplates,
-      variablesMap,
-      videoRow.container.separator,
-      videoRow.videoId
-    );
-
-    const latestHistory = await db
-      .select({ versionNumber: descriptionHistory.versionNumber })
-      .from(descriptionHistory)
-      .where(eq(descriptionHistory.videoId, video.id))
-      .orderBy(desc(descriptionHistory.versionNumber))
-      .limit(1);
-
-    const accessToken = await getChannelAccessToken(videoRow.channelId);
-    await updateVideoDescription(videoRow.videoId, description, accessToken);
-
     await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select 1 from youtube_videos where id = ${video.id} for update`
+      );
+
       await tx
         .update(youtubeVideos)
-        .set({ currentDescription: description, driftDetectedAt: null })
+        .set({ driftDetectedAt: null })
         .where(eq(youtubeVideos.id, video.id));
-      await tx.insert(descriptionHistory).values({
-        videoId: video.id,
-        description,
-        versionNumber: (latestHistory[0]?.versionNumber ?? 0) + 1,
-        createdBy: userId,
-        source: "template_push",
-      });
     });
 
-    return { data: { success: true } };
-  } catch {
+    return pushVideoDescriptions([video.id], userId, { force: true });
+  } catch (err) {
+    console.error("[videos] resolveDrift failed:", err);
     return {
       error: {
         code: "INTERNAL_ERROR",
