@@ -393,6 +393,7 @@ export default function VideosTab() {
         {/* Edit Variables Sheet */}
         {selectedVideo && (
           <EditVariablesSheet
+            key={selectedVideo.id}
             videoId={selectedVideo.id}
             videoTitle={selectedVideo.title ?? 'Untitled Video'}
             open={editVariablesOpen}

@@ -71,16 +71,19 @@ export default function EditContainerModal({
   const updateMutation = api.dashboard.youtube.containers.update.useMutation();
   const getAffectedVideosMutation = api.dashboard.youtube.containers.getAffectedVideos.useMutation();
 
-  // Initialize form data
+  // Initialize form data on open and when container changes.
+  // Depending on `open` ensures reopening the same container after a cancelled edit
+  // resets the form — `container`'s reference doesn't change on reopen because
+  // react-query serves it from cache.
   useEffect(() => {
-    if (container) {
+    if (open && container) {
       setName(container.name);
       setTemplateIds(container.templateOrder || []);
       setSeparator(container.separator || '\n\n');
       setOriginalTemplateIds(container.templateOrder || []);
       setOriginalSeparator(container.separator || '\n\n');
     }
-  }, [container]);
+  }, [open, container]);
 
   const moveTemplate = (index: number, direction: 'up' | 'down') => {
     const newTemplateIds = [...templateIds];
