@@ -40,7 +40,12 @@ export async function detectAndRecordDrift(
     return { drifted: false, skippedDedup: false };
   }
 
-  if (lockedVideo.currentDescription === liveDescription) {
+  const normalize = (s: string) => s.replace(/\s+$/, "");
+  if (normalize(lockedVideo.currentDescription) === normalize(liveDescription)) {
+    await tx
+      .update(youtubeVideos)
+      .set({ currentDescription: liveDescription, driftDetectedAt: null, updatedAt: now })
+      .where(eq(youtubeVideos.id, videoIdInternal));
     return { drifted: false, skippedDedup: false };
   }
 
@@ -73,6 +78,7 @@ export async function detectAndRecordDrift(
     videoId: videoIdInternal,
     description: liveDescription,
     versionNumber: nextVersion,
+    renderSnapshot: null,
     createdBy: userId,
     source: "manual_youtube_edit",
   });
