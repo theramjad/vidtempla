@@ -12,23 +12,27 @@ const TAG_LENGTH = 16;
 const TAG_POSITION = SALT_LENGTH + IV_LENGTH;
 const ENCRYPTED_POSITION = TAG_POSITION + TAG_LENGTH;
 
-function getKey(): Buffer {
-  const key = process.env.ENCRYPTION_KEY;
+function normalizeKey(rawKey: string): Buffer {
+  // Ensure key is 32 bytes for AES-256
+  return Buffer.from(rawKey.padEnd(32, '0').substring(0, 32), 'utf-8');
+}
+
+function getKey(rawKey?: string): Buffer {
+  const key = rawKey ?? process.env.ENCRYPTION_KEY;
   if (!key) {
     throw new Error('ENCRYPTION_KEY environment variable is not set');
   }
-
-  // Ensure key is 32 bytes for AES-256
-  return Buffer.from(key.padEnd(32, '0').substring(0, 32), 'utf-8');
+  return normalizeKey(key);
 }
 
 /**
  * Encrypts text using AES-256-GCM
  * @param text - The text to encrypt
+ * @param rawKey - Optional key override (defaults to process.env.ENCRYPTION_KEY)
  * @returns Base64 encoded encrypted string with salt, IV, and auth tag
  */
-export function encrypt(text: string): string {
-  const key = getKey();
+export function encrypt(text: string, rawKey?: string): string {
+  const key = getKey(rawKey);
   const iv = randomBytes(IV_LENGTH);
   const salt = randomBytes(SALT_LENGTH);
 
@@ -49,10 +53,11 @@ export function encrypt(text: string): string {
 /**
  * Decrypts text that was encrypted with encrypt()
  * @param encryptedText - Base64 encoded encrypted string
+ * @param rawKey - Optional key override (defaults to process.env.ENCRYPTION_KEY)
  * @returns Decrypted plaintext
  */
-export function decrypt(encryptedText: string): string {
-  const key = getKey();
+export function decrypt(encryptedText: string, rawKey?: string): string {
+  const key = getKey(rawKey);
   const combined = Buffer.from(encryptedText, 'base64');
 
   // Extract components
