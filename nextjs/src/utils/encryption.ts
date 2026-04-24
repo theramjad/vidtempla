@@ -18,9 +18,9 @@ function normalizeKey(rawKey: string): Buffer {
 }
 
 function getKey(rawKey?: string): Buffer {
-  const key = rawKey ?? process.env.ENCRYPTION_KEY;
+  const key = rawKey ?? process.env.ENCRYPTION_KEY_V2;
   if (!key) {
-    throw new Error('ENCRYPTION_KEY environment variable is not set');
+    throw new Error('ENCRYPTION_KEY_V2 environment variable is not set');
   }
   return normalizeKey(key);
 }
@@ -28,7 +28,7 @@ function getKey(rawKey?: string): Buffer {
 /**
  * Encrypts text using AES-256-GCM
  * @param text - The text to encrypt
- * @param rawKey - Optional key override (defaults to process.env.ENCRYPTION_KEY)
+ * @param rawKey - Optional key override (defaults to process.env.ENCRYPTION_KEY_V2)
  * @returns Base64 encoded encrypted string with salt, IV, and auth tag
  */
 export function encrypt(text: string, rawKey?: string): string {
@@ -53,7 +53,7 @@ export function encrypt(text: string, rawKey?: string): string {
 /**
  * Decrypts text that was encrypted with encrypt()
  * @param encryptedText - Base64 encoded encrypted string
- * @param rawKey - Optional key override (defaults to process.env.ENCRYPTION_KEY)
+ * @param rawKey - Optional key override (defaults to process.env.ENCRYPTION_KEY_V2)
  * @returns Decrypted plaintext
  */
 export function decrypt(encryptedText: string, rawKey?: string): string {

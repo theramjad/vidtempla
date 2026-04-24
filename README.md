@@ -113,7 +113,7 @@ YOUTUBE_CLIENT_SECRET=
 YOUTUBE_REDIRECT_URI=http://localhost:3000/api/auth/youtube/callback
 
 # Encryption key (generate a random 32+ character string)
-ENCRYPTION_KEY=
+ENCRYPTION_KEY_V2=
 
 # Trigger.dev (background jobs)
 TRIGGER_SECRET_KEY=tr_dev_YOUR_KEY_HERE

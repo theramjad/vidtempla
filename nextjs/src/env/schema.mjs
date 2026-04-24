@@ -15,7 +15,7 @@ export const serverSchema = z.object({
   YOUTUBE_REDIRECT_URI: z.string().url(),
 
   // Encryption
-  ENCRYPTION_KEY: z.string().min(32),
+  ENCRYPTION_KEY_V2: z.string().min(32),
 
   // RapidAPI (optional)
   RAPID_API_KEY: z.string().optional(),
@@ -60,7 +60,7 @@ export const serverEnv = {
   YOUTUBE_REDIRECT_URI: process.env.YOUTUBE_REDIRECT_URI,
 
   // Encryption
-  ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
+  ENCRYPTION_KEY_V2: process.env.ENCRYPTION_KEY_V2,
 
   // RapidAPI
   RAPID_API_KEY: process.env.RAPID_API_KEY,
