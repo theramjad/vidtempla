@@ -12,6 +12,28 @@ function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function logSendGridError(context: string, to: string, err: unknown): void {
+  // SendGrid SDK attaches the actionable reason at err.response.body.errors;
+  // the top-level Error message alone usually just says "Forbidden" / "Unauthorized".
+  const anyErr = err as {
+    code?: number | string;
+    message?: string;
+    response?: { statusCode?: number; body?: { errors?: Array<{ message?: string; field?: string }> } };
+  };
+  const status = anyErr?.response?.statusCode ?? anyErr?.code;
+  const reasons = anyErr?.response?.body?.errors
+    ?.map((e) => `${e.field ?? ""}: ${e.message ?? ""}`.trim())
+    .join("; ");
+  console.error("[sendgrid] failed", {
+    context,
+    to,
+    status,
+    message: anyErr?.message,
+    reasons,
+    keyPrefix: process.env.SENDGRID_API_KEY?.slice(0, 7),
+  });
+}
+
 sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
 
 export const auth = betterAuth({
@@ -88,12 +110,17 @@ export const auth = betterAuth({
   plugins: [
     magicLink({
       sendMagicLink: async ({ email, url }) => {
-        await sgMail.send({
-          from: "VidTempla <noreply@vidtempla.com>",
-          to: email,
-          subject: "Sign in to VidTempla",
-          html: `<a href="${url}">Click here to sign in</a>`,
-        });
+        try {
+          await sgMail.send({
+            from: "VidTempla <noreply@vidtempla.com>",
+            to: email,
+            subject: "Sign in to VidTempla",
+            html: `<a href="${url}">Click here to sign in</a>`,
+          });
+        } catch (err) {
+          logSendGridError("magic-link", email, err);
+          throw err;
+        }
       },
     }),
     organization({
@@ -101,13 +128,18 @@ export const auth = betterAuth({
         const inviteUrl = `${process.env.BETTER_AUTH_URL}/invite/${id}`;
         const inviterName = escapeHtml(inviter.user.name || inviter.user.email);
         const orgName = escapeHtml(org.name);
-        await sgMail.send({
-          from: "VidTempla <noreply@vidtempla.com>",
-          to: email,
-          subject: `You've been invited to ${org.name} on VidTempla`,
-          html: `<p>${inviterName} invited you to join <strong>${orgName}</strong> on VidTempla.</p>
-                 <a href="${inviteUrl}">Accept invitation</a>`,
-        });
+        try {
+          await sgMail.send({
+            from: "VidTempla <noreply@vidtempla.com>",
+            to: email,
+            subject: `You've been invited to ${org.name} on VidTempla`,
+            html: `<p>${inviterName} invited you to join <strong>${orgName}</strong> on VidTempla.</p>
+                   <a href="${inviteUrl}">Accept invitation</a>`,
+          });
+        } catch (err) {
+          logSendGridError("org-invite", email, err);
+          throw err;
+        }
       },
     }),
     mcp({

@@ -25,10 +25,12 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Redirect authenticated users to org resolver
+    // Redirect authenticated users to org resolver.
+    // Org pages live at /org/[slug]/dashboard/youtube, so preserve the full
+    // path as returnTo instead of stripping the /dashboard/ prefix.
     const url = request.nextUrl.clone();
-    // Map /dashboard/youtube → youtube, /dashboard/api-keys → api-keys, etc.
-    const subPath = pathname.replace(/^\/dashboard\/?/, "") || "dashboard/youtube";
+    const rel = pathname.replace(/^\/+/, "").replace(/\/+$/, "");
+    const subPath = rel === "" || rel === "dashboard" ? "dashboard/youtube" : rel;
     url.pathname = "/org/resolve";
     url.searchParams.set("returnTo", subPath);
     return NextResponse.redirect(url);
