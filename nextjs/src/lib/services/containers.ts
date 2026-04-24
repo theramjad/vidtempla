@@ -1,9 +1,9 @@
 import { eq, and, desc, lt, count, inArray, getTableColumns } from "drizzle-orm";
 import { db } from "@/db";
 import { containers, templates, youtubeVideos } from "@/db/schema";
-import { tasks } from "@trigger.dev/sdk/v3";
 import type { ServiceResult, PaginationOpts, PaginationMeta } from "./types";
 import { assertNoDrift } from "./drift";
+import { pushVideoDescriptions } from "./videos";
 
 // ── list_containers ──────────────────────────────────────────
 
@@ -174,10 +174,7 @@ export async function updateContainer(
     }
 
     if (videoIdsToPush.length > 0) {
-      await tasks.trigger("youtube-update-video-descriptions", {
-        videoIds: videoIdsToPush,
-        userId,
-      });
+      await pushVideoDescriptions(videoIdsToPush, userId, { force: data.force });
     }
 
     return { data: container };

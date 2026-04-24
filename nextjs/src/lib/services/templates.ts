@@ -2,9 +2,9 @@ import { eq, and, desc, lt, count, inArray, asc } from "drizzle-orm";
 import { db } from "@/db";
 import { templates, containers, youtubeVideos } from "@/db/schema";
 import { parseVariables } from "@/utils/templateParser";
-import { tasks } from "@trigger.dev/sdk/v3";
 import type { ServiceResult, PaginationOpts, PaginationMeta } from "./types";
 import { assertNoDrift } from "./drift";
+import { pushVideoDescriptions } from "./videos";
 
 // ── list_templates ───────────────────────────────────────────
 
@@ -163,10 +163,7 @@ export async function updateTemplate(
     }
 
     if (videoIdsToPush.length > 0) {
-      await tasks.trigger("youtube-update-video-descriptions", {
-        videoIds: videoIdsToPush,
-        userId,
-      });
+      await pushVideoDescriptions(videoIdsToPush, userId, { force: data.force });
     }
 
     return { data: { ...template, variables: parseVariables(template.content) } };

@@ -214,6 +214,7 @@ export const youtubeVideos = pgTable("youtube_videos", {
     mode: "date",
     withTimezone: true,
   }),
+  renderVersion: integer("render_version").notNull().default(0),
   publishedAt: timestamp("published_at", {
     mode: "date",
     withTimezone: true,
@@ -260,21 +261,72 @@ export type HistorySource =
   | "manual_youtube_edit"
   | "revert";
 
-export const descriptionHistory = pgTable("description_history", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  videoId: uuid("video_id")
-    .notNull()
-    .references(() => youtubeVideos.id, { onDelete: "cascade" }),
-  description: text("description").notNull(),
-  versionNumber: integer("version_number").notNull(),
-  createdBy: uuid("created_by").references(() => user.id, {
-    onDelete: "set null",
-  }),
-  source: text("source").$type<HistorySource | null>(),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const descriptionHistory = pgTable(
+  "description_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    videoId: uuid("video_id")
+      .notNull()
+      .references(() => youtubeVideos.id, { onDelete: "cascade" }),
+    description: text("description").notNull(),
+    versionNumber: integer("version_number").notNull(),
+    renderSnapshot: jsonb("render_snapshot").$type<Record<string, Record<string, string>>>(),
+    createdBy: uuid("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    source: text("source").$type<HistorySource | null>(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    uniqueVideoVersion: unique().on(table.videoId, table.versionNumber),
+  })
+);
+
+export type VariableChangeType =
+  | "create"
+  | "update"
+  | "delete"
+  | "assignment_init"
+  | "revert_clear"
+  | "drift_clear";
+
+export const videoVariableEvents = pgTable(
+  "video_variable_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    videoId: uuid("video_id")
+      .notNull()
+      .references(() => youtubeVideos.id, { onDelete: "cascade" }),
+    templateId: uuid("template_id").references(() => templates.id, {
+      onDelete: "set null",
+    }),
+    variableName: text("variable_name").notNull(),
+    oldValue: text("old_value"),
+    newValue: text("new_value"),
+    changeType: text("change_type").$type<VariableChangeType>().notNull(),
+    changedBy: uuid("changed_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    organizationId: text("organization_id").references(() => organization.id, {
+      onDelete: "cascade",
+    }),
+    historyVersionNumber: integer("history_version_number"),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    videoCreatedAtIdx: index("video_variable_events_video_created_at_idx").on(
+      table.videoId,
+      table.createdAt
+    ),
+    videoTemplateVarIdx: index(
+      "video_variable_events_video_template_name_idx"
+    ).on(table.videoId, table.templateId, table.variableName, table.createdAt),
+  })
+);
 
 export const subscriptions = pgTable("subscriptions", {
   id: uuid("id").defaultRandom().primaryKey(),

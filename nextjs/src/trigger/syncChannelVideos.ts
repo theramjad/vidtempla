@@ -214,6 +214,7 @@ export const syncChannelVideos = task({
             videoId: insertedVideo.id,
             description: ytVideo.snippet.description || "",
             versionNumber: 1,
+            renderSnapshot: null,
             createdBy: userId,
             source: "initial_sync",
           });
