@@ -3,38 +3,10 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { magicLink, mcp, organization } from "better-auth/plugins";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import sgMail from "@sendgrid/mail";
 import { subscriptions, userCredits, member as memberTable } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { PLAN_CONFIG } from "@/lib/stripe";
-
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function logSendGridError(context: string, to: string, err: unknown): void {
-  // SendGrid SDK attaches the actionable reason at err.response.body.errors;
-  // the top-level Error message alone usually just says "Forbidden" / "Unauthorized".
-  const anyErr = err as {
-    code?: number | string;
-    message?: string;
-    response?: { statusCode?: number; body?: { errors?: Array<{ message?: string; field?: string }> } };
-  };
-  const status = anyErr?.response?.statusCode ?? anyErr?.code;
-  const reasons = anyErr?.response?.body?.errors
-    ?.map((e) => `${e.field ?? ""}: ${e.message ?? ""}`.trim())
-    .join("; ");
-  console.error("[sendgrid] failed", {
-    context,
-    to,
-    status,
-    message: anyErr?.message,
-    reasons,
-    keyPrefix: process.env.SENDGRID_API_KEY?.slice(0, 7),
-  });
-}
-
-sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
+import { sendMagicLinkEmail } from "@/lib/email/senders/sendMagicLinkEmail";
+import { sendOrgInviteEmail } from "@/lib/email/senders/sendOrgInviteEmail";
 
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
@@ -110,36 +82,18 @@ export const auth = betterAuth({
   plugins: [
     magicLink({
       sendMagicLink: async ({ email, url }) => {
-        try {
-          await sgMail.send({
-            from: "VidTempla <noreply@vidtempla.com>",
-            to: email,
-            subject: "Sign in to VidTempla",
-            html: `<a href="${url}">Click here to sign in</a>`,
-          });
-        } catch (err) {
-          logSendGridError("magic-link", email, err);
-          throw err;
-        }
+        await sendMagicLinkEmail({ email, url });
       },
     }),
     organization({
       sendInvitationEmail: async ({ email, id, organization: org, inviter }) => {
         const inviteUrl = `${process.env.BETTER_AUTH_URL}/invite/${id}`;
-        const inviterName = escapeHtml(inviter.user.name || inviter.user.email);
-        const orgName = escapeHtml(org.name);
-        try {
-          await sgMail.send({
-            from: "VidTempla <noreply@vidtempla.com>",
-            to: email,
-            subject: `You've been invited to ${org.name} on VidTempla`,
-            html: `<p>${inviterName} invited you to join <strong>${orgName}</strong> on VidTempla.</p>
-                   <a href="${inviteUrl}">Accept invitation</a>`,
-          });
-        } catch (err) {
-          logSendGridError("org-invite", email, err);
-          throw err;
-        }
+        await sendOrgInviteEmail({
+          email,
+          inviteUrl,
+          inviterName: inviter.user.name || inviter.user.email,
+          orgName: org.name,
+        });
       },
     }),
     mcp({
