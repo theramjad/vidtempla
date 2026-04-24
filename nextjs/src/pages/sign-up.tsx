@@ -36,7 +36,7 @@ export default function Page() {
       if (returnTo && returnTo.startsWith("/")) {
         router.push(decodeURIComponent(returnTo));
       } else {
-        router.push("/dashboard");
+        router.push("/org/resolve");
       }
     }
   }, [user, userLoading]);

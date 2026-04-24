@@ -32,16 +32,30 @@ export default function Page() {
 
   const shownErrorsRef = useRef(new Set<string>());
 
+  // Tab-scoped flag set by useUser.signOut() right before the hard-navigate.
+  // Read synchronously on first render (lazy initializer) so the auto-redirect
+  // effect never fires with a stale useSession user. Not URL-visible.
+  const [justSignedOut] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const raw = sessionStorage.getItem("justSignedOut");
+    if (!raw) return false;
+    sessionStorage.removeItem("justSignedOut");
+    const ts = Number(raw);
+    return Number.isFinite(ts) && Date.now() - ts < 5000;
+  });
+
   useEffect(() => {
+    if (justSignedOut) return;
+
     if (user && !userLoading) {
       const returnTo = router.query.returnTo as string;
       if (returnTo && returnTo.startsWith("/")) {
         router.push(decodeURIComponent(returnTo));
       } else {
-        router.push("/dashboard");
+        router.push("/org/resolve");
       }
     }
-  }, [user, userLoading]);
+  }, [user, userLoading, justSignedOut]);
 
   useEffect(() => {
     const { error: queryError, error_description: queryErrorDesc } =
@@ -108,7 +122,7 @@ export default function Page() {
     }
   }
 
-  if (userLoading || user) {
+  if (!justSignedOut && (userLoading || user)) {
     return (
       <AuthLayout title="Sign In" headTitle="Sign In | VidTempla">
         <div
