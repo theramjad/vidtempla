@@ -3,7 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { magicLink, mcp, organization } from "better-auth/plugins";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import { Resend } from "resend";
+import sgMail from "@sendgrid/mail";
 import { subscriptions, userCredits, member as memberTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { PLAN_CONFIG } from "@/lib/stripe";
@@ -12,7 +12,7 @@ function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
 
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
@@ -88,7 +88,7 @@ export const auth = betterAuth({
   plugins: [
     magicLink({
       sendMagicLink: async ({ email, url }) => {
-        await resend.emails.send({
+        await sgMail.send({
           from: "VidTempla <noreply@vidtempla.com>",
           to: email,
           subject: "Sign in to VidTempla",
@@ -101,7 +101,7 @@ export const auth = betterAuth({
         const inviteUrl = `${process.env.BETTER_AUTH_URL}/invite/${id}`;
         const inviterName = escapeHtml(inviter.user.name || inviter.user.email);
         const orgName = escapeHtml(org.name);
-        await resend.emails.send({
+        await sgMail.send({
           from: "VidTempla <noreply@vidtempla.com>",
           to: email,
           subject: `You've been invited to ${org.name} on VidTempla`,
