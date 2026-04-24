@@ -27,8 +27,8 @@ export const serverSchema = z.object({
   BETTER_AUTH_SECRET: z.string(),
   BETTER_AUTH_URL: z.string().url().optional(),
 
-  // Resend
-  RESEND_API_KEY: z.string(),
+  // SendGrid
+  SENDGRID_API_KEY: z.string(),
 
   // Google OAuth (for Better Auth)
   GOOGLE_CLIENT_ID: z.string(),
@@ -72,8 +72,8 @@ export const serverEnv = {
   BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
   BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
 
-  // Resend
-  RESEND_API_KEY: process.env.RESEND_API_KEY,
+  // SendGrid
+  SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
 
   // Google OAuth (for Better Auth)
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
