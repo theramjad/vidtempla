@@ -41,7 +41,7 @@ export default function AuthCallback() {
         if (returnTo && returnTo.startsWith('/')) {
           router.push(decodeURIComponent(returnTo));
         } else {
-          router.push("/dashboard/youtube");
+          router.push("/org/resolve");
         }
       } else {
         router.push("/sign-in");

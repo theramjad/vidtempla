@@ -39,36 +39,51 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
     async function resolveOrg() {
       try {
-        // List user's orgs to find the one matching the slug
-        const { data: orgs } = await authClient.organization.list();
+        // Gate on session before anything else. If the user just signed out
+        // (or their session expired), send them to /sign-in, not /org/resolve
+        // — /org/resolve would show "create organization" to a signed-out user.
+        const { data: sessionData } = await authClient.getSession();
+        if (cancelled) return;
+        if (!sessionData?.user) {
+          router.replace("/sign-in");
+          return;
+        }
+
+        const { data: orgs, error: listError } =
+          await authClient.organization.list();
         if (cancelled) return;
 
+        if (listError) {
+          const status = (listError as { status?: number }).status;
+          if (status === 401 || status === 403) {
+            router.replace("/sign-in");
+            return;
+          }
+          setError("Failed to load organization");
+          return;
+        }
+
         if (!orgs || orgs.length === 0) {
-          setError("No organizations found");
+          router.replace("/org/resolve");
           return;
         }
 
         const org = orgs.find((o: any) => o.slug === slug);
         if (!org) {
-          setError("Organization not found");
           router.replace("/org/resolve");
           return;
         }
 
-        // Set active organization
         await authClient.organization.setActive({ organizationId: org.id });
         if (cancelled) return;
 
-        // Inject into tRPC headers
         setOrganizationId(org.id);
 
-        // Fetch full org data to get user's role
         const { data: fullOrg } = await authClient.organization.getFullOrganization();
         if (cancelled) return;
 
-        const { data: sessionData } = await authClient.getSession();
         const myMembership = fullOrg?.members?.find(
-          (m: any) => m.userId === sessionData?.user?.id
+          (m: any) => m.userId === sessionData.user.id
         ) ?? null;
         const role = myMembership?.role ?? "member";
 
