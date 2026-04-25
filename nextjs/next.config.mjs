@@ -5,6 +5,7 @@
  */
 !process.env.SKIP_ENV_VALIDATION && (await import("./src/env/server.mjs"));
 import createMDX from "@next/mdx";
+import { withWorkflow } from "workflow/next";
 
 /** @type {import("next").NextConfig} */
 const config = {
@@ -114,4 +115,4 @@ const withMDX = createMDX({
   // Add markdown plugins here, as desired
 });
 
-export default withMDX(config);
+export default withWorkflow(withMDX(config));

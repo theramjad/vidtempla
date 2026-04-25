@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/workflows/credit-reset",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/workflows/scheduled-sync",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}
