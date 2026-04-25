@@ -40,8 +40,8 @@ import {
 } from "@/lib/clients/youtube";
 import { parseUserVariables, buildDescription } from "@/utils/templateParser";
 import { checkVideoLimit } from "@/lib/plan-limits";
-import { tasks } from "@trigger.dev/sdk/v3";
-import type { PushPayload } from "@/trigger/updateVideoDescriptions";
+import { start } from "workflow/api";
+import { updateVideoDescriptionsWorkflow, type PushPayload } from "@/workflows/update-video-descriptions";
 import type { ServiceResult, PaginationMeta } from "./types";
 import { assertNoDrift, detectAndRecordDrift } from "./drift";
 
@@ -809,9 +809,7 @@ export async function pushVideoDescriptions(
   }
 
   for (const payload of payloads) {
-    await tasks.trigger("youtube-update-video-descriptions", payload, {
-      concurrencyKey: payload.videoId,
-    });
+    await start(updateVideoDescriptionsWorkflow, [payload]);
   }
 
   return { data: { success: true } };
@@ -910,9 +908,7 @@ export async function updateVideoVariables(
     });
 
     if (payload) {
-      await tasks.trigger("youtube-update-video-descriptions", payload, {
-        concurrencyKey: payload.videoId,
-      });
+      await start(updateVideoDescriptionsWorkflow, [payload]);
     }
 
     return { data: { success: true } };

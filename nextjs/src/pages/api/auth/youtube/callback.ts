@@ -12,7 +12,8 @@ import {
 } from '@/lib/clients/youtube';
 import { encrypt } from '@/utils/encryption';
 import { checkChannelLimit } from '@/lib/plan-limits';
-import { tasks } from '@trigger.dev/sdk/v3';
+import { start } from 'workflow/api';
+import { syncChannelVideosWorkflow } from '@/workflows/sync-channel-videos';
 import { db } from '@/db';
 import { youtubeChannels, member } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -104,10 +105,10 @@ export default async function handler(
         .where(eq(youtubeChannels.id, existingChannel.id));
 
       // Trigger automatic sync for reconnected channel
-      await tasks.trigger("youtube-sync-channel-videos", {
-        channelId: existingChannel.id,
-        userId: session.user.id,
-      });
+      await start(syncChannelVideosWorkflow, [
+        existingChannel.id,
+        session.user.id,
+      ]);
     } else {
       // Check channel limit before adding a new channel
       const limitCheck = await checkChannelLimit(organizationId, db);
@@ -138,10 +139,10 @@ export default async function handler(
 
       // Trigger automatic sync for newly connected channel
       if (newChannel) {
-        await tasks.trigger("youtube-sync-channel-videos", {
-          channelId: newChannel.id,
-          userId: session.user.id,
-        });
+        await start(syncChannelVideosWorkflow, [
+          newChannel.id,
+          session.user.id,
+        ]);
       }
     }
 

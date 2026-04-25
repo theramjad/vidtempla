@@ -7,9 +7,7 @@
     "dev": "next dev",
     "vercel-build": "npx drizzle-kit migrate && next build",
     "lint": "next lint",
-    "start": "next start",
-    "dev:trigger": "npx trigger.dev@latest dev",
-    "deploy:trigger": "npx trigger.dev@latest deploy"
+    "start": "next start"
   },
   "dependencies": {
     "@better-auth/cli": "^1.4.18",
@@ -46,7 +44,6 @@
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-query": "^4.29.19",
     "@tanstack/react-table": "^8.20.6",
-    "@trigger.dev/sdk": "4.4.4",
     "@trpc/client": "^10.45.2",
     "@trpc/next": "^10.45.2",
     "@trpc/react-query": "^10.45.2",
@@ -78,11 +75,11 @@
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^11.1.0",
     "vercel": "^39.2.5",
+    "workflow": "4.2.4",
     "zod": "^3.24.1",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
-    "@trigger.dev/build": "4.4.4",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/luxon": "^3.4.2",
     "@types/node": "^22.10.5",

@@ -15,7 +15,8 @@ import {
   buildDescription,
   findMissingVariables,
 } from '@/utils/templateParser';
-import { tasks } from '@trigger.dev/sdk/v3';
+import { start } from 'workflow/api';
+import { syncChannelVideosWorkflow } from '@/workflows/sync-channel-videos';
 import { db } from '@/db';
 import { youtubeChannels, containers, templates, youtubeVideos, videoVariables, descriptionHistory } from '@/db/schema';
 import { eq, and, desc, asc, sql, count, isNull, ilike, inArray, getTableColumns } from 'drizzle-orm';
@@ -113,10 +114,7 @@ export const youtubeRouter = router({
       .input(z.object({ channelId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         await verifyChannelOwnership(input.channelId, ctx.organizationId);
-        await tasks.trigger("youtube-sync-channel-videos", {
-          channelId: input.channelId,
-          userId: ctx.user.id,
-        });
+        await start(syncChannelVideosWorkflow, [input.channelId, ctx.user.id]);
 
         return { success: true, jobId: `sync-${input.channelId}-${Date.now()}` };
       }),
@@ -217,10 +215,7 @@ export const youtubeRouter = router({
           .returning();
 
         if (videoIdsToPush.length > 0) {
-          await tasks.trigger("youtube-update-video-descriptions", {
-            videoIds: videoIdsToPush,
-            userId: ctx.user.id,
-          });
+          await pushVideoDescriptions(videoIdsToPush, ctx.user.id);
         }
 
         return data;
@@ -355,10 +350,7 @@ export const youtubeRouter = router({
           .returning();
 
         if (videoIdsToPush.length > 0) {
-          await tasks.trigger("youtube-update-video-descriptions", {
-            videoIds: videoIdsToPush,
-            userId: ctx.user.id,
-          });
+          await pushVideoDescriptions(videoIdsToPush, ctx.user.id);
         }
 
         return data;

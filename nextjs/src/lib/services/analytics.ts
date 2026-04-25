@@ -3,7 +3,8 @@ import { db } from "@/db";
 import { youtubeChannels } from "@/db/schema";
 import { getChannelTokens } from "@/lib/api-auth";
 import { fetchChannelAnalytics } from "@/lib/clients/youtube";
-import { tasks } from "@trigger.dev/sdk/v3";
+import { start } from "workflow/api";
+import { syncChannelVideosWorkflow } from "@/workflows/sync-channel-videos";
 import axios from "axios";
 import type { ServiceResult } from "./types";
 
@@ -231,10 +232,7 @@ export async function syncChannel(
       return { error: { code: "SYNC_IN_PROGRESS", message: "A sync is already in progress", suggestion: "Wait for the current sync to complete", status: 409 } };
     }
 
-    await tasks.trigger("youtube-sync-channel-videos", {
-      channelId: channel.id,
-      userId,
-    });
+    await start(syncChannelVideosWorkflow, [channel.id, userId]);
 
     return { data: { message: "Video sync started", jobId: `sync-${channel.id}-${Date.now()}` } };
   } catch {
