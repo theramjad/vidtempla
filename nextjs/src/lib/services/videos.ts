@@ -1045,19 +1045,35 @@ export async function revertDescription(
     }
 
     const [currentVideo] = await db
-      .select({ containerId: youtubeVideos.containerId, videoId: youtubeVideos.videoId, channelId: youtubeVideos.channelId })
+      .select({
+        containerId: youtubeVideos.containerId,
+        videoId: youtubeVideos.videoId,
+        channelId: youtubeVideos.channelId,
+        renderVersion: youtubeVideos.renderVersion,
+      })
       .from(youtubeVideos)
       .where(eq(youtubeVideos.id, video.id));
 
     if (!currentVideo) return { error: videoNotFoundError("not_owned") };
 
     const accessToken = await getChannelAccessToken(currentVideo.channelId);
+    const expectedRenderVersion = currentVideo.renderVersion;
 
-    const { hadContainer, variableCount } = await db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select 1 from youtube_videos where id = ${video.id} for update`
-      );
+    // Phase 1 (read above): captured currentVideo + expectedRenderVersion.
+    // Phase 2: external HTTP PUT to YouTube — performed OUTSIDE any transaction
+    // so we never hold a row lock across the round-trip. If this throws, the DB
+    // remains in its pre-revert state and the caller's error path runs.
+    await updateVideoDescription(
+      currentVideo.videoId,
+      history.description,
+      accessToken
+    );
 
+    // Phase 3: short write txn with CAS on render_version. If a concurrent
+    // writer bumped render_version between phase 1 and phase 3, abort the local
+    // write — YouTube already has the reverted description, and the next sync's
+    // drift detection will reconcile.
+    const writeResult = await db.transaction(async (tx) => {
       const existingVars = await tx
         .select({
           templateId: videoVariables.templateId,
@@ -1070,11 +1086,25 @@ export async function revertDescription(
       const hadContainer = !!currentVideo.containerId;
       const variableCount = existingVars.length;
 
-      await updateVideoDescription(
-        currentVideo.videoId,
-        history.description,
-        accessToken
-      );
+      const updated = await tx
+        .update(youtubeVideos)
+        .set({
+          currentDescription: history.description,
+          driftDetectedAt: null,
+          renderVersion: sql`${youtubeVideos.renderVersion} + 1`,
+          ...(hadContainer ? { containerId: null } : {}),
+        })
+        .where(
+          and(
+            eq(youtubeVideos.id, video.id),
+            eq(youtubeVideos.renderVersion, expectedRenderVersion)
+          )
+        )
+        .returning({ id: youtubeVideos.id });
+
+      if (updated.length === 0) {
+        return { casFailed: true as const };
+      }
 
       if (variableCount > 0) {
         await tx.insert(videoVariableEvents).values(
@@ -1092,16 +1122,6 @@ export async function revertDescription(
         await tx.delete(videoVariables).where(eq(videoVariables.videoId, video.id));
       }
 
-      await tx
-        .update(youtubeVideos)
-        .set({
-          currentDescription: history.description,
-          driftDetectedAt: null,
-          renderVersion: sql`${youtubeVideos.renderVersion} + 1`,
-          ...(hadContainer ? { containerId: null } : {}),
-        })
-        .where(eq(youtubeVideos.id, video.id));
-
       const nextVersionRows = await tx.execute(sql<{ next: number }>`
         select coalesce(max(version_number), 0) + 1 as next
         from description_history where video_id = ${video.id}
@@ -1117,14 +1137,31 @@ export async function revertDescription(
         source: "revert",
       });
 
-      return { hadContainer, variableCount };
+      return { casFailed: false as const, hadContainer, variableCount };
     });
+
+    if (writeResult.casFailed) {
+      console.warn(
+        "[videos] revertDescription CAS failed after YouTube PUT — concurrent writer bumped render_version; YouTube has reverted description but DB write skipped (drift detection will reconcile)",
+        { videoId: video.id, expectedRenderVersion }
+      );
+      return {
+        error: {
+          code: "CONCURRENT_MODIFICATION",
+          message:
+            "Video was modified concurrently after YouTube revert; the DB metadata was not updated. Re-sync to reconcile.",
+          suggestion:
+            "Run a sync to refresh the cached description and resolve any drift, then retry if needed.",
+          status: 409,
+        },
+      };
+    }
 
     return {
       data: {
         success: true,
-        delinkedContainer: hadContainer,
-        variablesCleared: variableCount,
+        delinkedContainer: writeResult.hadContainer,
+        variablesCleared: writeResult.variableCount,
       },
     };
   } catch (err) {
