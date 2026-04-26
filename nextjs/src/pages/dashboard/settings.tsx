@@ -4,7 +4,7 @@
  */
 
 import Head from 'next/head';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -39,15 +39,18 @@ export default function SettingsPage() {
   );
 
   // Check for checkout success
+  const handledRef = useRef(false);
   useEffect(() => {
+    if (!router.isReady || handledRef.current) return;
     if (router.query.checkout === 'success') {
+      handledRef.current = true;
       toast.success('Subscription activated!', {
         description: 'Your subscription has been successfully activated.',
       });
       // Clear the query parameter
-      router.replace('/dashboard/settings', undefined, { shallow: true });
+      router.replace(router.pathname, undefined, { shallow: true });
     }
-  }, [router]);
+  }, [router.isReady, router.query.checkout]);
 
   const handleManageSubscription = async () => {
     setPortalLoading(true);
