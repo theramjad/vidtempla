@@ -6,12 +6,12 @@ import {
   getChannelTokens,
   logRequest,
 } from "@/lib/api-auth";
+import { mapYouTubeError } from "@/lib/youtube-errors";
 import {
   listCaptionTracks,
   downloadCaptionTrack,
 } from "@/lib/clients/youtube";
 import { srtToPlainText } from "@/utils/srtParser";
-import axios from "axios";
 
 /**
  * GET /api/v1/youtube/captions/[videoId]/transcript?channelId=...&captionId=...&language=...&format=text|srt|vtt
@@ -134,21 +134,8 @@ export async function GET(
       )
     );
   } catch (error) {
-    const status = axios.isAxiosError(error)
-      ? error.response?.status || 500
-      : 500;
-    const message = axios.isAxiosError(error)
-      ? error.response?.data?.error?.message || error.message
-      : "Unknown error";
-    logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", status, quotaUnits);
-    return NextResponse.json(
-      apiError(
-        "YOUTUBE_API_ERROR",
-        message,
-        "Check the videoId and captionId are correct and you own this video",
-        status
-      ),
-      { status }
-    );
+    const mapped = mapYouTubeError(error);
+    logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", mapped.status, quotaUnits);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }
