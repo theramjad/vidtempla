@@ -641,32 +641,61 @@ export async function assignVideo(
       }
     }
 
-    await db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select 1 from youtube_videos where id = ${video.id} for update`
-      );
-
-      await tx
-        .update(youtubeVideos)
-        .set({ containerId, driftDetectedAt: null })
-        .where(eq(youtubeVideos.id, video.id));
-
-      if (variablesToCreate.length > 0) {
-        await tx.insert(videoVariables).values(variablesToCreate);
-        await tx.insert(videoVariableEvents).values(
-          eventsToRecord.map((e) => ({
-            videoId: e.videoId,
-            templateId: e.templateId,
-            variableName: e.variableName,
-            oldValue: null,
-            newValue: "",
-            changeType: "assignment_init" as const,
-            changedBy: userId,
-            organizationId: organizationId ?? null,
-          }))
+    const ASSIGN_CONFLICT = Symbol("assign_conflict");
+    try {
+      await db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select 1 from youtube_videos where id = ${video.id} for update`
         );
+
+        // CAS update: only assign if container_id is still NULL. If a concurrent
+        // assign already won, this returns 0 rows and we abort the transaction
+        // to avoid silently overwriting the first assignment (and creating
+        // duplicate videoVariables rows).
+        const updated = await tx
+          .update(youtubeVideos)
+          .set({ containerId, driftDetectedAt: null })
+          .where(
+            and(
+              eq(youtubeVideos.id, video.id),
+              isNull(youtubeVideos.containerId)
+            )
+          )
+          .returning({ id: youtubeVideos.id });
+
+        if (updated.length === 0) {
+          throw ASSIGN_CONFLICT;
+        }
+
+        if (variablesToCreate.length > 0) {
+          await tx.insert(videoVariables).values(variablesToCreate);
+          await tx.insert(videoVariableEvents).values(
+            eventsToRecord.map((e) => ({
+              videoId: e.videoId,
+              templateId: e.templateId,
+              variableName: e.variableName,
+              oldValue: null,
+              newValue: "",
+              changeType: "assignment_init" as const,
+              changedBy: userId,
+              organizationId: organizationId ?? null,
+            }))
+          );
+        }
+      });
+    } catch (txErr) {
+      if (txErr === ASSIGN_CONFLICT) {
+        return {
+          error: {
+            code: "ALREADY_ASSIGNED",
+            message: "Video was just assigned to another container",
+            suggestion: "Refresh and try again — another request won the race",
+            status: 409,
+          },
+        };
       }
-    });
+      throw txErr;
+    }
 
     return { data: { success: true } };
   } catch (err) {
