@@ -25,10 +25,18 @@ function OrgSettingsContent() {
   const { toast } = useToast();
   const router = useRouter();
   const [orgName, setOrgName] = useState(name);
+  const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [orgCount, setOrgCount] = useState<number | null>(null);
 
   const { data: plan } = api.dashboard.billing.getCurrentPlan.useQuery();
+
+  // Defense-in-depth: resync local state when the org name prop changes (e.g.
+  // active org switches in-place without a remount). Dirty-guarded so it
+  // doesn't stomp on user typing.
+  useEffect(() => {
+    if (!isDirty) setOrgName(name);
+  }, [name, isDirty]);
 
   useEffect(() => {
     authClient.organization.list().then(({ data }) => {
@@ -47,6 +55,8 @@ function OrgSettingsContent() {
         data: { name: orgName },
       });
       toast({ title: "Organization updated" });
+      // Allow future prop changes to resync the input again.
+      setIsDirty(false);
       // If slug changed, redirect
       if (data?.slug && data.slug !== slug) {
         router.replace(`/org/${data.slug}/organization/settings`);
@@ -80,7 +90,13 @@ function OrgSettingsContent() {
       {/* Name */}
       <div className="space-y-2">
         <label className="text-sm font-medium">Organization Name</label>
-        <Input value={orgName} onChange={(e) => setOrgName(e.target.value)} />
+        <Input
+          value={orgName}
+          onChange={(e) => {
+            setOrgName(e.target.value);
+            setIsDirty(true);
+          }}
+        />
         <Button onClick={handleSave} disabled={saving || orgName === name}>
           {saving ? "Saving..." : "Save"}
         </Button>
