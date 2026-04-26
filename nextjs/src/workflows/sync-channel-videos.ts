@@ -52,10 +52,34 @@ async function markSyncFailed(channelId: string, err: unknown) {
 async function runSyncChannelVideos(channelId: string, userId: string) {
   "use step";
 
-  await db
+  // Atomic compare-and-set: claim the channel only if it's not already syncing.
+  // Prevents two overlapping runs (cron retry, deploy-time double-fire, or
+  // cron + manual trigger) from both proceeding and double-inserting drift /
+  // history rows and burning YouTube quota twice.
+  const claimed = await db
     .update(youtubeChannels)
     .set({ syncStatus: "syncing" })
-    .where(eq(youtubeChannels.id, channelId));
+    .where(
+      and(
+        eq(youtubeChannels.id, channelId),
+        sql`${youtubeChannels.syncStatus} != 'syncing'`
+      )
+    )
+    .returning({ id: youtubeChannels.id });
+
+  if (claimed.length === 0) {
+    console.log(
+      `[sync-channel-videos] Sync already in progress for channel ${channelId}, skipping`
+    );
+    return {
+      success: true,
+      skipped: true,
+      channelId,
+      videosProcessed: 0,
+      newVideos: 0,
+      deletedVideos: 0,
+    };
+  }
 
   const [channel] = await db
     .select()
