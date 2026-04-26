@@ -85,7 +85,29 @@ export async function withApiKey(
     .then(() => {})
     .catch(() => {});
 
-  return { userId: key.userId, organizationId: key.organizationId ?? key.userId, apiKeyId: key.id, permission: key.permission as "read" | "read-write" };
+  // Defense in depth: after the backfill migration (0011) every key should
+  // have a real organizationId. The schema still permits NULL because a key
+  // can become orphaned if its membership row is deleted (e.g. user removed
+  // from org). Reject rather than fall back to userId — a userId UUID would
+  // never match a real organization id and would silently 404 every request.
+  if (!key.organizationId) {
+    return NextResponse.json(
+      apiError(
+        "API_KEY_REISSUE_REQUIRED",
+        "API key is not organization-scoped — orphaned from a removed user.",
+        "Recreate this API key from your dashboard.",
+        401
+      ),
+      { status: 401 }
+    );
+  }
+
+  return {
+    userId: key.userId,
+    organizationId: key.organizationId,
+    apiKeyId: key.id,
+    permission: key.permission as "read" | "read-write",
+  };
 }
 
 /**
