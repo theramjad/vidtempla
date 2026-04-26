@@ -1,6 +1,7 @@
 import {
   eq,
   and,
+  or,
   desc,
   asc,
   ilike,
@@ -12,6 +13,7 @@ import {
   inArray,
   sql,
   getTableColumns,
+  type SQL,
 } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -262,24 +264,75 @@ export async function listVideos(
     if (opts.hasDrift === true) filters.push(isNotNull(youtubeVideos.driftDetectedAt));
     if (opts.hasDrift === false) filters.push(isNull(youtubeVideos.driftDetectedAt));
 
+    const [sortField, sortDir] = sortParam.split(":");
+    const isAsc = sortDir === "asc";
+    const isTitleSort = sortField === "title";
+
     if (opts.cursor) {
-      const [, sortDir] = sortParam.split(":");
-      if (sortDir === "asc") {
-        filters.push(gt(youtubeVideos.publishedAt, new Date(opts.cursor)));
+      // Composite cursor: `${sortKey}|${id}` so duplicate sort keys don't
+      // silently skip or repeat rows. The sort key MUST match the active
+      // sort mode (publishedAt vs title) — encoding mismatch is itself a bug.
+      // Legacy single-column cursors (no `|`) fall back to the previous
+      // behavior so in-flight pagination doesn't break across deploy.
+      if (opts.cursor.includes("|")) {
+        const sepIdx = opts.cursor.lastIndexOf("|");
+        const cursorKey = opts.cursor.slice(0, sepIdx);
+        const cursorId = opts.cursor.slice(sepIdx + 1);
+        if (!cursorKey || !cursorId) {
+          return {
+            error: {
+              code: "INVALID_CURSOR",
+              message: "Invalid cursor format",
+              suggestion: "Omit the cursor to start from the first page",
+              status: 400,
+            },
+          };
+        }
+
+        const idCmp = isAsc ? gt : lt;
+        let primary: SQL;
+        let tieEq: SQL;
+        if (isTitleSort) {
+          primary = isAsc
+            ? gt(youtubeVideos.title, cursorKey)
+            : lt(youtubeVideos.title, cursorKey);
+          tieEq = eq(youtubeVideos.title, cursorKey);
+        } else {
+          const cursorDate = new Date(cursorKey);
+          if (Number.isNaN(cursorDate.getTime())) {
+            return {
+              error: {
+                code: "INVALID_CURSOR",
+                message: "Invalid cursor format",
+                suggestion: "Omit the cursor to start from the first page",
+                status: 400,
+              },
+            };
+          }
+          primary = isAsc
+            ? gt(youtubeVideos.publishedAt, cursorDate)
+            : lt(youtubeVideos.publishedAt, cursorDate);
+          tieEq = eq(youtubeVideos.publishedAt, cursorDate);
+        }
+        filters.push(or(primary, and(tieEq, idCmp(youtubeVideos.id, cursorId)))!);
       } else {
-        filters.push(lt(youtubeVideos.publishedAt, new Date(opts.cursor)));
+        // Legacy cursor: bare publishedAt ISO string (pre-composite-cursor deploy).
+        if (isAsc) {
+          filters.push(gt(youtubeVideos.publishedAt, new Date(opts.cursor)));
+        } else {
+          filters.push(lt(youtubeVideos.publishedAt, new Date(opts.cursor)));
+        }
       }
     }
 
-    const [sortField, sortDir] = sortParam.split(":");
-    const orderBy =
-      sortField === "title"
-        ? sortDir === "asc"
-          ? asc(youtubeVideos.title)
-          : desc(youtubeVideos.title)
-        : sortDir === "asc"
-          ? asc(youtubeVideos.publishedAt)
-          : desc(youtubeVideos.publishedAt);
+    const idTiebreaker = isAsc ? asc(youtubeVideos.id) : desc(youtubeVideos.id);
+    const primaryOrder = isTitleSort
+      ? isAsc
+        ? asc(youtubeVideos.title)
+        : desc(youtubeVideos.title)
+      : isAsc
+        ? asc(youtubeVideos.publishedAt)
+        : desc(youtubeVideos.publishedAt);
 
     const results = await db
       .select({
@@ -295,12 +348,20 @@ export async function listVideos(
       .innerJoin(youtubeChannels, eq(youtubeVideos.channelId, youtubeChannels.id))
       .leftJoin(containers, eq(youtubeVideos.containerId, containers.id))
       .where(and(...filters))
-      .orderBy(orderBy)
+      .orderBy(primaryOrder, idTiebreaker)
       .limit(limit + 1);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
-    const nextCursor = hasMore && items.length > 0 ? items[items.length - 1]!.publishedAt?.toISOString() : undefined;
+    const last = items[items.length - 1];
+    let nextCursor: string | undefined;
+    if (hasMore && last) {
+      if (isTitleSort) {
+        nextCursor = `${last.title}|${last.id}`;
+      } else if (last.publishedAt) {
+        nextCursor = `${last.publishedAt.toISOString()}|${last.id}`;
+      }
+    }
 
     const baseFilters = [ownerFilter] as any[];
     if (opts.channelId) baseFilters.push(eq(youtubeChannels.channelId, opts.channelId));

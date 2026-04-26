@@ -1,4 +1,4 @@
-import { eq, and, desc, lt, count, inArray, asc } from "drizzle-orm";
+import { eq, and, or, desc, lt, count, inArray, asc, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { templates, containers, youtubeVideos } from "@/db/schema";
 import { parseVariables } from "@/utils/templateParser";
@@ -14,20 +14,58 @@ export async function listTemplates(
 ): Promise<ServiceResult<{ data: unknown[]; meta: PaginationMeta }>> {
   try {
     const limit = Math.min(opts.limit ?? 50, 100);
-    const filters: ReturnType<typeof eq>[] = [eq(templates.userId, userId)];
-    if (opts.cursor) filters.push(lt(templates.createdAt, new Date(opts.cursor)));
+    const filters: SQL[] = [eq(templates.userId, userId)];
+    if (opts.cursor) {
+      // Composite cursor: `${createdAt.toISOString()}|${id}` ensures stable
+      // ordering across rows that share a millisecond. Legacy cursors without
+      // a `|` are treated as the bare createdAt value for backwards compat.
+      if (opts.cursor.includes("|")) {
+        const [cursorDate, cursorId] = opts.cursor.split("|");
+        if (!cursorDate || !cursorId) {
+          return {
+            error: {
+              code: "INVALID_CURSOR",
+              message: "Invalid cursor format",
+              suggestion: "Omit the cursor to start from the first page",
+              status: 400,
+            },
+          };
+        }
+        const parsedDate = new Date(cursorDate);
+        if (Number.isNaN(parsedDate.getTime())) {
+          return {
+            error: {
+              code: "INVALID_CURSOR",
+              message: "Invalid cursor format",
+              suggestion: "Omit the cursor to start from the first page",
+              status: 400,
+            },
+          };
+        }
+        filters.push(
+          or(
+            lt(templates.createdAt, parsedDate),
+            and(eq(templates.createdAt, parsedDate), lt(templates.id, cursorId))
+          )!
+        );
+      } else {
+        // Legacy single-column cursor in flight — degrade gracefully.
+        filters.push(lt(templates.createdAt, new Date(opts.cursor)));
+      }
+    }
 
     const results = await db
       .select()
       .from(templates)
       .where(and(...filters))
-      .orderBy(desc(templates.createdAt))
+      .orderBy(desc(templates.createdAt), desc(templates.id))
       .limit(limit + 1);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
+    const last = items[items.length - 1];
     const nextCursor =
-      hasMore && items.length > 0 ? items[items.length - 1]!.createdAt.toISOString() : undefined;
+      hasMore && last ? `${last.createdAt.toISOString()}|${last.id}` : undefined;
 
     const templatesWithVars = items.map((t) => ({
       ...t,
