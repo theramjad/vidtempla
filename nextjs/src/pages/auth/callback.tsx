@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/hooks/use-toast";
@@ -8,9 +8,12 @@ export default function AuthCallback() {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
   const { toast } = useToast();
+  const redirectedRef = useRef(false);
+
+  const userId = session?.user?.id;
 
   useEffect(() => {
-    if (!router.isReady) return;
+    if (!router.isReady || redirectedRef.current) return;
 
     // Check for error parameters in URL
     const { error, error_description, error_code } = router.query;
@@ -26,28 +29,32 @@ export default function AuthCallback() {
         error_description: displayDescription,
         ...(error_code && { error_code: error_code as string }),
       });
+      redirectedRef.current = true;
       router.push(`/sign-in?${params.toString()}`);
       return;
     }
 
     // If session check is done, redirect accordingly
     if (!isPending) {
-      if (session) {
+      if (userId) {
         toast({
           title: "Success",
           description: "You've been signed in!",
         });
         const returnTo = router.query.returnTo as string;
+        redirectedRef.current = true;
         if (returnTo && returnTo.startsWith('/')) {
           router.push(decodeURIComponent(returnTo));
         } else {
           router.push("/org/resolve");
         }
       } else {
+        redirectedRef.current = true;
         router.push("/sign-in");
       }
     }
-  }, [router.isReady, isPending, session]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, isPending, userId]);
 
   return (
     <>
