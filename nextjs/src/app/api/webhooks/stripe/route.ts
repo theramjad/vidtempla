@@ -56,19 +56,30 @@ export async function POST(request: NextRequest) {
   console.log(`Received webhook event: ${event.type}`);
 
   try {
-    // Store webhook event for audit trail and idempotency
+    // Idempotency guard: if this event has already been processed, acknowledge
+    // without re-running handlers. Stripe redelivers (retries, manual replays,
+    // network blips) must not cause duplicate credit allocations or notifications.
+    const [existing] = await db
+      .select({ processed: webhookEvents.processed })
+      .from(webhookEvents)
+      .where(eq(webhookEvents.eventId, event.id))
+      .limit(1);
+
+    if (existing?.processed) {
+      console.log(`Skipping already-processed webhook event: ${event.id}`);
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+
+    // Store webhook event for audit trail and idempotency.
+    // Use onConflictDoNothing so an in-flight retry that arrives mid-processing
+    // does not reset `processed` back to false on the original row.
     await db.insert(webhookEvents).values({
       eventId: event.id,
       eventType: event.type,
       payload: event.data.object as never,
       processed: false,
-    }).onConflictDoUpdate({
+    }).onConflictDoNothing({
       target: webhookEvents.eventId,
-      set: {
-        eventType: event.type,
-        payload: event.data.object as never,
-        processed: false,
-      },
     });
 
     // Handle the event
