@@ -134,6 +134,18 @@ export async function updateContainer(
       return { error: { code: "EMPTY_UPDATE", message: "At least one field must be provided", suggestion: "Provide name, templateIds, or separator", status: 400 } };
     }
 
+    // Verify ownership BEFORE selecting videos so we never leak drift metadata
+    // for foreign containers via the VIDEO_HAS_DRIFT error envelope.
+    const [ownedContainer] = await db
+      .select({ id: containers.id })
+      .from(containers)
+      .where(and(eq(containers.id, id), eq(containers.userId, userId)))
+      .limit(1);
+
+    if (!ownedContainer) {
+      return { error: { code: "CONTAINER_NOT_FOUND", message: "Container not found", suggestion: "Check the container ID", status: 404 } };
+    }
+
     let videoIdsToPush: string[] = [];
     if (data.templateIds !== undefined || data.separator !== undefined) {
       const videos = await db
