@@ -115,8 +115,9 @@ export async function POST(request: NextRequest) {
       })
       .where(eq(webhookEvents.eventId, event.id));
 
-    // Return 200 to prevent Stripe from retrying
-    return NextResponse.json({ error: "Internal error" }, { status: 200 });
+    // Return 500 so Stripe retries with exponential backoff. The webhook_events
+    // idempotency guard prevents double-processing on retry.
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
