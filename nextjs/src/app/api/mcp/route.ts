@@ -5,7 +5,7 @@ import { registerAllTools } from "@/lib/mcp/tools/register";
 import { sessionStore } from "@/lib/mcp/helpers";
 import { db } from "@/db";
 import { member, session as sessionTable } from "@/db/schema";
-import { eq, asc, desc } from "drizzle-orm";
+import { and, eq, asc, desc } from "drizzle-orm";
 
 // Create MCP handler once at module level (not per-request)
 const mcpRouteHandler = createMcpHandler(
@@ -32,7 +32,22 @@ const mcpHandler = withMcpAuth(auth, async (req, session) => {
     .limit(1);
 
   if (latestSession?.activeOrganizationId) {
-    organizationId = latestSession.activeOrganizationId;
+    // Verify the user is still a current member of that organization.
+    // If they were removed but their session row still has the stale
+    // activeOrganizationId, fall through to the membership-based fallback.
+    const [activeMembership] = await db
+      .select({ id: member.id })
+      .from(member)
+      .where(
+        and(
+          eq(member.userId, session.userId),
+          eq(member.organizationId, latestSession.activeOrganizationId)
+        )
+      )
+      .limit(1);
+    if (activeMembership) {
+      organizationId = latestSession.activeOrganizationId;
+    }
   }
 
   if (!organizationId) {
