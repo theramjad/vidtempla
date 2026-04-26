@@ -4,7 +4,7 @@
  */
 
 import Head from 'next/head';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { OrganizationProvider } from '@/contexts/OrganizationContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -40,16 +40,23 @@ export default function OrgSettingsPage() {
   );
 
   // Check for checkout success
+  const handledRef = useRef(false);
   useEffect(() => {
+    if (!router.isReady || handledRef.current) return;
     if (router.query.checkout === 'success') {
+      handledRef.current = true;
       toast.success('Subscription activated!', {
         description: 'Your subscription has been successfully activated.',
       });
-      // Clear the query parameter
+      // Clear the query parameter (preserve dynamic slug segment)
       const slug = router.query.slug as string;
-      router.replace(`/org/${slug}/settings`, undefined, { shallow: true });
+      router.replace(
+        { pathname: router.pathname, query: { slug } },
+        undefined,
+        { shallow: true },
+      );
     }
-  }, [router]);
+  }, [router.isReady, router.query.checkout]);
 
   const handleManageSubscription = async () => {
     setPortalLoading(true);
