@@ -103,7 +103,9 @@ export const billingRouter = router({
           ],
           success_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/settings?checkout=success`,
           cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/pricing`,
-          customer_email: ctx.user.email,
+          ...(subscription?.stripeCustomerId
+            ? { customer: subscription.stripeCustomerId }
+            : { customer_email: ctx.user.email }),
           allow_promotion_codes: true,
           metadata: {
             userId: ctx.user.id,
