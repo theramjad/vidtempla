@@ -140,13 +140,18 @@ async function syncOwnedChannelVideos(
     if (isBaseline) {
       await db
         .update(youtubeChannels)
-        .set({ driftBaselinedAt: new Date() })
+        .set({ driftBaselinedAt: new Date(), lastSyncedAt: new Date() })
         .where(
           and(
             eq(youtubeChannels.id, tokens.channelDbId),
             sql`${youtubeChannels.driftBaselinedAt} IS NULL`
           )
         );
+    } else {
+      await db
+        .update(youtubeChannels)
+        .set({ lastSyncedAt: new Date() })
+        .where(eq(youtubeChannels.id, tokens.channelDbId));
     }
   } catch (err) {
     // YouTube sync failed — fall through to DB query with stale data
@@ -155,6 +160,10 @@ async function syncOwnedChannelVideos(
 
   return true;
 }
+
+// Throttle inline sync inside listVideos so each REST call doesn't repaginate
+// the entire YouTube uploads playlist. The cron + manual triggers handle freshness.
+const LIST_VIDEOS_SYNC_STALE_MS = 5 * 60 * 1000;
 
 export async function listVideos(
   userId: string,
@@ -190,7 +199,41 @@ export async function listVideos(
 
     let isOwned = false;
     if (opts.channelId) {
-      isOwned = await syncOwnedChannelVideos(opts.channelId, userId, organizationId);
+      // Look up the connected channel row scoped to user/org. Existence here
+      // implies ownership; we then decide whether to refresh from YouTube based
+      // on lastSyncedAt and syncStatus instead of syncing on every list call.
+      const channelOwnerFilter = organizationId
+        ? and(
+            eq(youtubeChannels.channelId, opts.channelId),
+            eq(youtubeChannels.organizationId, organizationId)
+          )
+        : and(
+            eq(youtubeChannels.channelId, opts.channelId),
+            eq(youtubeChannels.userId, userId)
+          );
+
+      const [ownedChannel] = await db
+        .select({
+          lastSyncedAt: youtubeChannels.lastSyncedAt,
+          syncStatus: youtubeChannels.syncStatus,
+        })
+        .from(youtubeChannels)
+        .where(channelOwnerFilter)
+        .limit(1);
+
+      if (ownedChannel) {
+        const stale =
+          !ownedChannel.lastSyncedAt ||
+          Date.now() - ownedChannel.lastSyncedAt.getTime() > LIST_VIDEOS_SYNC_STALE_MS;
+        const notSyncing = ownedChannel.syncStatus !== "syncing";
+
+        if (stale && notSyncing) {
+          isOwned = await syncOwnedChannelVideos(opts.channelId, userId, organizationId);
+        } else {
+          // Cached path: data is fresh enough or another sync is already running.
+          isOwned = true;
+        }
+      }
     }
 
     if (opts.channelId && !isOwned) {
