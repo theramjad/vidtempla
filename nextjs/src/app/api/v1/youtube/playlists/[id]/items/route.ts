@@ -63,11 +63,14 @@ export async function GET(
     });
 
     await logRequest(ctx, `/youtube/playlists/${id}/items`, "GET", 200, 1);
+    const nextPageToken: string | null = response.data.nextPageToken || null;
+    const pageInfo: { totalResults?: number } | undefined = response.data.pageInfo;
     return NextResponse.json(
       apiSuccess(response.data.items || [], {
+        cursor: nextPageToken,
+        hasMore: Boolean(nextPageToken),
+        total: pageInfo?.totalResults ?? null,
         quotaUnits: 1,
-        pageInfo: response.data.pageInfo,
-        nextPageToken: response.data.nextPageToken || null,
       })
     );
   } catch (error) {
