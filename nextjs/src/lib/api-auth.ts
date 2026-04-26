@@ -83,7 +83,9 @@ export async function withApiKey(
     .set({ lastUsedAt: new Date() })
     .where(eq(apiKeys.id, key.id))
     .then(() => {})
-    .catch(() => {});
+    .catch((err: unknown) => {
+      console.error("Failed to update API key lastUsedAt:", err);
+    });
 
   return { userId: key.userId, organizationId: key.organizationId ?? key.userId, apiKeyId: key.id, permission: key.permission as "read" | "read-write" };
 }
