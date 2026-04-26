@@ -7,6 +7,7 @@ import {
   getChannelTokens,
   logRequest,
 } from "@/lib/api-auth";
+import { mapYouTubeError } from "@/lib/youtube-errors";
 import axios from "axios";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
@@ -71,22 +72,9 @@ export async function GET(
       })
     );
   } catch (error) {
-    const status = axios.isAxiosError(error)
-      ? error.response?.status || 500
-      : 500;
-    const message = axios.isAxiosError(error)
-      ? error.response?.data?.error?.message || error.message
-      : "Unknown error";
-    await logRequest(ctx, `/youtube/playlists/${id}/items`, "GET", status, 1);
-    return NextResponse.json(
-      apiError(
-        "YOUTUBE_API_ERROR",
-        message,
-        "Check the playlist ID is correct",
-        status
-      ),
-      { status }
-    );
+    const mapped = mapYouTubeError(error);
+    await logRequest(ctx, `/youtube/playlists/${id}/items`, "GET", mapped.status, 1);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }
 
@@ -168,21 +156,8 @@ export async function POST(
     await logRequest(ctx, `/youtube/playlists/${id}/items`, "POST", 201, 50);
     return NextResponse.json(apiSuccess(response.data, { quotaUnits: 50 }));
   } catch (error) {
-    const status = axios.isAxiosError(error)
-      ? error.response?.status || 500
-      : 500;
-    const message = axios.isAxiosError(error)
-      ? error.response?.data?.error?.message || error.message
-      : "Unknown error";
-    await logRequest(ctx, `/youtube/playlists/${id}/items`, "POST", status, 50);
-    return NextResponse.json(
-      apiError(
-        "YOUTUBE_API_ERROR",
-        message,
-        "Check the videoId and playlist permissions",
-        status
-      ),
-      { status }
-    );
+    const mapped = mapYouTubeError(error);
+    await logRequest(ctx, `/youtube/playlists/${id}/items`, "POST", mapped.status, 50);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }
