@@ -23,7 +23,8 @@ export interface ChannelAnalyticsOpts {
 export async function getChannelAnalytics(
   channelId: string,
   userId: string,
-  opts: ChannelAnalyticsOpts
+  opts: ChannelAnalyticsOpts,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
     const now = new Date();
@@ -33,7 +34,7 @@ export async function getChannelAnalytics(
     const metrics = opts.metrics ?? "views,estimatedMinutesWatched";
     const dimensions = opts.dimensions ?? "day";
 
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -60,7 +61,8 @@ export interface QueryAnalyticsOpts {
 
 export async function queryAnalytics(
   userId: string,
-  opts: QueryAnalyticsOpts
+  opts: QueryAnalyticsOpts,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -68,7 +70,7 @@ export async function queryAnalytics(
       return { error: { code: "INVALID_PARAMETER", message: "Dates must be in YYYY-MM-DD format", suggestion: "Use ISO date format, e.g. 2024-01-01", status: 400 } };
     }
 
-    const tokens = await getChannelTokens(opts.channelId, userId);
+    const tokens = await getChannelTokens(opts.channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -125,12 +127,13 @@ export const searchChannelVideos = searchMyVideos;
 export async function searchMyVideos(
   channelId: string,
   userId: string,
-  opts: SearchChannelVideosOpts
+  opts: SearchChannelVideosOpts,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
     const maxResults = Math.min(opts.maxResults ?? 25, 50);
 
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -174,12 +177,13 @@ export interface SearchYouTubeOpts {
 export async function searchYouTube(
   authChannelId: string,
   userId: string,
-  opts: SearchYouTubeOpts
+  opts: SearchYouTubeOpts,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
     const maxResults = Math.min(opts.maxResults ?? 10, 50);
 
-    const tokens = await getChannelTokens(authChannelId, userId);
+    const tokens = await getChannelTokens(authChannelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
