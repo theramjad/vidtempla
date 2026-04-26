@@ -8,12 +8,12 @@ import { pushVideoDescriptions } from "./videos";
 // ── list_containers ──────────────────────────────────────────
 
 export async function listContainers(
-  userId: string,
+  organizationId: string,
   opts: PaginationOpts
 ): Promise<ServiceResult<{ data: unknown[]; meta: PaginationMeta }>> {
   try {
     const limit = Math.min(opts.limit ?? 50, 100);
-    const filters: ReturnType<typeof eq>[] = [eq(containers.userId, userId)];
+    const filters: ReturnType<typeof eq>[] = [eq(containers.organizationId, organizationId)];
     if (opts.cursor) filters.push(lt(containers.createdAt, new Date(opts.cursor)));
 
     const results = await db
@@ -36,7 +36,7 @@ export async function listContainers(
     const [totalResult] = await db
       .select({ total: count() })
       .from(containers)
-      .where(eq(containers.userId, userId));
+      .where(eq(containers.organizationId, organizationId));
 
     return {
       data: {
@@ -53,7 +53,7 @@ export async function listContainers(
 
 export async function getContainer(
   id: string,
-  userId: string
+  organizationId: string
 ): Promise<ServiceResult<unknown>> {
   try {
     const [container] = await db
@@ -63,7 +63,7 @@ export async function getContainer(
       })
       .from(containers)
       .leftJoin(youtubeVideos, eq(youtubeVideos.containerId, containers.id))
-      .where(and(eq(containers.id, id), eq(containers.userId, userId)))
+      .where(and(eq(containers.id, id), eq(containers.organizationId, organizationId)))
       .groupBy(containers.id);
 
     if (!container) {
@@ -92,6 +92,7 @@ export async function getContainer(
 
 export async function createContainer(
   userId: string,
+  organizationId: string,
   name: string,
   templateIds: string[],
   separator?: string
@@ -105,6 +106,7 @@ export async function createContainer(
       .insert(containers)
       .values({
         userId,
+        organizationId,
         name: name.trim(),
         templateOrder: templateIds,
         separator: separator ?? "\n\n",
@@ -122,6 +124,7 @@ export async function createContainer(
 export async function updateContainer(
   id: string,
   userId: string,
+  organizationId: string,
   data: { name?: string; templateIds?: string[]; separator?: string; force?: boolean }
 ): Promise<ServiceResult<unknown>> {
   try {
@@ -166,7 +169,7 @@ export async function updateContainer(
     const [container] = await db
       .update(containers)
       .set(updateData)
-      .where(and(eq(containers.id, id), eq(containers.userId, userId)))
+      .where(and(eq(containers.id, id), eq(containers.organizationId, organizationId)))
       .returning();
 
     if (!container) {
@@ -187,12 +190,12 @@ export async function updateContainer(
 
 export async function deleteContainer(
   id: string,
-  userId: string
+  organizationId: string
 ): Promise<ServiceResult<{ success: true }>> {
   try {
     const result = await db
       .delete(containers)
-      .where(and(eq(containers.id, id), eq(containers.userId, userId)))
+      .where(and(eq(containers.id, id), eq(containers.organizationId, organizationId)))
       .returning({ id: containers.id });
 
     if (result.length === 0) {
