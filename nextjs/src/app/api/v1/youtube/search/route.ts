@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     videoCategoryId: url.searchParams.get("videoCategoryId") ?? undefined,
     videoDuration: url.searchParams.get("videoDuration") ?? undefined,
     eventType: url.searchParams.get("eventType") ?? undefined,
-  });
+  }, ctx.organizationId);
 
   if ("error" in result) {
     await logRequest(ctx, "/youtube/search", "GET", result.error.status, 100);

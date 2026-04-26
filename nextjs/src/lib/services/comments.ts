@@ -57,10 +57,11 @@ export async function replyToComment(
   channelId: string,
   parentId: string,
   text: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -77,10 +78,11 @@ export async function replyToComment(
 export async function deleteComment(
   channelId: string,
   commentId: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<{ deleted: true }>> {
   try {
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
