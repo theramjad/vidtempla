@@ -238,6 +238,10 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     .set({
       status: "canceled",
       planTier: "free", // Revert to free plan
+      stripeSubscriptionId: null,
+      cancelAtPeriodEnd: false,
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
     })
     .where(eq(subscriptions.stripeSubscriptionId, subscription.id));
 
