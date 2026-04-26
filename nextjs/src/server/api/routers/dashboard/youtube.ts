@@ -241,7 +241,13 @@ export const youtubeRouter = router({
             videoId: youtubeVideos.videoId,
           })
           .from(youtubeVideos)
-          .where(eq(youtubeVideos.containerId, input.containerId))
+          .innerJoin(containers, eq(containers.id, youtubeVideos.containerId))
+          .where(
+            and(
+              eq(youtubeVideos.containerId, input.containerId),
+              eq(containers.organizationId, ctx.organizationId)
+            )
+          )
           .orderBy(asc(youtubeVideos.title));
 
         return {
