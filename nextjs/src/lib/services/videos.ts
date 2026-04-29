@@ -548,7 +548,8 @@ export async function assignVideo(
 ): Promise<ServiceResult<{ success: true }>> {
   try {
     const videoResult = await resolveVideo(id, userId, organizationId);
-    if (!videoResult.found) return { error: videoNotFoundError(videoResult.reason) };
+    if (!videoResult.found)
+      return { error: videoNotFoundError(videoResult.reason) };
     const video = videoResult.video;
 
     if (video.containerId) {
@@ -565,27 +566,13 @@ export async function assignVideo(
     const channelOwnerFilter = organizationId
       ? eq(youtubeChannels.organizationId, organizationId)
       : eq(youtubeChannels.userId, userId);
-    const channels = await db.select({ id: youtubeChannels.id }).from(youtubeChannels).where(channelOwnerFilter);
+    const channels = await db
+      .select({ id: youtubeChannels.id })
+      .from(youtubeChannels)
+      .where(channelOwnerFilter);
     const channelIds = channels.map((c) => c.id);
 
-    if (channelIds.length > 0) {
-      const [countResult] = await db
-        .select({ assignedCount: count() })
-        .from(youtubeVideos)
-        .where(and(inArray(youtubeVideos.channelId, channelIds), sql`${youtubeVideos.containerId} IS NOT NULL`));
-
-      const limitCheck = await checkVideoLimit(organizationId ?? userId, db);
-      if ((countResult?.assignedCount ?? 0) >= limitCheck.limit) {
-        return {
-          error: {
-            code: "VIDEO_LIMIT_REACHED",
-            message: `Assigned video limit reached (${limitCheck.limit} on ${limitCheck.planTier} plan)`,
-            suggestion: "Upgrade your plan to assign more videos",
-            status: 403,
-          },
-        };
-      }
-    }
+    const limitCheck = await checkVideoLimit(organizationId ?? userId, db);
 
     const containerOwnerFilter = organizationId
       ? eq(containers.organizationId, organizationId)
@@ -642,10 +629,17 @@ export async function assignVideo(
     }
 
     const ASSIGN_CONFLICT = Symbol("assign_conflict");
+    const LIMIT_REACHED = Symbol("limit_reached");
     try {
       await db.transaction(async (tx) => {
+        // Serialize owner-level assignments so post-update limit checks cannot
+        // interleave and commit over the plan cap.
         await tx.execute(
-          sql`select 1 from youtube_videos where id = ${video.id} for update`
+          sql`select pg_advisory_xact_lock(hashtext(${organizationId ?? userId}))`,
+        );
+
+        await tx.execute(
+          sql`select 1 from youtube_videos where id = ${video.id} for update`,
         );
 
         // CAS update: only assign if container_id is still NULL. If a concurrent
@@ -658,13 +652,29 @@ export async function assignVideo(
           .where(
             and(
               eq(youtubeVideos.id, video.id),
-              isNull(youtubeVideos.containerId)
-            )
+              isNull(youtubeVideos.containerId),
+            ),
           )
           .returning({ id: youtubeVideos.id });
 
         if (updated.length === 0) {
           throw ASSIGN_CONFLICT;
+        }
+
+        if (channelIds.length > 0) {
+          const [countResult] = await tx
+            .select({ assignedCount: count() })
+            .from(youtubeVideos)
+            .where(
+              and(
+                inArray(youtubeVideos.channelId, channelIds),
+                isNotNull(youtubeVideos.containerId),
+              ),
+            );
+
+          if ((countResult?.assignedCount ?? 0) > limitCheck.limit) {
+            throw LIMIT_REACHED;
+          }
         }
 
         if (variablesToCreate.length > 0) {
@@ -679,7 +689,7 @@ export async function assignVideo(
               changeType: "assignment_init" as const,
               changedBy: userId,
               organizationId: organizationId ?? null,
-            }))
+            })),
           );
         }
       });
@@ -691,6 +701,18 @@ export async function assignVideo(
             message: "Video was just assigned to another container",
             suggestion: "Refresh and try again — another request won the race",
             status: 409,
+          },
+        };
+      }
+      if (txErr === LIMIT_REACHED) {
+        return {
+          error: {
+            code: "VIDEO_LIMIT_REACHED",
+            message: `Assigned video limit reached (${limitCheck.limit} on ${
+              limitCheck.planTier
+            } plan)`,
+            suggestion: "Upgrade your plan to assign more videos",
+            status: 403,
           },
         };
       }
