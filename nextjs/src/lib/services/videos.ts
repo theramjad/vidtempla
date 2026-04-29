@@ -6,12 +6,14 @@ import {
   ilike,
   isNull,
   isNotNull,
+  ne,
   lt,
   gt,
   count,
   inArray,
   sql,
   getTableColumns,
+  or,
 } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -59,14 +61,15 @@ export interface ListVideosOpts {
 async function syncOwnedChannelVideos(
   channelYoutubeId: string,
   userId: string,
-  organizationId?: string
+  organizationId?: string,
+  lockedChannelDbId?: string
 ) {
-  const tokens = await getChannelTokens(channelYoutubeId, userId, organizationId);
-  if ("error" in tokens) {
-    return false;
-  }
-
   try {
+    const tokens = await getChannelTokens(channelYoutubeId, userId, organizationId);
+    if ("error" in tokens) {
+      return false;
+    }
+
     const [channel] = await db
       .select({
         id: youtubeChannels.id,
@@ -137,25 +140,33 @@ async function syncOwnedChannelVideos(
       nextPageToken = page.nextPageToken;
     } while (nextPageToken);
 
+    const syncedAt = new Date();
     if (isBaseline) {
       await db
         .update(youtubeChannels)
-        .set({ driftBaselinedAt: new Date(), lastSyncedAt: new Date() })
+        .set({ driftBaselinedAt: syncedAt })
         .where(
           and(
             eq(youtubeChannels.id, tokens.channelDbId),
             sql`${youtubeChannels.driftBaselinedAt} IS NULL`
           )
         );
-    } else {
-      await db
-        .update(youtubeChannels)
-        .set({ lastSyncedAt: new Date() })
-        .where(eq(youtubeChannels.id, tokens.channelDbId));
     }
+
+    await db
+      .update(youtubeChannels)
+      .set({ lastSyncedAt: syncedAt })
+      .where(eq(youtubeChannels.id, tokens.channelDbId));
   } catch (err) {
     // YouTube sync failed — fall through to DB query with stale data
     console.warn("[videos] syncOwnedChannelVideos failed (serving stale data):", err);
+  } finally {
+    if (lockedChannelDbId) {
+      await db
+        .update(youtubeChannels)
+        .set({ syncStatus: "idle" })
+        .where(eq(youtubeChannels.id, lockedChannelDbId));
+    }
   }
 
   return true;
@@ -164,6 +175,26 @@ async function syncOwnedChannelVideos(
 // Throttle inline sync inside listVideos so each REST call doesn't repaginate
 // the entire YouTube uploads playlist. The cron + manual triggers handle freshness.
 const LIST_VIDEOS_SYNC_STALE_MS = 5 * 60 * 1000;
+
+async function tryAcquireListVideosSyncLock(channelDbId: string) {
+  const staleBefore = new Date(Date.now() - LIST_VIDEOS_SYNC_STALE_MS);
+  const [lockedChannel] = await db
+    .update(youtubeChannels)
+    .set({ syncStatus: "syncing" })
+    .where(
+      and(
+        eq(youtubeChannels.id, channelDbId),
+        ne(youtubeChannels.syncStatus, "syncing"),
+        or(
+          isNull(youtubeChannels.lastSyncedAt),
+          lt(youtubeChannels.lastSyncedAt, staleBefore)
+        )
+      )
+    )
+    .returning({ id: youtubeChannels.id });
+
+  return !!lockedChannel;
+}
 
 export async function listVideos(
   userId: string,
@@ -214,6 +245,7 @@ export async function listVideos(
 
       const [ownedChannel] = await db
         .select({
+          id: youtubeChannels.id,
           lastSyncedAt: youtubeChannels.lastSyncedAt,
           syncStatus: youtubeChannels.syncStatus,
         })
@@ -228,11 +260,22 @@ export async function listVideos(
         const notSyncing = ownedChannel.syncStatus !== "syncing";
 
         if (stale && notSyncing) {
-          isOwned = await syncOwnedChannelVideos(opts.channelId, userId, organizationId);
-        } else {
-          // Cached path: data is fresh enough or another sync is already running.
-          isOwned = true;
+          const lockAcquired = await tryAcquireListVideosSyncLock(
+            ownedChannel.id
+          );
+          if (lockAcquired) {
+            await syncOwnedChannelVideos(
+              opts.channelId,
+              userId,
+              organizationId,
+              ownedChannel.id
+            );
+          }
         }
+
+        // Connected channel ownership does not depend on whether the opportunistic
+        // refresh succeeded; token/Youtube failures should still serve cached DB data.
+        isOwned = true;
       }
     }
 
