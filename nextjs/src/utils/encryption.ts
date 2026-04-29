@@ -45,6 +45,7 @@ const SALT_LENGTH = 64;
 const TAG_LENGTH = 16;
 const TAG_POSITION = SALT_LENGTH + IV_LENGTH;
 const ENCRYPTED_POSITION = TAG_POSITION + TAG_LENGTH;
+const MIN_CIPHERTEXT_LENGTH = ENCRYPTED_POSITION;
 
 const KEY_LENGTH = 32; // AES-256
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1 } as const;
@@ -120,6 +121,10 @@ export function encrypt(text: string, rawKey?: string): string {
 export function decrypt(encryptedText: string, rawKey?: string): string {
   const raw = resolveRawKey(rawKey);
   const combined = Buffer.from(encryptedText, 'base64');
+
+  if (combined.length < MIN_CIPHERTEXT_LENGTH) {
+    throw new Error('Encrypted payload is too short');
+  }
 
   const salt = combined.subarray(0, SALT_LENGTH);
   const iv = combined.subarray(SALT_LENGTH, TAG_POSITION);
