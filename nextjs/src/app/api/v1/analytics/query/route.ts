@@ -3,11 +3,19 @@ import { z } from "zod";
 import { withApiKey, apiSuccess, apiError, logRequest } from "@/lib/api-auth";
 import { queryAnalytics } from "@/lib/services/analytics";
 
+const isoDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, "Date must be a valid calendar date");
+
 const QuerySchema = z
   .object({
     channelId: z.string().min(1),
-    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    startDate: isoDateSchema,
+    endDate: isoDateSchema,
     metrics: z.string().min(1).max(500),
     dimensions: z.string().max(500).optional(),
     filters: z.string().max(1000).optional(),
