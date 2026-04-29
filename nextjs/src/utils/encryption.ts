@@ -108,6 +108,17 @@ function decryptWithKey(packed: Buffer, key: Buffer): string {
   return decrypted.toString("utf8");
 }
 
+function getKnownVersionPrefix(buf: Buffer): number | undefined {
+  const possibleVersion = buf[0];
+  if (
+    typeof possibleVersion === "number" &&
+    Object.prototype.hasOwnProperty.call(KEYS, possibleVersion)
+  ) {
+    return possibleVersion;
+  }
+  return undefined;
+}
+
 /**
  * Encrypts text using AES-256-GCM with the currently-active key. The output
  * is a base64 string whose first byte (after decoding) identifies the key
@@ -138,8 +149,9 @@ export function encrypt(text: string, rawKey?: string): string {
  *
  * @param encryptedText - Base64 encoded ciphertext
  * @param rawKey - Optional raw key override. When set, this key is used
- *                 directly and version routing is bypassed (legacy layout
- *                 assumed). Useful in tests.
+ *                 directly. Versioned layout is tried first when a known
+ *                 version prefix exists, then legacy layout is tried for
+ *                 backwards compatibility with old test/tool ciphertexts.
  * @returns Decrypted plaintext
  */
 export function decrypt(encryptedText: string, rawKey?: string): string {
@@ -149,7 +161,16 @@ export function decrypt(encryptedText: string, rawKey?: string): string {
   }
 
   if (rawKey) {
-    return decryptWithKey(buf, normalizeKey(rawKey));
+    const key = normalizeKey(rawKey);
+    if (getKnownVersionPrefix(buf) !== undefined) {
+      try {
+        return decryptWithKey(buf.subarray(1), key);
+      } catch {
+        // Legacy raw-key ciphertexts can start with a byte that looks like a
+        // version marker because that byte used to be random salt.
+      }
+    }
+    return decryptWithKey(buf, key);
   }
 
   // If the first byte is a known version marker, peel it off and route.
@@ -158,12 +179,8 @@ export function decrypt(encryptedText: string, rawKey?: string): string {
   // decrypt will throw a GCM auth error; we fall back to the legacy layout
   // and try again. New ciphertexts are well-formed under the versioned path,
   // so the fallback is dead code for them.
-  const possibleVersion = buf[0];
-  if (
-    typeof possibleVersion === "number" &&
-    Object.prototype.hasOwnProperty.call(KEYS, possibleVersion) &&
-    KEYS[possibleVersion]
-  ) {
+  const possibleVersion = getKnownVersionPrefix(buf);
+  if (possibleVersion !== undefined && KEYS[possibleVersion]) {
     try {
       const key = getKeyForVersion(possibleVersion);
       return decryptWithKey(buf.subarray(1), key);
