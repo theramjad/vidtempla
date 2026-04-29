@@ -12,7 +12,7 @@ export async function POST(
   if (writeCheck) return writeCheck;
 
   const { channelId } = await params;
-  const result = await syncChannel(channelId, auth.userId);
+  const result = await syncChannel(channelId, auth.userId, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, `/v1/channels/${channelId}/sync`, "POST", result.error.status, 0);

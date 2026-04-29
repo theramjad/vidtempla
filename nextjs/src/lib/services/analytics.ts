@@ -220,13 +220,18 @@ export async function searchYouTube(
 
 export async function syncChannel(
   channelId: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<{ message: string; jobId: string }>> {
   try {
+    const ownerFilter = organizationId
+      ? eq(youtubeChannels.organizationId, organizationId)
+      : eq(youtubeChannels.userId, userId);
+
     const [channel] = await db
       .select({ id: youtubeChannels.id, syncStatus: youtubeChannels.syncStatus })
       .from(youtubeChannels)
-      .where(and(eq(youtubeChannels.channelId, channelId), eq(youtubeChannels.userId, userId)));
+      .where(and(eq(youtubeChannels.channelId, channelId), ownerFilter));
 
     if (!channel) {
       return { error: { code: "CHANNEL_NOT_FOUND", message: "Channel not found or not connected", suggestion: "Connect a YouTube channel from the dashboard first", status: 404 } };
@@ -236,7 +241,7 @@ export async function syncChannel(
       return { error: { code: "SYNC_IN_PROGRESS", message: "A sync is already in progress", suggestion: "Wait for the current sync to complete", status: 409 } };
     }
 
-    await start(syncChannelVideosWorkflow, [channel.id, userId]);
+    await start(syncChannelVideosWorkflow, [channel.id, userId, organizationId]);
 
     return { data: { message: "Video sync started", jobId: `sync-${channel.id}-${Date.now()}` } };
   } catch {

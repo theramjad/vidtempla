@@ -113,7 +113,8 @@ export function registerAnalyticsTools(server: McpServer) {
     WRITE,
     async ({ channelId }) => {
       const userId = getSessionUserId();
-      const result = await syncChannel(channelId, userId);
+      const orgId = getSessionOrgId();
+      const result = await syncChannel(channelId, userId, orgId);
       logMcpRequest(userId, "sync_channel", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
