@@ -46,6 +46,11 @@ import { start } from "workflow/api";
 import { updateVideoDescriptionsWorkflow, type PushPayload } from "@/workflows/update-video-descriptions";
 import type { ServiceResult, PaginationMeta } from "./types";
 import { assertNoDrift, detectAndRecordDrift } from "./drift";
+import {
+  decodeCompositeCursor,
+  encodeCompositeCursor,
+  isEncodedCompositeCursor,
+} from "./cursors";
 
 export interface ListVideosOpts {
   channelId?: string;
@@ -265,28 +270,68 @@ export async function listVideos(
     if (opts.hasDrift === false) filters.push(isNull(youtubeVideos.driftDetectedAt));
 
     const [sortField, sortDir] = sortParam.split(":");
-    const isAsc = sortDir === "asc";
-    const isTitleSort = sortField === "title";
+    const activeSortField = sortField === "title" ? "title" : "publishedAt";
+    const activeSortDir = sortDir === "asc" ? "asc" : "desc";
+    const isAsc = activeSortDir === "asc";
+    const isTitleSort = activeSortField === "title";
 
     if (opts.cursor) {
-      // Composite cursor: `${sortKey}|${id}` so duplicate sort keys don't
-      // silently skip or repeat rows. The sort key MUST match the active
-      // sort mode (publishedAt vs title) — encoding mismatch is itself a bug.
-      // Legacy single-column cursors (no `|`) fall back to the previous
-      // behavior so in-flight pagination doesn't break across deploy.
-      if (opts.cursor.includes("|")) {
+      if (isEncodedCompositeCursor(opts.cursor)) {
+        const cursor = decodeCompositeCursor(opts.cursor);
+        if (
+          !cursor ||
+          cursor.scope !== "videos" ||
+          cursor.sort !== activeSortField ||
+          cursor.dir !== activeSortDir
+        ) {
+          return invalidCursor();
+        }
+
+        const idCmp = isAsc ? gt : lt;
+        let primary: SQL | undefined;
+        let tieEq: SQL;
+        if (isTitleSort) {
+          if (cursor.key === null) {
+            filters.push(and(isNull(youtubeVideos.title), idCmp(youtubeVideos.id, cursor.id))!);
+            primary = undefined;
+          } else {
+            primary = isAsc
+              ? gt(youtubeVideos.title, cursor.key)
+              : lt(youtubeVideos.title, cursor.key);
+            tieEq = eq(youtubeVideos.title, cursor.key);
+            filters.push(
+              or(primary, isNull(youtubeVideos.title), and(tieEq, idCmp(youtubeVideos.id, cursor.id)))!
+            );
+          }
+        } else {
+          const cursorDate = parseCursorDate(cursor.key);
+          if (cursor.key !== null && !cursorDate) {
+            return invalidCursor();
+          }
+          if (cursorDate === null) {
+            filters.push(and(isNull(youtubeVideos.publishedAt), idCmp(youtubeVideos.id, cursor.id))!);
+            primary = undefined;
+          } else {
+            primary = isAsc
+              ? gt(youtubeVideos.publishedAt, cursorDate)
+              : lt(youtubeVideos.publishedAt, cursorDate);
+            tieEq = eq(youtubeVideos.publishedAt, cursorDate);
+            filters.push(
+              or(
+                primary,
+                isNull(youtubeVideos.publishedAt),
+                and(tieEq, idCmp(youtubeVideos.id, cursor.id))
+              )!
+            );
+          }
+        }
+      } else if (opts.cursor.includes("|")) {
+        // Pre-versioned composite cursor from this PR: `${sortKey}|${id}`.
         const sepIdx = opts.cursor.lastIndexOf("|");
         const cursorKey = opts.cursor.slice(0, sepIdx);
         const cursorId = opts.cursor.slice(sepIdx + 1);
         if (!cursorKey || !cursorId) {
-          return {
-            error: {
-              code: "INVALID_CURSOR",
-              message: "Invalid cursor format",
-              suggestion: "Omit the cursor to start from the first page",
-              status: 400,
-            },
-          };
+          return invalidCursor();
         }
 
         const idCmp = isAsc ? gt : lt;
@@ -298,16 +343,9 @@ export async function listVideos(
             : lt(youtubeVideos.title, cursorKey);
           tieEq = eq(youtubeVideos.title, cursorKey);
         } else {
-          const cursorDate = new Date(cursorKey);
-          if (Number.isNaN(cursorDate.getTime())) {
-            return {
-              error: {
-                code: "INVALID_CURSOR",
-                message: "Invalid cursor format",
-                suggestion: "Omit the cursor to start from the first page",
-                status: 400,
-              },
-            };
+          const cursorDate = parseCursorDate(cursorKey);
+          if (!cursorDate) {
+            return invalidCursor();
           }
           primary = isAsc
             ? gt(youtubeVideos.publishedAt, cursorDate)
@@ -317,10 +355,14 @@ export async function listVideos(
         filters.push(or(primary, and(tieEq, idCmp(youtubeVideos.id, cursorId)))!);
       } else {
         // Legacy cursor: bare publishedAt ISO string (pre-composite-cursor deploy).
+        const cursorDate = parseCursorDate(opts.cursor);
+        if (!cursorDate) {
+          return invalidCursor();
+        }
         if (isAsc) {
-          filters.push(gt(youtubeVideos.publishedAt, new Date(opts.cursor)));
+          filters.push(gt(youtubeVideos.publishedAt, cursorDate));
         } else {
-          filters.push(lt(youtubeVideos.publishedAt, new Date(opts.cursor)));
+          filters.push(lt(youtubeVideos.publishedAt, cursorDate));
         }
       }
     }
@@ -328,11 +370,11 @@ export async function listVideos(
     const idTiebreaker = isAsc ? asc(youtubeVideos.id) : desc(youtubeVideos.id);
     const primaryOrder = isTitleSort
       ? isAsc
-        ? asc(youtubeVideos.title)
-        : desc(youtubeVideos.title)
+        ? sql`${youtubeVideos.title} asc nulls last`
+        : sql`${youtubeVideos.title} desc nulls last`
       : isAsc
-        ? asc(youtubeVideos.publishedAt)
-        : desc(youtubeVideos.publishedAt);
+        ? sql`${youtubeVideos.publishedAt} asc nulls last`
+        : sql`${youtubeVideos.publishedAt} desc nulls last`;
 
     const results = await db
       .select({
@@ -357,9 +399,21 @@ export async function listVideos(
     let nextCursor: string | undefined;
     if (hasMore && last) {
       if (isTitleSort) {
-        nextCursor = `${last.title}|${last.id}`;
-      } else if (last.publishedAt) {
-        nextCursor = `${last.publishedAt.toISOString()}|${last.id}`;
+        nextCursor = encodeCompositeCursor({
+          scope: "videos",
+          sort: activeSortField,
+          dir: activeSortDir,
+          key: last.title,
+          id: last.id,
+        });
+      } else {
+        nextCursor = encodeCompositeCursor({
+          scope: "videos",
+          sort: activeSortField,
+          dir: activeSortDir,
+          key: last.publishedAt?.toISOString() ?? null,
+          id: last.id,
+        });
       }
     }
 
@@ -395,6 +449,23 @@ export async function listVideos(
       },
     };
   }
+}
+
+function invalidCursor(): ServiceResult<{ data: any[]; meta: PaginationMeta; source: "db" | "youtube" }> {
+  return {
+    error: {
+      code: "INVALID_CURSOR",
+      message: "Invalid cursor format",
+      suggestion: "Omit the cursor to start from the first page",
+      status: 400,
+    },
+  };
+}
+
+function parseCursorDate(value: string | null): Date | null {
+  if (value === null) return null;
+  const parsedDate = new Date(value);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
 }
 
 export async function getVideo(
