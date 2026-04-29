@@ -631,6 +631,7 @@ export async function assignVideo(
     // re-counted assigned-video total has hit the plan cap. Rolls back the txn
     // and is caught below so we can return a proper VIDEO_LIMIT_REACHED result.
     const LIMIT_REACHED = "__assignVideo_limit_reached__";
+    const ALREADY_ASSIGNED = "__assignVideo_already_assigned__";
 
     try {
       await db.transaction(async (tx) => {
@@ -640,6 +641,19 @@ export async function assignVideo(
         // can both pass the count check and both succeed → over-cap.
         const lockKey = organizationId ?? userId;
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
+
+        await tx.execute(
+          sql`select 1 from youtube_videos where id = ${video.id} for update`
+        );
+
+        const [lockedVideo] = await tx
+          .select({ containerId: youtubeVideos.containerId })
+          .from(youtubeVideos)
+          .where(eq(youtubeVideos.id, video.id));
+
+        if (lockedVideo?.containerId) {
+          throw new Error(ALREADY_ASSIGNED);
+        }
 
         if (channelIds.length > 0) {
           const [countResult] = await tx
@@ -656,10 +670,6 @@ export async function assignVideo(
             throw new Error(LIMIT_REACHED);
           }
         }
-
-        await tx.execute(
-          sql`select 1 from youtube_videos where id = ${video.id} for update`
-        );
 
         await tx
           .update(youtubeVideos)
@@ -690,6 +700,16 @@ export async function assignVideo(
             message: `Assigned video limit reached (${limitCheck.limit} on ${limitCheck.planTier} plan)`,
             suggestion: "Upgrade your plan to assign more videos",
             status: 403,
+          },
+        };
+      }
+      if (txErr instanceof Error && txErr.message === ALREADY_ASSIGNED) {
+        return {
+          error: {
+            code: "ALREADY_ASSIGNED",
+            message: "Video is already assigned to a container",
+            suggestion: "Unassign the video first or use a different video",
+            status: 400,
           },
         };
       }
