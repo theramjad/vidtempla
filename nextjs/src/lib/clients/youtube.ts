@@ -30,9 +30,21 @@ const YOUTUBE_ANALYTICS_BASE = 'https://youtubeanalytics.googleapis.com/v2';
  */
 export class YouTubeInvalidGrantError extends Error {
   constructor(public channelId?: string) {
-    super("YouTube refresh token is invalid (user revoked access or token expired)");
-    this.name = "YouTubeInvalidGrantError";
+    super(
+      'YouTube token refresh failed with invalid_grant (user revoked access or token expired)'
+    );
+    this.name = 'YouTubeInvalidGrantError';
+    Object.setPrototypeOf(this, YouTubeInvalidGrantError.prototype);
   }
+}
+
+export function isYouTubeInvalidGrantError(
+  error: unknown
+): error is YouTubeInvalidGrantError {
+  return (
+    error instanceof YouTubeInvalidGrantError ||
+    (error instanceof Error && error.name === 'YouTubeInvalidGrantError')
+  );
 }
 
 /**
@@ -312,12 +324,17 @@ export async function getChannelAccessToken(channelId: string): Promise<string> 
       accessTokenEncrypted: youtubeChannels.accessTokenEncrypted,
       refreshTokenEncrypted: youtubeChannels.refreshTokenEncrypted,
       tokenExpiresAt: youtubeChannels.tokenExpiresAt,
+      tokenStatus: youtubeChannels.tokenStatus,
     })
     .from(youtubeChannels)
     .where(eq(youtubeChannels.id, channelId));
 
   if (!channel?.accessTokenEncrypted || !channel.refreshTokenEncrypted) {
     throw new Error('Channel tokens not found');
+  }
+
+  if (channel.tokenStatus === 'invalid') {
+    throw new YouTubeInvalidGrantError(channel.id);
   }
 
   const accessToken = decrypt(channel.accessTokenEncrypted);
@@ -335,7 +352,7 @@ export async function getChannelAccessToken(channelId: string): Promise<string> 
   try {
     newTokens = await refreshAccessToken(refreshToken);
   } catch (err) {
-    if (err instanceof YouTubeInvalidGrantError) {
+    if (isYouTubeInvalidGrantError(err)) {
       // Mark the channel as needing reconnection so the UI/API can prompt
       // re-auth instead of retrying the doomed refresh on every request.
       await db
