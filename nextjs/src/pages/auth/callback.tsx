@@ -4,11 +4,16 @@ import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/hooks/use-toast";
 import Head from "next/head";
 
+const SIGN_IN_REDIRECT_DELAY_MS = 500;
+
 export default function AuthCallback() {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
   const { toast } = useToast();
   const redirectedRef = useRef(false);
+  const signInRedirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const userId = session?.user?.id;
 
@@ -20,7 +25,10 @@ export default function AuthCallback() {
 
     if (error && error_description) {
       let displayDescription = error_description as string;
-      if (error_code === 'signup_disabled' || displayDescription.toLowerCase().includes('signups not allowed')) {
+      if (
+        error_code === "signup_disabled" ||
+        displayDescription.toLowerCase().includes("signups not allowed")
+      ) {
         displayDescription = "Can't find an account associated with this email";
       }
 
@@ -37,23 +45,37 @@ export default function AuthCallback() {
     // If session check is done, redirect accordingly
     if (!isPending) {
       if (userId) {
+        if (signInRedirectTimeoutRef.current) {
+          clearTimeout(signInRedirectTimeoutRef.current);
+          signInRedirectTimeoutRef.current = null;
+        }
         toast({
           title: "Success",
           description: "You've been signed in!",
         });
         const returnTo = router.query.returnTo as string;
         redirectedRef.current = true;
-        if (returnTo && returnTo.startsWith('/')) {
+        if (returnTo && returnTo.startsWith("/")) {
           router.push(decodeURIComponent(returnTo));
         } else {
           router.push("/org/resolve");
         }
       } else {
-        redirectedRef.current = true;
-        router.push("/sign-in");
+        signInRedirectTimeoutRef.current = setTimeout(() => {
+          if (redirectedRef.current) return;
+
+          redirectedRef.current = true;
+          router.push("/sign-in");
+        }, SIGN_IN_REDIRECT_DELAY_MS);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    return () => {
+      if (signInRedirectTimeoutRef.current) {
+        clearTimeout(signInRedirectTimeoutRef.current);
+        signInRedirectTimeoutRef.current = null;
+      }
+    };
   }, [router.isReady, isPending, userId]);
 
   return (
