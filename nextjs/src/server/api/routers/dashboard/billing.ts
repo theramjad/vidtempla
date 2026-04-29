@@ -20,6 +20,19 @@ import { subscriptions, youtubeChannels, youtubeVideos } from "@/db/schema";
 import { eq, and, desc, count, inArray } from "drizzle-orm";
 import { router } from "@/server/trpc/init";
 
+async function getPreferredOrgSubscription(organizationId: string) {
+  const orgSubscriptions = await db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.organizationId, organizationId))
+    .orderBy(desc(subscriptions.createdAt));
+
+  return (
+    orgSubscriptions.find((subscription) => subscription.stripeCustomerId) ??
+    orgSubscriptions[0]
+  );
+}
+
 export const billingRouter = router({
   /**
    * Get the current org's subscription plan
@@ -71,10 +84,7 @@ export const billingRouter = router({
         }
 
         // Get or create subscription record
-        let [subscription] = await db
-          .select()
-          .from(subscriptions)
-          .where(eq(subscriptions.organizationId, ctx.organizationId));
+        let subscription = await getPreferredOrgSubscription(ctx.organizationId);
 
         // Create subscription record if it doesn't exist
         if (!subscription) {
@@ -142,12 +152,10 @@ export const billingRouter = router({
    */
   getCustomerPortalUrl: orgProcedure.query(async ({ ctx }) => {
     try {
-      const [subscription] = await db
-        .select({ stripeCustomerId: subscriptions.stripeCustomerId })
-        .from(subscriptions)
-        .where(eq(subscriptions.organizationId, ctx.organizationId));
+      const subscription = await getPreferredOrgSubscription(ctx.organizationId);
+      const stripeCustomerId = subscription?.stripeCustomerId;
 
-      if (!subscription?.stripeCustomerId) {
+      if (!stripeCustomerId) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "No active subscription found",
@@ -156,7 +164,7 @@ export const billingRouter = router({
 
       // Create Stripe Customer Portal session
       const portalSession = await stripe.billingPortal.sessions.create({
-        customer: subscription.stripeCustomerId,
+        customer: stripeCustomerId,
         return_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/settings`,
       });
 
