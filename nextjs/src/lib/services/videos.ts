@@ -769,7 +769,8 @@ async function buildPushPayload(
     renderVersion: number;
   }>`
     update youtube_videos
-    set render_version = render_version + 1
+    set render_version = render_version + 1,
+        updated_at = now()
     where id = ${videoId}
     returning render_version as "renderVersion"
   `);
@@ -1060,14 +1061,64 @@ export async function revertDescription(
     const expectedRenderVersion = currentVideo.renderVersion;
 
     // Phase 1 (read above): captured currentVideo + expectedRenderVersion.
-    // Phase 2: external HTTP PUT to YouTube — performed OUTSIDE any transaction
-    // so we never hold a row lock across the round-trip. If this throws, the DB
-    // remains in its pre-revert state and the caller's error path runs.
-    await updateVideoDescription(
-      currentVideo.videoId,
-      history.description,
-      accessToken
-    );
+    // Phase 2a: reserve the row with a short CAS before the external PUT. If the
+    // row was deleted or modified after phase 1, skip the side effect.
+    const claimRows = await db
+      .update(youtubeVideos)
+      .set({
+        renderVersion: sql`${youtubeVideos.renderVersion} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(youtubeVideos.id, video.id),
+          eq(youtubeVideos.renderVersion, expectedRenderVersion)
+        )
+      )
+      .returning({ renderVersion: youtubeVideos.renderVersion });
+
+    const claimedRenderVersion = Number(claimRows[0]?.renderVersion ?? 0);
+
+    if (!claimedRenderVersion) {
+      console.warn(
+        "[videos] revertDescription CAS claim failed before YouTube PUT — skipping side effect",
+        { videoId: video.id, expectedRenderVersion }
+      );
+      return {
+        error: {
+          code: "CONCURRENT_MODIFICATION",
+          message:
+            "Video was modified concurrently before YouTube revert; no changes were applied.",
+          suggestion: "Refresh the video state and retry if the revert is still needed.",
+          status: 409,
+        },
+      };
+    }
+
+    // Phase 2b: external HTTP PUT to YouTube — performed OUTSIDE any transaction
+    // so we never hold a row lock across the round-trip. If this throws, best-effort
+    // restore the reservation so the caller can retry against the original stamp.
+    try {
+      await updateVideoDescription(
+        currentVideo.videoId,
+        history.description,
+        accessToken
+      );
+    } catch (err) {
+      await db
+        .update(youtubeVideos)
+        .set({
+          renderVersion: expectedRenderVersion,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(youtubeVideos.id, video.id),
+            eq(youtubeVideos.renderVersion, claimedRenderVersion)
+          )
+        );
+      throw err;
+    }
 
     // Phase 3: short write txn with CAS on render_version. If a concurrent
     // writer bumped render_version between phase 1 and phase 3, abort the local
@@ -1091,13 +1142,12 @@ export async function revertDescription(
         .set({
           currentDescription: history.description,
           driftDetectedAt: null,
-          renderVersion: sql`${youtubeVideos.renderVersion} + 1`,
           ...(hadContainer ? { containerId: null } : {}),
         })
         .where(
           and(
             eq(youtubeVideos.id, video.id),
-            eq(youtubeVideos.renderVersion, expectedRenderVersion)
+            eq(youtubeVideos.renderVersion, claimedRenderVersion)
           )
         )
         .returning({ id: youtubeVideos.id });
@@ -1143,7 +1193,7 @@ export async function revertDescription(
     if (writeResult.casFailed) {
       console.warn(
         "[videos] revertDescription CAS failed after YouTube PUT — concurrent writer bumped render_version; YouTube has reverted description but DB write skipped (drift detection will reconcile)",
-        { videoId: video.id, expectedRenderVersion }
+        { videoId: video.id, expectedRenderVersion, claimedRenderVersion }
       );
       return {
         error: {

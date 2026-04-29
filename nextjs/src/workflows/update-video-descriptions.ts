@@ -75,10 +75,52 @@ async function runUpdateVideoDescription(payload: PushPayload) {
     });
   }
 
-  // Phase 2: external HTTP PUT — performed OUTSIDE any transaction so we never
-  // hold a row lock across the YouTube round-trip. If this throws, the DB still
-  // reflects the old state and the workflow's existing retry logic kicks in.
-  await updateVideoDescription(videoIdYouTube, canonical, accessToken);
+  // Phase 2a: reserve this render with a short CAS before the external PUT.
+  // If the row was deleted or modified after the pre-check, skip the side effect.
+  const claimRows = await db
+    .update(youtubeVideos)
+    .set({
+      renderVersion: sql`${youtubeVideos.renderVersion} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(youtubeVideos.id, videoId),
+        eq(youtubeVideos.renderVersion, renderVersion)
+      )
+    )
+    .returning({ renderVersion: youtubeVideos.renderVersion });
+
+  const claimedRenderVersion = Number(claimRows[0]?.renderVersion ?? 0);
+
+  if (!claimedRenderVersion) {
+    console.warn(
+      "[update-video-descriptions] CAS claim failed before YouTube PUT — skipping side effect",
+      { videoId, renderVersion }
+    );
+    return { success: true, videoId, stale: true };
+  }
+
+  // Phase 2b: external HTTP PUT — performed OUTSIDE any transaction so we never
+  // hold a row lock across the YouTube round-trip. If this throws, best-effort
+  // restore the reservation so the workflow retry can use the original stamp.
+  try {
+    await updateVideoDescription(videoIdYouTube, canonical, accessToken);
+  } catch (err) {
+    await db
+      .update(youtubeVideos)
+      .set({
+        renderVersion,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(youtubeVideos.id, videoId),
+          eq(youtubeVideos.renderVersion, claimedRenderVersion)
+        )
+      );
+    throw err;
+  }
 
   // Phase 3: short write txn with CAS on render_version. If a concurrent writer
   // bumped render_version between phase 1 and phase 3, we abort the local write
@@ -93,7 +135,7 @@ async function runUpdateVideoDescription(payload: PushPayload) {
       .where(
         and(
           eq(youtubeVideos.id, videoId),
-          eq(youtubeVideos.renderVersion, renderVersion)
+          eq(youtubeVideos.renderVersion, claimedRenderVersion)
         )
       )
       .returning({ id: youtubeVideos.id });
@@ -123,7 +165,7 @@ async function runUpdateVideoDescription(payload: PushPayload) {
   if (result.casFailed) {
     console.warn(
       "[update-video-descriptions] CAS failed after YouTube PUT — concurrent writer changed render_version; YouTube has new description but DB write skipped (drift detection will reconcile)",
-      { videoId, renderVersion }
+      { videoId, renderVersion, claimedRenderVersion }
     );
     return { success: true, videoId, stale: true };
   }

@@ -5,7 +5,7 @@ import {
   youtubeVideos,
   descriptionHistory,
 } from "@/db/schema";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { decrypt, encrypt } from "@/utils/encryption";
 import {
   refreshAccessToken,
@@ -56,6 +56,8 @@ async function runSyncChannelVideos(
   organizationId?: string
 ) {
   "use step";
+
+  const syncStartedAt = new Date();
 
   await db
     .update(youtubeChannels)
@@ -198,6 +200,8 @@ async function runSyncChannelVideos(
     .select({
       id: youtubeVideos.id,
       videoId: youtubeVideos.videoId,
+      renderVersion: youtubeVideos.renderVersion,
+      updatedAt: youtubeVideos.updatedAt,
     })
     .from(youtubeVideos)
     .where(eq(youtubeVideos.channelId, channelId));
@@ -257,19 +261,33 @@ async function runSyncChannelVideos(
     }
   }
 
-  const videosToDelete = Array.from(existingVideoMap.keys()).filter(
-    (id) => !videoIds.includes(id)
+  const videosToDelete = Array.from(existingVideoMap.values()).filter(
+    (video) => !videoIds.includes(video.videoId)
   );
 
   if (videosToDelete.length > 0) {
-    await db
-      .delete(youtubeVideos)
-      .where(
-        and(
-          inArray(youtubeVideos.videoId, videosToDelete),
-          eq(youtubeVideos.channelId, channelId)
+    for (const video of videosToDelete) {
+      const deleted = await db
+        .delete(youtubeVideos)
+        .where(
+          and(
+            eq(youtubeVideos.videoId, video.videoId),
+            eq(youtubeVideos.channelId, channelId),
+            eq(youtubeVideos.renderVersion, video.renderVersion),
+            sql`${youtubeVideos.updatedAt} < ${syncStartedAt}`
+          )
         )
-      );
+        .returning({ id: youtubeVideos.id });
+
+      if (deleted.length === 0) {
+        console.warn("[sync-channel-videos] skipped deleting changed video row", {
+          channelId,
+          videoId: video.videoId,
+          renderVersion: video.renderVersion,
+          updatedAt: video.updatedAt,
+        });
+      }
+    }
   }
 
   if (isBaseline) {
