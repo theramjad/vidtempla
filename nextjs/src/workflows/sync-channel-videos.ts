@@ -15,6 +15,8 @@ import {
 } from "@/lib/clients/youtube";
 import { detectAndRecordDrift } from "@/lib/services/drift";
 
+const DESCRIPTION_PUSH_DELETE_GRACE_MS = 2 * 60 * 1000;
+
 export async function syncChannelVideosWorkflow(
   channelId: string,
   userId: string,
@@ -58,6 +60,9 @@ async function runSyncChannelVideos(
   "use step";
 
   const syncStartedAt = new Date();
+  const deleteUpdatedBefore = new Date(
+    syncStartedAt.getTime() - DESCRIPTION_PUSH_DELETE_GRACE_MS
+  );
 
   await db
     .update(youtubeChannels)
@@ -274,7 +279,7 @@ async function runSyncChannelVideos(
             eq(youtubeVideos.videoId, video.videoId),
             eq(youtubeVideos.channelId, channelId),
             eq(youtubeVideos.renderVersion, video.renderVersion),
-            sql`${youtubeVideos.updatedAt} < ${syncStartedAt}`
+            sql`${youtubeVideos.updatedAt} < ${deleteUpdatedBefore}`
           )
         )
         .returning({ id: youtubeVideos.id });
