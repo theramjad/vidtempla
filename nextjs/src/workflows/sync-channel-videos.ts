@@ -5,7 +5,7 @@ import {
   youtubeVideos,
   descriptionHistory,
 } from "@/db/schema";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray, lt, ne, or, sql } from "drizzle-orm";
 import { decrypt, encrypt } from "@/utils/encryption";
 import {
   refreshAccessToken,
@@ -15,6 +15,8 @@ import {
 } from "@/lib/clients/youtube";
 import { detectAndRecordDrift } from "@/lib/services/drift";
 
+const SYNC_LOCK_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
+
 export async function syncChannelVideosWorkflow(
   channelId: string,
   userId: string,
@@ -22,17 +24,15 @@ export async function syncChannelVideosWorkflow(
 ) {
   "use workflow";
 
-  try {
-    return await runSyncChannelVideos(channelId, userId, organizationId);
-  } catch (err) {
-    await markSyncFailed(channelId, err);
-    throw err;
-  }
+  return await runSyncChannelVideos(channelId, userId, organizationId);
 }
 
-async function markSyncFailed(channelId: string, err: unknown) {
-  "use step";
-
+async function markSyncFailed(
+  channelId: string,
+  userId: string,
+  err: unknown,
+  organizationId?: string
+) {
   const errorMessage = err instanceof Error ? err.message : String(err);
   console.error("[sync-channel-videos] failed", { channelId, error: errorMessage });
 
@@ -41,13 +41,23 @@ async function markSyncFailed(channelId: string, err: unknown) {
     errorMessage.includes("Token has been expired or revoked") ||
     errorMessage.includes("Failed to refresh access token");
 
+  const ownerFilter = organizationId
+    ? eq(youtubeChannels.organizationId, organizationId)
+    : eq(youtubeChannels.userId, userId);
+
   await db
     .update(youtubeChannels)
     .set({
       syncStatus: "idle",
       ...(isTokenError && { tokenStatus: "invalid" }),
     })
-    .where(eq(youtubeChannels.id, channelId));
+    .where(
+      and(
+        eq(youtubeChannels.id, channelId),
+        ownerFilter,
+        eq(youtubeChannels.syncStatus, "syncing")
+      )
+    );
 }
 
 async function runSyncChannelVideos(
@@ -57,22 +67,48 @@ async function runSyncChannelVideos(
 ) {
   "use step";
 
+  const staleSyncCutoff = new Date(
+    Date.now() - SYNC_LOCK_STALE_AFTER_MS
+  );
+  const ownerFilter = organizationId
+    ? eq(youtubeChannels.organizationId, organizationId)
+    : eq(youtubeChannels.userId, userId);
+
   // Atomic compare-and-set: claim the channel only if it's not already syncing.
   // Prevents two overlapping runs (cron retry, deploy-time double-fire, or
   // cron + manual trigger) from both proceeding and double-inserting drift /
-  // history rows and burning YouTube quota twice.
+  // history rows and burning YouTube quota twice. updatedAt is trigger-managed,
+  // so it is safe as a stale-age signal but not as a lock token.
   const claimed = await db
     .update(youtubeChannels)
     .set({ syncStatus: "syncing" })
     .where(
       and(
         eq(youtubeChannels.id, channelId),
-        sql`${youtubeChannels.syncStatus} != 'syncing'`
+        ownerFilter,
+        or(
+          ne(youtubeChannels.syncStatus, "syncing"),
+          lt(youtubeChannels.updatedAt, staleSyncCutoff)
+        )
       )
     )
     .returning({ id: youtubeChannels.id });
 
   if (claimed.length === 0) {
+    const [channel] = await db
+      .select({ id: youtubeChannels.id })
+      .from(youtubeChannels)
+      .where(
+        and(
+          eq(youtubeChannels.id, channelId),
+          ownerFilter
+        )
+      );
+
+    if (!channel) {
+      throw new Error("Channel not found");
+    }
+
     console.log(
       `[sync-channel-videos] Sync already in progress for channel ${channelId}, skipping`
     );
@@ -86,10 +122,19 @@ async function runSyncChannelVideos(
     };
   }
 
-  const ownerFilter = organizationId
-    ? eq(youtubeChannels.organizationId, organizationId)
-    : eq(youtubeChannels.userId, userId);
+  try {
+    return await syncClaimedChannelVideos(channelId, userId, ownerFilter);
+  } catch (err) {
+    await markSyncFailed(channelId, userId, err, organizationId);
+    throw err;
+  }
+}
 
+async function syncClaimedChannelVideos(
+  channelId: string,
+  userId: string,
+  ownerFilter: ReturnType<typeof eq>
+) {
   const [channel] = await db
     .select()
     .from(youtubeChannels)
@@ -152,7 +197,13 @@ async function runSyncChannelVideos(
             tokenStatus: "invalid",
             syncStatus: "idle",
           })
-          .where(eq(youtubeChannels.id, channelId));
+          .where(
+            and(
+              eq(youtubeChannels.id, channelId),
+              ownerFilter,
+              eq(youtubeChannels.syncStatus, "syncing")
+            )
+          );
 
         throw new FatalError(
           `Token invalid for channel ${channel.channelId} (${channel.title || "Unknown"}). ` +
@@ -314,7 +365,13 @@ async function runSyncChannelVideos(
       lastSyncedAt: new Date(),
       syncStatus: "idle",
     })
-    .where(eq(youtubeChannels.id, channelId));
+    .where(
+      and(
+        eq(youtubeChannels.id, channelId),
+        ownerFilter,
+        eq(youtubeChannels.syncStatus, "syncing")
+      )
+    );
 
   return {
     success: true,
