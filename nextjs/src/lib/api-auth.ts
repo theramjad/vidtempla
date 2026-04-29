@@ -78,13 +78,6 @@ export async function withApiKey(
     );
   }
 
-  // Fire-and-forget: update lastUsedAt
-  db.update(apiKeys)
-    .set({ lastUsedAt: new Date() })
-    .where(eq(apiKeys.id, key.id))
-    .then(() => {})
-    .catch(() => {});
-
   // Defense in depth: after the backfill migration (0011) every key should
   // have a real organizationId. The schema still permits NULL because a key
   // can become orphaned if its membership row is deleted (e.g. user removed
@@ -101,6 +94,13 @@ export async function withApiKey(
       { status: 401 }
     );
   }
+
+  // Fire-and-forget: update lastUsedAt only after the key is accepted.
+  db.update(apiKeys)
+    .set({ lastUsedAt: new Date() })
+    .where(eq(apiKeys.id, key.id))
+    .then(() => {})
+    .catch(() => {});
 
   return {
     userId: key.userId,
