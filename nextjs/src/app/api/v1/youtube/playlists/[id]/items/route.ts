@@ -12,7 +12,7 @@ import axios from "axios";
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 
 /**
- * GET /api/v1/youtube/playlists/[id]/items?channelId=...&pageToken=...&maxResults=25
+ * GET /api/v1/youtube/playlists/[id]/items?channelId=...&cursor=...&maxResults=25
  * List items in a playlist
  * Quota cost: 1 unit
  */
@@ -26,7 +26,7 @@ export async function GET(
   const { id } = await params;
   const { searchParams } = new URL(request.url);
   const channelId = searchParams.get("channelId");
-  const pageToken = searchParams.get("pageToken");
+  const pageToken = searchParams.get("cursor") || searchParams.get("pageToken");
   const maxResults = Math.min(
     parseInt(searchParams.get("maxResults") || "25", 10),
     50

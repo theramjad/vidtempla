@@ -12,7 +12,7 @@ import axios from "axios";
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 
 /**
- * GET /api/v1/youtube/comments/[id]?channelId=...&maxResults=100&order=relevance|time&pageToken=...
+ * GET /api/v1/youtube/comments/[id]?channelId=...&maxResults=100&order=relevance|time&cursor=...
  * List comment threads for a video (id = videoId)
  * Quota cost: 1 unit
  */
@@ -26,7 +26,7 @@ export async function GET(
   const { id: videoId } = await params;
   const { searchParams } = new URL(request.url);
   const channelId = searchParams.get("channelId");
-  const pageToken = searchParams.get("pageToken");
+  const pageToken = searchParams.get("cursor") || searchParams.get("pageToken");
   const maxResults = Math.min(
     parseInt(searchParams.get("maxResults") || "20", 10),
     100
