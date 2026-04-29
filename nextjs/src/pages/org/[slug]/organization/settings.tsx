@@ -1,5 +1,5 @@
 import Head from "next/head";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { OrganizationProvider, useOrganization } from "@/contexts/OrganizationContext";
 import { authClient } from "@/lib/auth-client";
@@ -25,7 +25,8 @@ function OrgSettingsContent() {
   const { toast } = useToast();
   const router = useRouter();
   const [orgName, setOrgName] = useState(name);
-  const [isDirty, setIsDirty] = useState(false);
+  const [savedOrgName, setSavedOrgName] = useState(name);
+  const isDirtyRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [orgCount, setOrgCount] = useState<number | null>(null);
 
@@ -35,8 +36,9 @@ function OrgSettingsContent() {
   // active org switches in-place without a remount). Dirty-guarded so it
   // doesn't stomp on user typing.
   useEffect(() => {
-    if (!isDirty) setOrgName(name);
-  }, [name, isDirty]);
+    setSavedOrgName(name);
+    if (!isDirtyRef.current) setOrgName(name);
+  }, [name]);
 
   useEffect(() => {
     authClient.organization.list().then(({ data }) => {
@@ -55,8 +57,10 @@ function OrgSettingsContent() {
         data: { name: orgName },
       });
       toast({ title: "Organization updated" });
-      // Allow future prop changes to resync the input again.
-      setIsDirty(false);
+      const updatedName = data?.name ?? orgName;
+      setOrgName(updatedName);
+      setSavedOrgName(updatedName);
+      isDirtyRef.current = false;
       // If slug changed, redirect
       if (data?.slug && data.slug !== slug) {
         router.replace(`/org/${data.slug}/organization/settings`);
@@ -94,10 +98,10 @@ function OrgSettingsContent() {
           value={orgName}
           onChange={(e) => {
             setOrgName(e.target.value);
-            setIsDirty(true);
+            isDirtyRef.current = true;
           }}
         />
-        <Button onClick={handleSave} disabled={saving || orgName === name}>
+        <Button onClick={handleSave} disabled={saving || orgName === savedOrgName}>
           {saving ? "Saving..." : "Save"}
         </Button>
       </div>
