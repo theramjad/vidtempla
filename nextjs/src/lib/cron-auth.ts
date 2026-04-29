@@ -17,8 +17,12 @@ export function verifyCronAuth(request: Request): NextResponse | null {
     return new NextResponse("Cron not configured", { status: 500 });
   }
 
-  const got =
-    request.headers.get("authorization")?.replace(/^Bearer /, "") ?? "";
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+
+  const got = authHeader.slice("Bearer ".length);
   const a = Buffer.from(got);
   const b = Buffer.from(expected);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
