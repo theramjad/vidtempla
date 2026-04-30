@@ -6,7 +6,6 @@ import {
   ilike,
   isNull,
   isNotNull,
-  ne,
   lt,
   gt,
   count,
@@ -165,7 +164,12 @@ async function syncOwnedChannelVideos(
       await db
         .update(youtubeChannels)
         .set({ syncStatus: "idle" })
-        .where(eq(youtubeChannels.id, lockedChannelDbId));
+        .where(
+          and(
+            eq(youtubeChannels.id, lockedChannelDbId),
+            eq(youtubeChannels.syncStatus, LIST_VIDEOS_SYNC_STATUS)
+          )
+        );
     }
   }
 
@@ -175,16 +179,17 @@ async function syncOwnedChannelVideos(
 // Throttle inline sync inside listVideos so each REST call doesn't repaginate
 // the entire YouTube uploads playlist. The cron + manual triggers handle freshness.
 const LIST_VIDEOS_SYNC_STALE_MS = 5 * 60 * 1000;
+const LIST_VIDEOS_SYNC_STATUS = "list_syncing";
 
 async function tryAcquireListVideosSyncLock(channelDbId: string) {
   const staleBefore = new Date(Date.now() - LIST_VIDEOS_SYNC_STALE_MS);
   const [lockedChannel] = await db
     .update(youtubeChannels)
-    .set({ syncStatus: "syncing" })
+    .set({ syncStatus: LIST_VIDEOS_SYNC_STATUS })
     .where(
       and(
         eq(youtubeChannels.id, channelDbId),
-        ne(youtubeChannels.syncStatus, "syncing"),
+        eq(youtubeChannels.syncStatus, "idle"),
         or(
           isNull(youtubeChannels.lastSyncedAt),
           lt(youtubeChannels.lastSyncedAt, staleBefore)
@@ -257,9 +262,9 @@ export async function listVideos(
         const stale =
           !ownedChannel.lastSyncedAt ||
           Date.now() - ownedChannel.lastSyncedAt.getTime() > LIST_VIDEOS_SYNC_STALE_MS;
-        const notSyncing = ownedChannel.syncStatus !== "syncing";
+        const syncIdle = ownedChannel.syncStatus === "idle";
 
-        if (stale && notSyncing) {
+        if (stale && syncIdle) {
           const lockAcquired = await tryAcquireListVideosSyncLock(
             ownedChannel.id
           );
