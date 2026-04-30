@@ -57,6 +57,31 @@ const mcpHandler = withMcpAuth(auth, async (req, session) => {
 
 const HANDLER_TIMEOUT_MS = 55_000;
 
+async function strictJsonRpcResponse(response: Response): Promise<Response> {
+  if (response.status !== 401) return response;
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) return response;
+
+  const body = await response.clone().json().catch(() => null);
+  if (!body || typeof body !== "object" || !("error" in body)) return response;
+
+  const jsonRpcBody = body as {
+    error?: { ["www-authenticate"]?: unknown };
+  };
+  if (!jsonRpcBody.error?.["www-authenticate"]) return response;
+
+  delete jsonRpcBody.error["www-authenticate"];
+  const headers = new Headers(response.headers);
+  headers.set("content-type", "application/json");
+
+  return new Response(JSON.stringify(jsonRpcBody), {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 async function handler(req: Request): Promise<Response> {
   try {
     const response = await Promise.race([
@@ -71,7 +96,7 @@ async function handler(req: Request): Promise<Response> {
         { status: 500 }
       );
     }
-    return response;
+    return strictJsonRpcResponse(response);
   } catch (error) {
     console.error("[MCP] Handler error:", error);
     return Response.json(
