@@ -9,14 +9,16 @@
  *
  *   [version (1 byte)] [salt (64 bytes)] [iv (16 bytes)] [tag (16 bytes)] [ct]
  *
- * The leading byte selects which key in `KEYS` was used. `decrypt()` reads
- * that byte, looks up the key, and decrypts the rest of the buffer.
+ * The leading byte selects which raw key in `KEYS` was used. New writes use
+ * the PR #48 KDF scheme: masterKey = sha256(rawKey), then
+ * aesKey = scrypt(masterKey, salt, 32).
  *
  * Legacy ciphertexts (written before this change) have NO version prefix and
  * begin directly with the salt. To stay backwards-compatible, `decrypt()`
  * peeks at the first byte: if it matches a known version in the keyring it
  * is consumed as a version marker, otherwise the buffer is treated as a
- * legacy blob and decrypted with `ENCRYPTION_KEY_V2`.
+ * legacy blob and decrypted with `ENCRYPTION_KEY_V2`. The legacy path accepts
+ * both PR #48 unversioned KDF ciphertext and older pre-KDF ciphertext.
  *
  * Version-byte → env-var mapping:
  *   0x02 → ENCRYPTION_KEY_V2 (currently active)
@@ -32,7 +34,13 @@
  * --------------------------------------------------------------------------
  */
 
-import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+  scryptSync,
+} from "crypto";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 16;
@@ -40,6 +48,8 @@ const SALT_LENGTH = 64;
 const TAG_LENGTH = 16;
 const TAG_POSITION = SALT_LENGTH + IV_LENGTH;
 const ENCRYPTED_POSITION = TAG_POSITION + TAG_LENGTH;
+const KEY_LENGTH = 32;
+const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1 } as const;
 
 /**
  * Map of version byte → raw key string (from env). Add a new entry here when
@@ -57,24 +67,33 @@ const KEYS: Record<number, string | undefined> = {
  */
 const ACTIVE_VERSION = 0x02;
 
-function normalizeKey(rawKey: string): Buffer {
-  // Ensure key is 32 bytes for AES-256
+function deriveMasterKey(rawKey: string): Buffer {
+  return createHash("sha256").update(rawKey, "utf-8").digest();
+}
+
+function deriveAesKey(masterKey: Buffer, salt: Buffer): Buffer {
+  return scryptSync(masterKey, salt, KEY_LENGTH, SCRYPT_PARAMS);
+}
+
+function legacyNormalizeKey(rawKey: string): Buffer {
+  // Pre-KDF compatibility path: pad/truncate to 32 bytes.
   return Buffer.from(rawKey.padEnd(32, "0").substring(0, 32), "utf-8");
 }
 
-function getKeyForVersion(version: number): Buffer {
+function getRawKeyForVersion(version: number): string {
   const raw = KEYS[version];
   if (!raw) {
     throw new Error(
       `Encryption key for version 0x${version.toString(16).padStart(2, "0")} is not set`,
     );
   }
-  return normalizeKey(raw);
+  return raw;
 }
 
-function encryptWithKey(plaintext: string, key: Buffer): Buffer {
+function encryptWithRawKey(plaintext: string, rawKey: string): Buffer {
   const iv = randomBytes(IV_LENGTH);
   const salt = randomBytes(SALT_LENGTH);
+  const key = deriveAesKey(deriveMasterKey(rawKey), salt);
 
   const cipher = createCipheriv(ALGORITHM, key, iv);
   const encrypted = Buffer.concat([
@@ -87,16 +106,12 @@ function encryptWithKey(plaintext: string, key: Buffer): Buffer {
   return Buffer.concat([salt, iv, tag, encrypted]);
 }
 
-function decryptWithKey(packed: Buffer, key: Buffer): string {
-  if (packed.length < ENCRYPTED_POSITION) {
-    throw new Error("Ciphertext is too short to decrypt");
-  }
-  // salt is at [0, SALT_LENGTH) but is not used as part of key derivation here
-  // (kept in the payload for future KDF schemes / backwards compatibility).
-  const iv = packed.subarray(SALT_LENGTH, TAG_POSITION);
-  const tag = packed.subarray(TAG_POSITION, ENCRYPTED_POSITION);
-  const encrypted = packed.subarray(ENCRYPTED_POSITION);
-
+function decryptComponentsWithKey(
+  key: Buffer,
+  iv: Buffer,
+  tag: Buffer,
+  encrypted: Buffer,
+): string {
   const decipher = createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(tag);
 
@@ -106,6 +121,32 @@ function decryptWithKey(packed: Buffer, key: Buffer): string {
   ]);
 
   return decrypted.toString("utf8");
+}
+
+function decryptWithRawKey(packed: Buffer, rawKey: string): string {
+  if (packed.length < ENCRYPTED_POSITION) {
+    throw new Error("Ciphertext is too short to decrypt");
+  }
+  const salt = packed.subarray(0, SALT_LENGTH);
+  const iv = packed.subarray(SALT_LENGTH, TAG_POSITION);
+  const tag = packed.subarray(TAG_POSITION, ENCRYPTED_POSITION);
+  const encrypted = packed.subarray(ENCRYPTED_POSITION);
+
+  try {
+    const key = deriveAesKey(deriveMasterKey(rawKey), salt);
+    return decryptComponentsWithKey(key, iv, tag, encrypted);
+  } catch (newSchemeError) {
+    try {
+      return decryptComponentsWithKey(
+        legacyNormalizeKey(rawKey),
+        iv,
+        tag,
+        encrypted,
+      );
+    } catch {
+      throw newSchemeError;
+    }
+  }
 }
 
 function getKnownVersionPrefix(buf: Buffer): number | undefined {
@@ -132,8 +173,8 @@ function getKnownVersionPrefix(buf: Buffer): number | undefined {
  * @returns Base64 encoded `version | salt | iv | tag | encrypted`
  */
 export function encrypt(text: string, rawKey?: string): string {
-  const key = rawKey ? normalizeKey(rawKey) : getKeyForVersion(ACTIVE_VERSION);
-  const packed = encryptWithKey(text, key);
+  const key = rawKey ?? getRawKeyForVersion(ACTIVE_VERSION);
+  const packed = encryptWithRawKey(text, key);
   const versioned = Buffer.concat([Buffer.from([ACTIVE_VERSION]), packed]);
   return versioned.toString("base64");
 }
@@ -161,16 +202,20 @@ export function decrypt(encryptedText: string, rawKey?: string): string {
   }
 
   if (rawKey) {
-    const key = normalizeKey(rawKey);
     if (getKnownVersionPrefix(buf) !== undefined) {
       try {
-        return decryptWithKey(buf.subarray(1), key);
-      } catch {
+        return decryptWithRawKey(buf.subarray(1), rawKey);
+      } catch (versionedError) {
         // Legacy raw-key ciphertexts can start with a byte that looks like a
         // version marker because that byte used to be random salt.
+        try {
+          return decryptWithRawKey(buf, rawKey);
+        } catch {
+          throw versionedError;
+        }
       }
     }
-    return decryptWithKey(buf, key);
+    return decryptWithRawKey(buf, rawKey);
   }
 
   // If the first byte is a known version marker, peel it off and route.
@@ -182,10 +227,20 @@ export function decrypt(encryptedText: string, rawKey?: string): string {
   const possibleVersion = getKnownVersionPrefix(buf);
   if (possibleVersion !== undefined && KEYS[possibleVersion]) {
     try {
-      const key = getKeyForVersion(possibleVersion);
-      return decryptWithKey(buf.subarray(1), key);
-    } catch {
-      // Fall through to the legacy path below.
+      const key = getRawKeyForVersion(possibleVersion);
+      return decryptWithRawKey(buf.subarray(1), key);
+    } catch (versionedError) {
+      // Fall through to the legacy path below. If the legacy path also fails,
+      // surface the versioned failure because tagged blobs should be read that way.
+      const legacyKey = KEYS[0x02];
+      if (!legacyKey) {
+        throw versionedError;
+      }
+      try {
+        return decryptWithRawKey(buf, legacyKey);
+      } catch {
+        throw versionedError;
+      }
     }
   }
 
@@ -196,5 +251,5 @@ export function decrypt(encryptedText: string, rawKey?: string): string {
       "Cannot decrypt legacy ciphertext: ENCRYPTION_KEY_V2 is not set",
     );
   }
-  return decryptWithKey(buf, normalizeKey(legacyKey));
+  return decryptWithRawKey(buf, legacyKey);
 }
