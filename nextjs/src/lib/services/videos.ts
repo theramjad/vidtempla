@@ -630,6 +630,7 @@ export async function assignVideo(
 
     const ASSIGN_CONFLICT = Symbol("assign_conflict");
     const LIMIT_REACHED = Symbol("limit_reached");
+    const VIDEO_MISSING = Symbol("video_missing");
     try {
       await db.transaction(async (tx) => {
         // Serialize owner-level assignments so post-update limit checks cannot
@@ -641,6 +642,18 @@ export async function assignVideo(
         await tx.execute(
           sql`select 1 from youtube_videos where id = ${video.id} for update`,
         );
+        const [lockedVideo] = await tx
+          .select({ containerId: youtubeVideos.containerId })
+          .from(youtubeVideos)
+          .where(eq(youtubeVideos.id, video.id));
+
+        if (!lockedVideo) {
+          throw VIDEO_MISSING;
+        }
+
+        if (lockedVideo.containerId) {
+          throw ASSIGN_CONFLICT;
+        }
 
         // CAS update: only assign if container_id is still NULL. If a concurrent
         // assign already won, this returns 0 rows and we abort the transaction
@@ -694,6 +707,9 @@ export async function assignVideo(
         }
       });
     } catch (txErr) {
+      if (txErr === VIDEO_MISSING) {
+        return { error: videoNotFoundError("not_found") };
+      }
       if (txErr === ASSIGN_CONFLICT) {
         return {
           error: {
