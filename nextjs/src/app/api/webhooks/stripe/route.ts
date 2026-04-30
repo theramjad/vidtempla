@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "@/lib/stripe-server";
 import { db } from "@/db";
-import { webhookEvents, subscriptions } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { webhookEvents, subscriptions, member, userCredits } from "@/db/schema";
+import { and, eq, sql } from "drizzle-orm";
 import type { PlanTier, SubscriptionStatus } from "@/lib/stripe";
 import { mapPriceIdToPlanTier, PLAN_CONFIG } from "@/lib/stripe";
-import { upsertCredits } from "@/lib/plan-limits";
 import Stripe from "stripe";
 
 /**
@@ -20,6 +19,8 @@ interface StripeSubscriptionWithPeriods extends Stripe.Subscription {
 interface StripeInvoiceWithSubscription extends Stripe.Invoice {
   subscription: string | Stripe.Subscription | null;
 }
+
+type WebhookDatabase = Pick<typeof db, "insert" | "select" | "update">;
 
 /**
  * Stripe webhook handler
@@ -69,82 +70,67 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      try {
-        // Idempotency guard: processed Stripe events must be acknowledged without
-        // replaying side effects when Stripe retries or manually replays an event.
-        const [existing] = await db
-          .select({ processed: webhookEvents.processed })
-          .from(webhookEvents)
-          .where(eq(webhookEvents.eventId, event.id))
-          .limit(1);
+      // Idempotency guard: processed Stripe events must be acknowledged without
+      // replaying side effects when Stripe retries or manually replays an event.
+      const [existing] = await tx
+        .select({ processed: webhookEvents.processed })
+        .from(webhookEvents)
+        .where(eq(webhookEvents.eventId, event.id))
+        .limit(1);
 
-        if (existing?.processed) {
-          console.log(`Skipping already-processed webhook event: ${event.id}`);
-          return NextResponse.json({ received: true, duplicate: true });
-        }
-
-        // Store webhook event for audit trail and idempotency. Preserve an existing
-        // row so duplicates cannot reset `processed` back to false.
-        await db.insert(webhookEvents).values({
-          eventId: event.id,
-          eventType: event.type,
-          payload: event.data.object as never,
-          processed: false,
-        }).onConflictDoNothing({
-          target: webhookEvents.eventId,
-        });
-
-        // Handle the event
-        switch (event.type) {
-          case "checkout.session.completed":
-            await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
-            break;
-
-          case "customer.subscription.created":
-          case "customer.subscription.updated":
-            await handleSubscriptionUpdate(event.data.object as StripeSubscriptionWithPeriods);
-            break;
-
-          case "customer.subscription.deleted":
-            await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
-            break;
-
-          case "invoice.paid":
-            console.log(`Invoice paid: ${(event.data.object as StripeInvoiceWithSubscription).id}`);
-            break;
-
-          case "invoice.payment_failed":
-            await handleInvoicePaymentFailed(event.data.object as StripeInvoiceWithSubscription);
-            break;
-
-          default:
-            console.log(`Unhandled event type: ${event.type}`);
-        }
-
-        // Mark event as processed
-        await db.update(webhookEvents)
-          .set({ processed: true, processedAt: new Date(), errorMessage: null })
-          .where(eq(webhookEvents.eventId, event.id));
-
-        return NextResponse.json({ received: true });
-      } catch (error) {
-        console.error("Error processing webhook:", error);
-
-        // Log error in webhook_events table before releasing the event lock.
-        await db.update(webhookEvents)
-          .set({
-            processed: false,
-            errorMessage: error instanceof Error ? error.message : "Unknown error",
-          })
-          .where(eq(webhookEvents.eventId, event.id));
-
-        // Return 500 so Stripe retries with exponential backoff. The webhook_events
-        // idempotency guard prevents double-processing on retry.
-        return NextResponse.json({ error: "Internal error" }, { status: 500 });
+      if (existing?.processed) {
+        console.log(`Skipping already-processed webhook event: ${event.id}`);
+        return NextResponse.json({ received: true, duplicate: true });
       }
+
+      // Store webhook event for audit trail and idempotency. Preserve an existing
+      // row so duplicates cannot reset `processed` back to false.
+      await tx.insert(webhookEvents).values({
+        eventId: event.id,
+        eventType: event.type,
+        payload: event.data.object as never,
+        processed: false,
+      }).onConflictDoNothing({
+        target: webhookEvents.eventId,
+      });
+
+      // Handle the event
+      switch (event.type) {
+        case "checkout.session.completed":
+          await handleCheckoutCompleted(tx, event.data.object as Stripe.Checkout.Session);
+          break;
+
+        case "customer.subscription.created":
+        case "customer.subscription.updated":
+          await handleSubscriptionUpdate(tx, event.data.object as StripeSubscriptionWithPeriods);
+          break;
+
+        case "customer.subscription.deleted":
+          await handleSubscriptionDeleted(tx, event.data.object as Stripe.Subscription);
+          break;
+
+        case "invoice.paid":
+          console.log(`Invoice paid: ${(event.data.object as StripeInvoiceWithSubscription).id}`);
+          break;
+
+        case "invoice.payment_failed":
+          await handleInvoicePaymentFailed(tx, event.data.object as StripeInvoiceWithSubscription);
+          break;
+
+        default:
+          console.log(`Unhandled event type: ${event.type}`);
+      }
+
+      // Mark event as processed
+      await tx.update(webhookEvents)
+        .set({ processed: true, processedAt: new Date(), errorMessage: null })
+        .where(eq(webhookEvents.eventId, event.id));
+
+      return NextResponse.json({ received: true });
     });
   } catch (error) {
     console.error("Error processing webhook:", error);
+    await recordWebhookProcessingError(event, error);
 
     // Return 500 so Stripe retries with exponential backoff. The webhook_events
     // idempotency guard prevents double-processing on retry.
@@ -155,7 +141,7 @@ export async function POST(request: NextRequest) {
 /**
  * Handle checkout.session.completed event
  */
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+async function handleCheckoutCompleted(database: WebhookDatabase, session: Stripe.Checkout.Session) {
   console.log(`Processing checkout.session.completed: ${session.id}`);
 
   const customerId = session.customer as string;
@@ -172,7 +158,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const whereClause = organizationId
     ? eq(subscriptions.organizationId, organizationId)
     : eq(subscriptions.userId, userId!);
-  await db.update(subscriptions)
+  await database.update(subscriptions)
     .set({
       stripeCustomerId: customerId,
       stripeCheckoutSessionId: session.id,
@@ -184,14 +170,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // Fetch and process the subscription details
   if (subscriptionId) {
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    await handleSubscriptionUpdate(subscription as unknown as StripeSubscriptionWithPeriods);
+    await handleSubscriptionUpdate(database, subscription as unknown as StripeSubscriptionWithPeriods);
   }
 }
 
 /**
  * Handle subscription created/updated events
  */
-async function handleSubscriptionUpdate(subscription: StripeSubscriptionWithPeriods) {
+async function handleSubscriptionUpdate(database: WebhookDatabase, subscription: StripeSubscriptionWithPeriods) {
   console.log(`Processing subscription update: ${subscription.id}`);
 
   const customerId = subscription.customer as string;
@@ -207,7 +193,7 @@ async function handleSubscriptionUpdate(subscription: StripeSubscriptionWithPeri
   const status = mapSubscriptionStatus(subscription.status);
 
   // Find subscription by stripe_customer_id
-  const [existingSubscription] = await db.select({
+  const [existingSubscription] = await database.select({
     id: subscriptions.id,
     userId: subscriptions.userId,
     organizationId: subscriptions.organizationId,
@@ -242,7 +228,7 @@ async function handleSubscriptionUpdate(subscription: StripeSubscriptionWithPeri
   }
 
   // Update subscription
-  await db.update(subscriptions)
+  await database.update(subscriptions)
     .set(updateData)
     .where(eq(subscriptions.id, existingSubscription.id));
 
@@ -251,7 +237,7 @@ async function handleSubscriptionUpdate(subscription: StripeSubscriptionWithPeri
   const periodStart = updateData.currentPeriodStart ?? new Date();
   const periodEnd = updateData.currentPeriodEnd ?? new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
 
-  await upsertCredits(existingSubscription.organizationId ?? existingSubscription.userId, allocation, periodStart, periodEnd);
+  await upsertCreditsForWebhook(database, existingSubscription.organizationId ?? existingSubscription.userId, allocation, periodStart, periodEnd);
 
   console.log(`Updated subscription ${existingSubscription.id} to ${planTier} (${status})`);
 }
@@ -259,14 +245,14 @@ async function handleSubscriptionUpdate(subscription: StripeSubscriptionWithPeri
 /**
  * Handle subscription deleted event
  */
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+async function handleSubscriptionDeleted(database: WebhookDatabase, subscription: Stripe.Subscription) {
   console.log(`Processing subscription.deleted: ${subscription.id}`);
 
-  const [sub] = await db.select({ userId: subscriptions.userId, organizationId: subscriptions.organizationId })
+  const [sub] = await database.select({ userId: subscriptions.userId, organizationId: subscriptions.organizationId })
     .from(subscriptions)
     .where(eq(subscriptions.stripeSubscriptionId, subscription.id));
 
-  await db.update(subscriptions)
+  await database.update(subscriptions)
     .set({
       status: "canceled",
       planTier: "free", // Revert to free plan
@@ -278,7 +264,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     const freeAllocation = PLAN_CONFIG.free.monthlyCredits;
     const now = new Date();
     const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    await upsertCredits(sub.organizationId ?? sub.userId, freeAllocation, now, periodEnd);
+    await upsertCreditsForWebhook(database, sub.organizationId ?? sub.userId, freeAllocation, now, periodEnd);
   }
 
   console.log(`Subscription ${subscription.id} deleted and reverted to free`);
@@ -288,18 +274,90 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 /**
  * Handle invoice.payment_failed event
  */
-async function handleInvoicePaymentFailed(invoice: StripeInvoiceWithSubscription) {
+async function handleInvoicePaymentFailed(database: WebhookDatabase, invoice: StripeInvoiceWithSubscription) {
   console.log(`Processing invoice.payment_failed: ${invoice.id}`);
 
   const subscriptionId = invoice.subscription as string;
 
   if (subscriptionId) {
     // Update subscription status to past_due
-    await db.update(subscriptions)
+    await database.update(subscriptions)
       .set({ status: "past_due" })
       .where(eq(subscriptions.stripeSubscriptionId, subscriptionId));
 
     console.log(`Subscription ${subscriptionId} marked as past_due`);
+  }
+}
+
+async function upsertCreditsForWebhook(
+  database: WebhookDatabase,
+  organizationId: string,
+  allocation: number,
+  periodStart: Date,
+  periodEnd: Date,
+  userId?: string
+) {
+  let resolvedUserId = userId;
+  if (!resolvedUserId) {
+    const [owner] = await database
+      .select({ userId: member.userId })
+      .from(member)
+      .where(and(eq(member.organizationId, organizationId), eq(member.role, "owner")))
+      .limit(1);
+    resolvedUserId = owner?.userId ?? undefined;
+
+    if (!resolvedUserId) {
+      const [anyMember] = await database
+        .select({ userId: member.userId })
+        .from(member)
+        .where(eq(member.organizationId, organizationId))
+        .limit(1);
+      resolvedUserId = anyMember?.userId;
+    }
+
+    if (!resolvedUserId) {
+      console.error(`upsertCreditsForWebhook: no members found for org ${organizationId}`);
+      return;
+    }
+  }
+
+  await database.insert(userCredits).values({
+    organizationId,
+    userId: resolvedUserId,
+    balance: allocation,
+    monthlyAllocation: allocation,
+    periodStart,
+    periodEnd,
+  }).onConflictDoUpdate({
+    target: userCredits.organizationId,
+    set: {
+      balance: allocation,
+      monthlyAllocation: allocation,
+      periodStart,
+      periodEnd,
+      updatedAt: new Date(),
+    },
+  });
+}
+
+async function recordWebhookProcessingError(event: Stripe.Event, error: unknown) {
+  try {
+    await db.insert(webhookEvents).values({
+      eventId: event.id,
+      eventType: event.type,
+      payload: event.data.object as never,
+      processed: false,
+      errorMessage: error instanceof Error ? error.message : "Unknown error",
+    }).onConflictDoUpdate({
+      target: webhookEvents.eventId,
+      set: {
+        eventType: event.type,
+        payload: event.data.object as never,
+        errorMessage: error instanceof Error ? error.message : "Unknown error",
+      },
+    });
+  } catch (logError) {
+    console.error("Failed to record webhook processing error:", logError);
   }
 }
 
