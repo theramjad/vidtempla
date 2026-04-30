@@ -78,7 +78,7 @@ export async function withApiKey(
     );
   }
 
-  // Defense in depth: after the backfill migration (0012) every key should
+  // Defense in depth: after the backfill migration (0013) every key should
   // have a real organizationId. Reject rather than fall back to userId — a
   // userId UUID would never match a real organization id and would silently
   // 404 every request.

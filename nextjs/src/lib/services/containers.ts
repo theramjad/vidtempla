@@ -5,15 +5,36 @@ import type { ServiceResult, PaginationOpts, PaginationMeta } from "./types";
 import { assertNoDrift } from "./drift";
 import { pushVideoDescriptions } from "./videos";
 
+async function templatesBelongToOrganization(templateIds: string[], organizationId: string) {
+  const uniqueTemplateIds = [...new Set(templateIds)];
+  if (uniqueTemplateIds.length === 0) return true;
+
+  const rows = await db
+    .select({ id: templates.id })
+    .from(templates)
+    .where(and(inArray(templates.id, uniqueTemplateIds), eq(templates.organizationId, organizationId)));
+
+  return rows.length === uniqueTemplateIds.length;
+}
+
+function invalidTemplateIdsError() {
+  return {
+    code: "INVALID_TEMPLATE_IDS",
+    message: "templateIds must reference templates in this organization",
+    suggestion: "Use template IDs returned by list_templates for this organization",
+    status: 400,
+  } as const;
+}
+
 // ── list_containers ──────────────────────────────────────────
 
 export async function listContainers(
-  userId: string,
+  organizationId: string,
   opts: PaginationOpts
 ): Promise<ServiceResult<{ data: unknown[]; meta: PaginationMeta }>> {
   try {
     const limit = Math.min(opts.limit ?? 50, 100);
-    const filters: ReturnType<typeof eq>[] = [eq(containers.userId, userId)];
+    const filters: ReturnType<typeof eq>[] = [eq(containers.organizationId, organizationId)];
     if (opts.cursor) filters.push(lt(containers.createdAt, new Date(opts.cursor)));
 
     const results = await db
@@ -36,7 +57,7 @@ export async function listContainers(
     const [totalResult] = await db
       .select({ total: count() })
       .from(containers)
-      .where(eq(containers.userId, userId));
+      .where(eq(containers.organizationId, organizationId));
 
     return {
       data: {
@@ -53,7 +74,7 @@ export async function listContainers(
 
 export async function getContainer(
   id: string,
-  userId: string
+  organizationId: string
 ): Promise<ServiceResult<unknown>> {
   try {
     const [container] = await db
@@ -63,7 +84,7 @@ export async function getContainer(
       })
       .from(containers)
       .leftJoin(youtubeVideos, eq(youtubeVideos.containerId, containers.id))
-      .where(and(eq(containers.id, id), eq(containers.userId, userId)))
+      .where(and(eq(containers.id, id), eq(containers.organizationId, organizationId)))
       .groupBy(containers.id);
 
     if (!container) {
@@ -75,7 +96,7 @@ export async function getContainer(
       templateDetails = await db
         .select({ id: templates.id, name: templates.name, content: templates.content })
         .from(templates)
-        .where(inArray(templates.id, container.templateOrder));
+        .where(and(inArray(templates.id, container.templateOrder), eq(templates.organizationId, organizationId)));
 
       templateDetails.sort(
         (a, b) => container.templateOrder!.indexOf(a.id) - container.templateOrder!.indexOf(b.id)
@@ -92,6 +113,7 @@ export async function getContainer(
 
 export async function createContainer(
   userId: string,
+  organizationId: string,
   name: string,
   templateIds: string[],
   separator?: string
@@ -101,10 +123,15 @@ export async function createContainer(
       return { error: { code: "INVALID_NAME", message: "name is required", suggestion: "Provide a non-empty name", status: 400 } };
     }
 
+    if (!(await templatesBelongToOrganization(templateIds, organizationId))) {
+      return { error: invalidTemplateIdsError() };
+    }
+
     const [container] = await db
       .insert(containers)
       .values({
         userId,
+        organizationId,
         name: name.trim(),
         templateOrder: templateIds,
         separator: separator ?? "\n\n",
@@ -122,12 +149,19 @@ export async function createContainer(
 export async function updateContainer(
   id: string,
   userId: string,
+  organizationId: string,
   data: { name?: string; templateIds?: string[]; separator?: string; force?: boolean }
 ): Promise<ServiceResult<unknown>> {
   try {
     const updateData: { name?: string; templateOrder?: string[]; separator?: string } = {};
     if (data.name !== undefined) updateData.name = data.name;
-    if (data.templateIds !== undefined) updateData.templateOrder = data.templateIds;
+    if (data.templateIds !== undefined) {
+      if (!(await templatesBelongToOrganization(data.templateIds, organizationId))) {
+        return { error: invalidTemplateIdsError() };
+      }
+
+      updateData.templateOrder = data.templateIds;
+    }
     if (data.separator !== undefined) updateData.separator = data.separator;
 
     if (Object.keys(updateData).length === 0) {
@@ -139,7 +173,8 @@ export async function updateContainer(
       const videos = await db
         .select({ id: youtubeVideos.id })
         .from(youtubeVideos)
-        .where(eq(youtubeVideos.containerId, id));
+        .innerJoin(containers, eq(youtubeVideos.containerId, containers.id))
+        .where(and(eq(youtubeVideos.containerId, id), eq(containers.organizationId, organizationId)));
       videoIdsToPush = videos.map((v) => v.id);
 
       if (videoIdsToPush.length > 0) {
@@ -166,7 +201,7 @@ export async function updateContainer(
     const [container] = await db
       .update(containers)
       .set(updateData)
-      .where(and(eq(containers.id, id), eq(containers.userId, userId)))
+      .where(and(eq(containers.id, id), eq(containers.organizationId, organizationId)))
       .returning();
 
     if (!container) {
@@ -187,12 +222,12 @@ export async function updateContainer(
 
 export async function deleteContainer(
   id: string,
-  userId: string
+  organizationId: string
 ): Promise<ServiceResult<{ success: true }>> {
   try {
     const result = await db
       .delete(containers)
-      .where(and(eq(containers.id, id), eq(containers.userId, userId)))
+      .where(and(eq(containers.id, id), eq(containers.organizationId, organizationId)))
       .returning({ id: containers.id });
 
     if (result.length === 0) {

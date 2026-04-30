@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const url = new URL(request.url);
-  const result = await listContainers(auth.userId, {
+  const result = await listContainers(auth.organizationId, {
     cursor: url.searchParams.get("cursor") ?? undefined,
     limit: url.searchParams.has("limit") ? parseInt(url.searchParams.get("limit")!) : undefined,
   });
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const result = await createContainer(auth.userId, name, templateIds, separator);
+  const result = await createContainer(auth.userId, auth.organizationId, name, templateIds, separator);
 
   if ("error" in result) {
     logRequest(auth, "/v1/containers", "POST", result.error.status, 0);
