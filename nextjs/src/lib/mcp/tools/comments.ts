@@ -41,7 +41,7 @@ export function registerCommentTools(server: McpServer) {
       const orgId = getSessionOrgId();
       const credits = await consumeCredits(orgId, 50);
       if (!credits.success) return mcpQuotaExceeded(userId, "reply_to_comment");
-      const result = await replyToComment(channelId, parentId, text, userId);
+      const result = await replyToComment(channelId, parentId, text, userId, orgId);
       logMcpRequest(userId, "reply_to_comment", 50, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -60,7 +60,7 @@ export function registerCommentTools(server: McpServer) {
       const orgId = getSessionOrgId();
       const credits = await consumeCredits(orgId, 50);
       if (!credits.success) return mcpQuotaExceeded(userId, "delete_comment");
-      const result = await deleteComment(channelId, commentId, userId);
+      const result = await deleteComment(channelId, commentId, userId, orgId);
       logMcpRequest(userId, "delete_comment", 50, "error" in result ? 400 : 200);
       return toMcp(result);
     }
