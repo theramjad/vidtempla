@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     await logRequest(ctx, "/youtube/playlists", "GET", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     await logRequest(ctx, "/youtube/playlists", "POST", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });

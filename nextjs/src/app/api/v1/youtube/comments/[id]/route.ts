@@ -60,7 +60,7 @@ export async function GET(
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -124,7 +124,7 @@ export async function DELETE(
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     await logRequest(ctx, `/youtube/comments/${commentId}`, "DELETE", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });

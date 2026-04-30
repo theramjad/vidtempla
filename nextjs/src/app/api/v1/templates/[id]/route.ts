@@ -10,7 +10,7 @@ export async function GET(
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await params;
-  const result = await getTemplate(id, auth.userId);
+  const result = await getTemplate(id, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, `/v1/templates/${id}`, "GET", result.error.status, 0);
@@ -33,7 +33,7 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
-  const result = await updateTemplate(id, auth.userId, {
+  const result = await updateTemplate(id, auth.userId, auth.organizationId, {
     name: body.name,
     content: body.content,
     force: body.force,
@@ -58,7 +58,7 @@ export async function DELETE(
   if (writeCheck) return writeCheck;
 
   const { id } = await params;
-  const result = await deleteTemplate(id, auth.userId);
+  const result = await deleteTemplate(id, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, `/v1/templates/${id}`, "DELETE", result.error.status, 0);

@@ -25,7 +25,7 @@ export async function GET(
     q,
     sort: url.searchParams.get("sort") ?? undefined,
     maxResults: url.searchParams.has("maxResults") ? parseInt(url.searchParams.get("maxResults")!) : undefined,
-  });
+  }, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, `/v1/channels/${channelId}/search`, "GET", result.error.status, 100);

@@ -46,7 +46,7 @@ export async function GET(
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     await logRequest(ctx, `/youtube/captions/${videoId}`, "GET", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -101,7 +101,7 @@ export async function POST(
     return NextResponse.json(apiError("VALIDATION_ERROR", "channelId, language, name, and captionData are required", "Provide all required fields in the request body", 400), { status: 400 });
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     logRequest(ctx, endpoint, "POST", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -149,7 +149,7 @@ export async function PUT(
     return NextResponse.json(apiError("VALIDATION_ERROR", "channelId and captionId are required", "Provide channelId and captionId in the request body", 400), { status: 400 });
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     logRequest(ctx, endpoint, "PUT", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -191,7 +191,7 @@ export async function DELETE(
     return NextResponse.json(apiError("VALIDATION_ERROR", "channelId and captionId query parameters are required", "Provide ?channelId=...&captionId=...", 400), { status: 400 });
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     logRequest(ctx, endpoint, "DELETE", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
