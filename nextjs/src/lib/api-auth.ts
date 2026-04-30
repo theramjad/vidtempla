@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { apiKeys, apiRequestLog, youtubeChannels, youtubeVideos } from "@/db/schema";
+import { apiKeys, apiRequestLog, member, youtubeChannels, youtubeVideos } from "@/db/schema";
 import { hashApiKey } from "@/lib/api-keys";
 import { decrypt } from "@/utils/encryption";
 import { refreshAccessToken } from "@/lib/clients/youtube";
@@ -78,7 +78,46 @@ export async function withApiKey(
     );
   }
 
-  // Fire-and-forget: update lastUsedAt
+  // Defense in depth: after the backfill migration (0013) every key should
+  // have a real organizationId. Reject rather than fall back to userId - a
+  // userId UUID would never match a real organization id and would silently
+  // 404 every request.
+  if (!key.organizationId) {
+    return NextResponse.json(
+      apiError(
+        "API_KEY_REISSUE_REQUIRED",
+        "API key is not organization-scoped.",
+        "Recreate this API key from your dashboard.",
+        401
+      ),
+      { status: 401 }
+    );
+  }
+
+  const [membership] = await db
+    .select({ id: member.id })
+    .from(member)
+    .where(
+      and(
+        eq(member.userId, key.userId),
+        eq(member.organizationId, key.organizationId)
+      )
+    )
+    .limit(1);
+
+  if (!membership) {
+    return NextResponse.json(
+      apiError(
+        "API_KEY_REISSUE_REQUIRED",
+        "API key is orphaned from its organization.",
+        "Ask an organization admin to reissue this API key.",
+        401
+      ),
+      { status: 401 }
+    );
+  }
+
+  // Fire-and-forget: update lastUsedAt only after the key is accepted.
   db.update(apiKeys)
     .set({ lastUsedAt: new Date() })
     .where(eq(apiKeys.id, key.id))
@@ -87,7 +126,12 @@ export async function withApiKey(
       console.error("Failed to update API key lastUsedAt:", err);
     });
 
-  return { userId: key.userId, organizationId: key.organizationId ?? key.userId, apiKeyId: key.id, permission: key.permission as "read" | "read-write" };
+  return {
+    userId: key.userId,
+    organizationId: key.organizationId,
+    apiKeyId: key.id,
+    permission: key.permission as "read" | "read-write",
+  };
 }
 
 /**
@@ -333,9 +377,9 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 /**
  * Resolves a video by either VidTempla UUID or YouTube video ID.
  * Returns a discriminated result:
- * - `{ found: true, video }` — owned by the caller
- * - `{ found: false, reason: "not_owned" }` — exists but on an unconnected channel
- * - `{ found: false, reason: "not_found" }` — doesn't exist in the DB at all
+ * - `{ found: true, video }` - owned by the caller
+ * - `{ found: false, reason: "not_owned" }` - exists but on an unconnected channel
+ * - `{ found: false, reason: "not_found" }` - doesn't exist in the DB at all
  */
 export type ResolveVideoResult =
   | { found: true; video: { id: string; videoId: string; channelId: string; containerId: string | null; channelYoutubeId: string } }
@@ -394,7 +438,7 @@ export function videoNotFoundError(reason: "not_owned" | "not_found") {
   return {
     code: "VIDEO_NOT_FOUND" as const,
     message: "Video not found",
-    suggestion: "Check the video ID is correct, or the video may not have been synced yet — try syncing the channel first.",
+    suggestion: "Check the video ID is correct, or the video may not have been synced yet - try syncing the channel first.",
     status: 404,
   };
 }
