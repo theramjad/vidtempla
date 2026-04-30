@@ -215,6 +215,10 @@ export const youtubeVideos = pgTable("youtube_videos", {
     withTimezone: true,
   }),
   renderVersion: integer("render_version").notNull().default(0),
+  descriptionPushReservedUntil: timestamp("description_push_reserved_until", {
+    mode: "date",
+    withTimezone: true,
+  }),
   publishedAt: timestamp("published_at", {
     mode: "date",
     withTimezone: true,

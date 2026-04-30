@@ -6,6 +6,8 @@ import {
   updateVideoDescription,
 } from "@/lib/clients/youtube";
 
+const DESCRIPTION_PUSH_RESERVATION_MS = 2 * 60 * 1000;
+
 export interface PushPayload {
   videoId: string;
   videoIdYouTube: string;
@@ -38,6 +40,9 @@ async function runUpdateVideoDescription(payload: PushPayload) {
 
   const canonical = newDescription.replace(/\s+$/, "");
   const accessToken = await getChannelAccessToken(channelId);
+  const reservationExpiresAt = new Date(
+    Date.now() + DESCRIPTION_PUSH_RESERVATION_MS
+  );
 
   // Phase 1: validate state in a short read-only txn (no FOR UPDATE — we use CAS
   // on render_version in phase 3 to detect concurrent modifications).
@@ -81,6 +86,7 @@ async function runUpdateVideoDescription(payload: PushPayload) {
     .update(youtubeVideos)
     .set({
       renderVersion: sql`${youtubeVideos.renderVersion} + 1`,
+      descriptionPushReservedUntil: reservationExpiresAt,
       updatedAt: new Date(),
     })
     .where(
@@ -111,6 +117,7 @@ async function runUpdateVideoDescription(payload: PushPayload) {
       .update(youtubeVideos)
       .set({
         renderVersion,
+        descriptionPushReservedUntil: null,
         updatedAt: new Date(),
       })
       .where(
@@ -131,7 +138,11 @@ async function runUpdateVideoDescription(payload: PushPayload) {
 
     const updated = await tx
       .update(youtubeVideos)
-      .set({ currentDescription: canonical, driftDetectedAt: null })
+      .set({
+        currentDescription: canonical,
+        driftDetectedAt: null,
+        descriptionPushReservedUntil: null,
+      })
       .where(
         and(
           eq(youtubeVideos.id, videoId),

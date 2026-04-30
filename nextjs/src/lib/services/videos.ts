@@ -45,6 +45,8 @@ import { updateVideoDescriptionsWorkflow, type PushPayload } from "@/workflows/u
 import type { ServiceResult, PaginationMeta } from "./types";
 import { assertNoDrift, detectAndRecordDrift } from "./drift";
 
+const DESCRIPTION_PUSH_RESERVATION_MS = 2 * 60 * 1000;
+
 export interface ListVideosOpts {
   channelId?: string;
   containerId?: string;
@@ -1059,6 +1061,9 @@ export async function revertDescription(
 
     const accessToken = await getChannelAccessToken(currentVideo.channelId);
     const expectedRenderVersion = currentVideo.renderVersion;
+    const reservationExpiresAt = new Date(
+      Date.now() + DESCRIPTION_PUSH_RESERVATION_MS
+    );
 
     // Phase 1 (read above): captured currentVideo + expectedRenderVersion.
     // Phase 2a: reserve the row with a short CAS before the external PUT. If the
@@ -1067,6 +1072,7 @@ export async function revertDescription(
       .update(youtubeVideos)
       .set({
         renderVersion: sql`${youtubeVideos.renderVersion} + 1`,
+        descriptionPushReservedUntil: reservationExpiresAt,
         updatedAt: new Date(),
       })
       .where(
@@ -1109,6 +1115,7 @@ export async function revertDescription(
         .update(youtubeVideos)
         .set({
           renderVersion: expectedRenderVersion,
+          descriptionPushReservedUntil: null,
           updatedAt: new Date(),
         })
         .where(
@@ -1142,6 +1149,7 @@ export async function revertDescription(
         .set({
           currentDescription: history.description,
           driftDetectedAt: null,
+          descriptionPushReservedUntil: null,
           ...(hadContainer ? { containerId: null } : {}),
         })
         .where(

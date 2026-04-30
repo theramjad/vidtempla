@@ -207,6 +207,7 @@ async function runSyncChannelVideos(
       videoId: youtubeVideos.videoId,
       renderVersion: youtubeVideos.renderVersion,
       updatedAt: youtubeVideos.updatedAt,
+      descriptionPushReservedUntil: youtubeVideos.descriptionPushReservedUntil,
     })
     .from(youtubeVideos)
     .where(eq(youtubeVideos.channelId, channelId));
@@ -279,7 +280,8 @@ async function runSyncChannelVideos(
             eq(youtubeVideos.videoId, video.videoId),
             eq(youtubeVideos.channelId, channelId),
             eq(youtubeVideos.renderVersion, video.renderVersion),
-            sql`${youtubeVideos.updatedAt} < ${deleteUpdatedBefore}`
+            sql`${youtubeVideos.updatedAt} < ${deleteUpdatedBefore}`,
+            sql`(${youtubeVideos.descriptionPushReservedUntil} is null or ${youtubeVideos.descriptionPushReservedUntil} <= now())`
           )
         )
         .returning({ id: youtubeVideos.id });
@@ -290,6 +292,7 @@ async function runSyncChannelVideos(
           videoId: video.videoId,
           renderVersion: video.renderVersion,
           updatedAt: video.updatedAt,
+          descriptionPushReservedUntil: video.descriptionPushReservedUntil,
         });
       }
     }
