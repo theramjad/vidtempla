@@ -5,6 +5,36 @@ import { useToast } from "@/hooks/use-toast";
 import Head from "next/head";
 
 const SIGN_IN_REDIRECT_DELAY_MS = 500;
+const FALLBACK_AUTH_ERROR_DESCRIPTION = "Authentication failed. Please try again.";
+
+function firstQueryValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function getSafeReturnTo(value: string | string[] | undefined) {
+  const rawReturnTo = firstQueryValue(value);
+  if (!rawReturnTo || !rawReturnTo.startsWith("/")) return null;
+
+  let decodedReturnTo: string;
+  try {
+    decodedReturnTo = decodeURIComponent(rawReturnTo);
+  } catch {
+    return null;
+  }
+
+  if (
+    !decodedReturnTo.startsWith("/") ||
+    decodedReturnTo.startsWith("//") ||
+    decodedReturnTo.includes("\\")
+  ) {
+    return null;
+  }
+
+  const parsedReturnTo = new URL(decodedReturnTo, "https://vidtempla.local");
+  if (parsedReturnTo.origin !== "https://vidtempla.local") return null;
+
+  return `${parsedReturnTo.pathname}${parsedReturnTo.search}${parsedReturnTo.hash}`;
+}
 
 export default function AuthCallback() {
   const router = useRouter();
@@ -21,21 +51,24 @@ export default function AuthCallback() {
     if (!router.isReady || redirectedRef.current) return;
 
     // Check for error parameters in URL
-    const { error, error_description, error_code } = router.query;
+    const error = firstQueryValue(router.query.error);
+    const errorDescription = firstQueryValue(router.query.error_description);
+    const errorCode = firstQueryValue(router.query.error_code);
 
-    if (error && error_description) {
-      let displayDescription = error_description as string;
+    if (error) {
+      let displayDescription =
+        errorDescription ?? FALLBACK_AUTH_ERROR_DESCRIPTION;
       if (
-        error_code === "signup_disabled" ||
+        errorCode === "signup_disabled" ||
         displayDescription.toLowerCase().includes("signups not allowed")
       ) {
         displayDescription = "Can't find an account associated with this email";
       }
 
       const params = new URLSearchParams({
-        error: error as string,
+        error,
         error_description: displayDescription,
-        ...(error_code && { error_code: error_code as string }),
+        ...(errorCode && { error_code: errorCode }),
       });
       redirectedRef.current = true;
       router.push(`/sign-in?${params.toString()}`);
@@ -53,10 +86,10 @@ export default function AuthCallback() {
           title: "Success",
           description: "You've been signed in!",
         });
-        const returnTo = router.query.returnTo as string;
+        const returnTo = getSafeReturnTo(router.query.returnTo);
         redirectedRef.current = true;
-        if (returnTo && returnTo.startsWith("/")) {
-          router.push(decodeURIComponent(returnTo));
+        if (returnTo) {
+          router.push(returnTo);
         } else {
           router.push("/org/resolve");
         }
