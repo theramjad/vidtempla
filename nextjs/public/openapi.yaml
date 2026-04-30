@@ -91,6 +91,10 @@ components:
             status:
               type: integer
               description: HTTP status code
+            meta:
+              type: object
+              additionalProperties: true
+              description: Optional machine-readable context about the error
           required: [code, message, status]
       required: [data, error]
 
@@ -395,6 +399,9 @@ components:
               message: YouTube API quota exhausted
               suggestion: Retry with backoff. If daily quota is exhausted, wait for the Pacific midnight reset or contact support.
               status: 429
+              meta:
+                upstreamStatus: 403
+                reasons: [quotaExceeded]
 
     InternalError:
       description: Internal server error

@@ -31,13 +31,27 @@ export interface YouTubeServiceError {
   message: string;
   suggestion: string;
   status: number;
+  meta?: {
+    upstreamStatus?: number;
+    reasons?: string[];
+  };
 }
 
 const QUOTA_REASONS = new Set([
   "quotaExceeded",
+  "dailyLimitExceededUnreg",
   "dailyLimitExceeded",
+  "insufficientTokens",
+  "limitExceeded",
   "rateLimitExceeded",
+  "rateLimitExceededUnreg",
+  "servingLimitExceeded",
+  "uploadLimitExceeded",
+  "uploadRateLimitExceeded",
   "userRateLimitExceeded",
+  "userRateLimitExceededUnreg",
+  "variableTermExpiredDailyExceeded",
+  "variableTermLimitExceeded",
 ]);
 
 /**
@@ -65,6 +79,13 @@ export function mapYouTubeError(err: unknown): MappedYouTubeError {
     payload?.error?.message ??
     (err instanceof Error ? err.message : undefined) ??
     "YouTube API error";
+  const meta =
+    axiosErr?.response || reasons.length > 0
+      ? {
+          upstreamStatus: status,
+          ...(reasons.length > 0 ? { reasons } : {}),
+        }
+      : undefined;
 
   if (status === 429 || reasons.some((reason) => QUOTA_REASONS.has(reason))) {
     return {
@@ -72,7 +93,8 @@ export function mapYouTubeError(err: unknown): MappedYouTubeError {
         "QUOTA_EXCEEDED",
         "YouTube API quota exhausted",
         "Retry with backoff. If daily quota is exhausted, wait for the Pacific midnight reset or contact support.",
-        429
+        429,
+        meta
       ),
       status: 429,
     };
@@ -115,12 +137,13 @@ export function mapYouTubeError(err: unknown): MappedYouTubeError {
 
 export function mapYouTubeServiceError(err: unknown): YouTubeServiceError {
   const mapped = mapYouTubeError(err);
-  const { code, message, suggestion, status } = mapped.body.error;
+  const { code, message, suggestion, status, meta } = mapped.body.error;
 
   return {
     code,
     message,
     suggestion: suggestion ?? "",
     status,
+    ...(meta ? { meta: meta as YouTubeServiceError["meta"] } : {}),
   };
 }
