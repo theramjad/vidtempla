@@ -168,6 +168,18 @@ export async function updateContainer(
       return { error: { code: "EMPTY_UPDATE", message: "At least one field must be provided", suggestion: "Provide name, templateIds, or separator", status: 400 } };
     }
 
+    // Verify ownership before any drift checks so foreign container IDs get the
+    // same not-found response as missing containers.
+    const [ownedContainer] = await db
+      .select({ id: containers.id })
+      .from(containers)
+      .where(and(eq(containers.id, id), eq(containers.organizationId, organizationId)))
+      .limit(1);
+
+    if (!ownedContainer) {
+      return { error: { code: "CONTAINER_NOT_FOUND", message: "Container not found", suggestion: "Check the container ID", status: 404 } };
+    }
+
     let videoIdsToPush: string[] = [];
     if (data.templateIds !== undefined || data.separator !== undefined) {
       const videos = await db
