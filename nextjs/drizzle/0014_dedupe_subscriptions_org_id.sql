@@ -1,9 +1,10 @@
--- Dedupe duplicate subscription rows per organization, keeping the best row.
+-- Dedupe duplicate subscription rows per organization, keeping the safest row.
 -- Migration 0006 dropped subscriptions_user_id_unique without a replacement, so
 -- the user.create.after hook (and any other insert path) can produce duplicates
 -- on retry. We delete duplicates per organization here so the partial unique
--- index added in the next migration (0012) can be created safely. Prefer rows
--- with billing data, then the most recent row, then a deterministic id tie-break.
+-- index added in the next migration (0015) can be created safely. Prefer an
+-- actual Stripe subscription over checkout/customer/free records, then use the
+-- most recent row and a deterministic id tie-break.
 WITH ranked_subscriptions AS (
   SELECT
     id,
@@ -11,12 +12,11 @@ WITH ranked_subscriptions AS (
       PARTITION BY organization_id
       ORDER BY
         CASE
-          WHEN stripe_subscription_id IS NOT NULL
-            OR stripe_customer_id IS NOT NULL
-            OR stripe_checkout_session_id IS NOT NULL
-            OR plan_tier <> 'free'
-          THEN 0
-          ELSE 1
+          WHEN stripe_subscription_id IS NOT NULL THEN 0
+          WHEN plan_tier <> 'free' THEN 1
+          WHEN stripe_customer_id IS NOT NULL THEN 2
+          WHEN stripe_checkout_session_id IS NOT NULL THEN 3
+          ELSE 4
         END,
         created_at DESC,
         id DESC
