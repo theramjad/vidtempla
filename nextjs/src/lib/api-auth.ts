@@ -79,7 +79,7 @@ export async function withApiKey(
   }
 
   // Defense in depth: after the backfill migration (0013) every key should
-  // have a real organizationId. Reject rather than fall back to userId - a
+  // have a real organizationId. Reject rather than fall back to userId — a
   // userId UUID would never match a real organization id and would silently
   // 404 every request.
   if (!key.organizationId) {
@@ -377,9 +377,9 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 /**
  * Resolves a video by either VidTempla UUID or YouTube video ID.
  * Returns a discriminated result:
- * - `{ found: true, video }` - owned by the caller
- * - `{ found: false, reason: "not_owned" }` - exists but on an unconnected channel
- * - `{ found: false, reason: "not_found" }` - doesn't exist in the DB at all
+ * - `{ found: true, video }` — owned by the caller
+ * - `{ found: false, reason: "not_owned" }` — exists but on an unconnected channel
+ * - `{ found: false, reason: "not_found" }` — doesn't exist in the DB at all
  */
 export type ResolveVideoResult =
   | { found: true; video: { id: string; videoId: string; channelId: string; containerId: string | null; channelYoutubeId: string } }
@@ -438,7 +438,7 @@ export function videoNotFoundError(reason: "not_owned" | "not_found") {
   return {
     code: "VIDEO_NOT_FOUND" as const,
     message: "Video not found",
-    suggestion: "Check the video ID is correct, or the video may not have been synced yet - try syncing the channel first.",
+    suggestion: "Check the video ID is correct, or the video may not have been synced yet — try syncing the channel first.",
     status: 404,
   };
 }
