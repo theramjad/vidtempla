@@ -57,8 +57,48 @@ const mcpHandler = withMcpAuth(auth, async (req, session) => {
 
 const HANDLER_TIMEOUT_MS = 55_000;
 
+async function getJsonRpcRequestId(req: Request): Promise<string | number | undefined> {
+  const body = await req.clone().json().catch(() => null);
+  if (!body || typeof body !== "object" || !("id" in body)) return undefined;
+
+  const id = (body as { id?: unknown }).id;
+  return typeof id === "string" || typeof id === "number" ? id : undefined;
+}
+
+async function strictJsonRpcResponse(
+  response: Response,
+  requestId: string | number | undefined
+): Promise<Response> {
+  if (response.status !== 401) return response;
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) return response;
+
+  const body = await response.clone().json().catch(() => null);
+  if (!body || typeof body !== "object" || !("error" in body)) return response;
+
+  const jsonRpcBody = body as {
+    error?: { ["www-authenticate"]?: unknown };
+  };
+  if (!jsonRpcBody.error?.["www-authenticate"]) return response;
+
+  delete jsonRpcBody.error["www-authenticate"];
+  if (requestId !== undefined) {
+    (jsonRpcBody as { id?: string | number }).id = requestId;
+  }
+  const headers = new Headers(response.headers);
+  headers.set("content-type", "application/json");
+
+  return new Response(JSON.stringify(jsonRpcBody), {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 async function handler(req: Request): Promise<Response> {
   try {
+    const requestId = await getJsonRpcRequestId(req);
     const response = await Promise.race([
       mcpHandler(req),
       new Promise<never>((_, reject) =>
@@ -71,7 +111,7 @@ async function handler(req: Request): Promise<Response> {
         { status: 500 }
       );
     }
-    return response;
+    return strictJsonRpcResponse(response, requestId);
   } catch (error) {
     console.error("[MCP] Handler error:", error);
     return Response.json(

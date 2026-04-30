@@ -78,7 +78,7 @@ export async function withApiKey(
     );
   }
 
-  // Defense in depth: after the backfill migration (0011) every key should
+  // Defense in depth: after the backfill migration (0012) every key should
   // have a real organizationId. The schema still permits NULL because a key
   // can become orphaned if its membership row is deleted (e.g. user removed
   // from org). Reject rather than fall back to userId — a userId UUID would
