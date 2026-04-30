@@ -71,7 +71,9 @@ function throwServiceError(error: { code: string; message: string; status: numbe
           ? 'FORBIDDEN'
           : error.status === 409
             ? 'CONFLICT'
-            : 'BAD_REQUEST',
+            : error.status === 500
+              ? 'INTERNAL_SERVER_ERROR'
+              : 'BAD_REQUEST',
     message: error.message,
     ...(driftMeta ? { cause: { driftMeta } } : {}),
   });
