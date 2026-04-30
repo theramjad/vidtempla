@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
   const body = parsed.data;
 
-  const result = await queryAnalytics(auth.userId, body);
+  const result = await queryAnalytics(auth.userId, body, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, "/analytics/query", "POST", result.error.status, 0);
