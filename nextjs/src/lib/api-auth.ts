@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { apiKeys, apiRequestLog, youtubeChannels, youtubeVideos } from "@/db/schema";
+import { apiKeys, apiRequestLog, member, youtubeChannels, youtubeVideos } from "@/db/schema";
 import { hashApiKey } from "@/lib/api-keys";
 import { decrypt } from "@/utils/encryption";
 import { refreshAccessToken } from "@/lib/clients/youtube";
@@ -79,16 +79,38 @@ export async function withApiKey(
   }
 
   // Defense in depth: after the backfill migration (0012) every key should
-  // have a real organizationId. The schema still permits NULL because a key
-  // can become orphaned if its membership row is deleted (e.g. user removed
-  // from org). Reject rather than fall back to userId — a userId UUID would
-  // never match a real organization id and would silently 404 every request.
+  // have a real organizationId. Reject rather than fall back to userId — a
+  // userId UUID would never match a real organization id and would silently
+  // 404 every request.
   if (!key.organizationId) {
     return NextResponse.json(
       apiError(
         "API_KEY_REISSUE_REQUIRED",
-        "API key is not organization-scoped — orphaned from a removed user.",
+        "API key is not organization-scoped.",
         "Recreate this API key from your dashboard.",
+        401
+      ),
+      { status: 401 }
+    );
+  }
+
+  const [membership] = await db
+    .select({ id: member.id })
+    .from(member)
+    .where(
+      and(
+        eq(member.userId, key.userId),
+        eq(member.organizationId, key.organizationId)
+      )
+    )
+    .limit(1);
+
+  if (!membership) {
+    return NextResponse.json(
+      apiError(
+        "API_KEY_REISSUE_REQUIRED",
+        "API key is orphaned from its organization.",
+        "Ask an organization admin to reissue this API key.",
         401
       ),
       { status: 401 }
