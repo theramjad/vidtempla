@@ -355,6 +355,9 @@ export async function listVideos(
         filters.push(or(primary, and(tieEq, idCmp(youtubeVideos.id, cursorId)))!);
       } else {
         // Legacy cursor: bare publishedAt ISO string (pre-composite-cursor deploy).
+        if (activeSortField !== "publishedAt") {
+          return invalidCursor();
+        }
         const cursorDate = parseCursorDate(opts.cursor);
         if (!cursorDate) {
           return invalidCursor();
