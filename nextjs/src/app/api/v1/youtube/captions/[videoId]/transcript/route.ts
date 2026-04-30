@@ -58,7 +58,7 @@ export async function GET(
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     logRequest(ctx, `/youtube/captions/${videoId}/transcript`, "GET", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });

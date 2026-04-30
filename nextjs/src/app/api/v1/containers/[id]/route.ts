@@ -10,7 +10,7 @@ export async function GET(
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await params;
-  const result = await getContainer(id, auth.userId);
+  const result = await getContainer(id, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, `/v1/containers/${id}`, "GET", result.error.status, 0);
@@ -33,7 +33,7 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
-  const result = await updateContainer(id, auth.userId, {
+  const result = await updateContainer(id, auth.userId, auth.organizationId, {
     name: body.name,
     templateIds: body.templateIds,
     separator: body.separator,
@@ -59,7 +59,7 @@ export async function DELETE(
   if (writeCheck) return writeCheck;
 
   const { id } = await params;
-  const result = await deleteContainer(id, auth.userId);
+  const result = await deleteContainer(id, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, `/v1/containers/${id}`, "DELETE", result.error.status, 0);

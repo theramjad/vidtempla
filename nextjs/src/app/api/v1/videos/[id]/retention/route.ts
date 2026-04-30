@@ -20,7 +20,7 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const videoResult = await resolveVideo(id, auth.userId);
+    const videoResult = await resolveVideo(id, auth.userId, auth.organizationId);
 
     if (!videoResult.found) {
       const err = videoNotFoundError(videoResult.reason);
@@ -32,7 +32,11 @@ export async function GET(
     }
     const video = videoResult.video;
 
-    const tokens = await getChannelTokens(video.channelYoutubeId, auth.userId);
+    const tokens = await getChannelTokens(
+      video.channelYoutubeId,
+      auth.userId,
+      auth.organizationId
+    );
     if ("error" in tokens) {
       logRequest(
         auth,

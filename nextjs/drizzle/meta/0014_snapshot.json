@@ -1,6 +1,6 @@
 {
-  "id": "e8a90167-29be-4bd4-99f5-dccb60f61c01",
-  "prevId": "5a5417e0-728a-48a4-90d2-b347c65fdecd",
+  "id": "3deccccf-d8d3-43ef-9ffc-6c91aa12795d",
+  "prevId": "4720dd31-cc00-443e-bbef-16159adcf03d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -178,7 +178,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "api_keys_key_hash_unique": {
+          "name": "api_keys_key_hash_unique",
+          "columns": [
+            {
+              "expression": "key_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "api_keys_user_id_user_id_fk": {
           "name": "api_keys_user_id_user_id_fk",
