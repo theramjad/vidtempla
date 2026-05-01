@@ -11,7 +11,6 @@ import { decrypt, encrypt } from '@/utils/encryption';
 import { refreshAccessToken, fetchChannelVideos } from '@/lib/clients/youtube';
 import {
   parseVariables,
-  parseUserVariables,
   buildDescription,
   findMissingVariables,
 } from '@/utils/templateParser';
@@ -19,10 +18,11 @@ import { start } from 'workflow/api';
 import { syncChannelVideosWorkflow } from '@/workflows/sync-channel-videos';
 import { db } from '@/db';
 import { youtubeChannels, containers, templates, youtubeVideos, videoVariables, descriptionHistory } from '@/db/schema';
-import { eq, and, desc, asc, sql, count, isNull, ilike, inArray, getTableColumns } from 'drizzle-orm';
-import { checkVideoLimit, checkChannelLimit } from '@/lib/plan-limits';
+import { eq, and, desc, asc, count, isNull, ilike, inArray, getTableColumns, sql } from 'drizzle-orm';
+import { checkChannelLimit } from '@/lib/plan-limits';
 import { router } from '@/server/trpc/init';
 import {
+  assignVideo,
   listVideos as listVideosService,
   getVideo as getVideoService,
   updateVideoVariables as updateVideoVariablesService,
@@ -71,7 +71,9 @@ function throwServiceError(error: { code: string; message: string; status: numbe
           ? 'FORBIDDEN'
           : error.status === 409
             ? 'CONFLICT'
-            : 'BAD_REQUEST',
+            : error.status === 500
+              ? 'INTERNAL_SERVER_ERROR'
+              : 'BAD_REQUEST',
     message: error.message,
     ...(driftMeta ? { cause: { driftMeta } } : {}),
   });
@@ -103,9 +105,55 @@ export const youtubeRouter = router({
     disconnect: orgProcedure
       .input(z.object({ channelId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
-        await db
-          .delete(youtubeChannels)
-          .where(and(eq(youtubeChannels.id, input.channelId), eq(youtubeChannels.organizationId, ctx.organizationId)));
+        const result = await db.transaction(async (tx) => {
+          const videoRows = (await tx.execute(sql<{
+            videoId: string;
+            descriptionPushReservedUntil: Date | string | null;
+          }>`
+            select v.video_id as "videoId",
+                   v.description_push_reserved_until as "descriptionPushReservedUntil"
+            from youtube_videos v
+            inner join youtube_channels c on c.id = v.channel_id
+            where c.id = ${input.channelId}
+              and c.organization_id = ${ctx.organizationId}
+            for update of v
+          `)) as Array<{
+            videoId: string;
+            descriptionPushReservedUntil: Date | string | null;
+          }>;
+
+          const now = Date.now();
+          const reservedVideo = videoRows.find((video) => {
+            if (!video.descriptionPushReservedUntil) return false;
+            return new Date(video.descriptionPushReservedUntil).getTime() > now;
+          });
+
+          if (reservedVideo) {
+            return {
+              reserved: true as const,
+              videoId: reservedVideo.videoId,
+              reservedUntil: reservedVideo.descriptionPushReservedUntil,
+            };
+          }
+
+          await tx
+            .delete(youtubeChannels)
+            .where(
+              and(
+                eq(youtubeChannels.id, input.channelId),
+                eq(youtubeChannels.organizationId, ctx.organizationId)
+              )
+            );
+
+          return { reserved: false as const };
+        });
+
+        if (result.reserved) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'A YouTube description push is in progress for this channel. Try disconnecting again shortly.',
+          });
+        }
 
         return { success: true };
       }),
@@ -241,7 +289,13 @@ export const youtubeRouter = router({
             videoId: youtubeVideos.videoId,
           })
           .from(youtubeVideos)
-          .where(eq(youtubeVideos.containerId, input.containerId))
+          .innerJoin(containers, eq(containers.id, youtubeVideos.containerId))
+          .where(
+            and(
+              eq(youtubeVideos.containerId, input.containerId),
+              eq(containers.organizationId, ctx.organizationId)
+            )
+          )
           .orderBy(asc(youtubeVideos.title));
 
         return {
@@ -499,107 +553,16 @@ export const youtubeRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await verifyVideoOwnership(input.videoId, ctx.organizationId);
-        // First verify the video isn't already assigned
-        const [video] = await db
-          .select({ containerId: youtubeVideos.containerId })
-          .from(youtubeVideos)
-          .where(eq(youtubeVideos.id, input.videoId));
-
-        if (video?.containerId) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Video is already assigned to a container',
-          });
+        const result = await assignVideo(
+          input.videoId,
+          input.containerId,
+          ctx.user.id,
+          ctx.organizationId
+        );
+        if ('error' in result) {
+          throwServiceError(result.error);
         }
-
-        // Check if org has reached their assigned video limit
-        const channels = await db
-          .select({ id: youtubeChannels.id })
-          .from(youtubeChannels)
-          .where(eq(youtubeChannels.organizationId, ctx.organizationId));
-
-        const channelIds = channels?.map((c) => c.id) || [];
-
-        if (channelIds.length > 0) {
-          const countResult = await db
-            .select({ assignedCount: count() })
-            .from(youtubeVideos)
-            .where(
-              and(
-                inArray(youtubeVideos.channelId, channelIds),
-                sql`${youtubeVideos.containerId} IS NOT NULL`
-              )
-            );
-          const assignedCount = countResult[0]?.assignedCount ?? 0;
-
-          const limitCheck = await checkVideoLimit(ctx.organizationId, db);
-
-          // If adding this video would exceed the limit, reject
-          if ((assignedCount || 0) >= limitCheck.limit) {
-            throw new TRPCError({
-              code: 'FORBIDDEN',
-              message: `You have reached your assigned video limit (${limitCheck.limit} videos on the ${limitCheck.planTier} plan). Please upgrade your plan to assign more videos to containers.`,
-            });
-          }
-        }
-
-        // Get the container's templates
-        const [container] = await db
-          .select({ templateOrder: containers.templateOrder })
-          .from(containers)
-          .where(and(eq(containers.id, input.containerId), eq(containers.organizationId, ctx.organizationId)));
-
-        if (!container) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Container not found',
-          });
-        }
-
-        // Assign video to container (clear drift since we're entering template management)
-        await db
-          .update(youtubeVideos)
-          .set({ containerId: input.containerId, driftDetectedAt: null })
-          .where(eq(youtubeVideos.id, input.videoId));
-
-        // Initialize variables for all templates in the container
-        if (container.templateOrder && container.templateOrder.length > 0) {
-          const templatesData = await db
-            .select({
-              id: templates.id,
-              content: templates.content,
-            })
-            .from(templates)
-            .where(inArray(templates.id, container.templateOrder));
-
-          if (templatesData) {
-            const variablesToCreate: Array<{
-              videoId: string;
-              templateId: string;
-              variableName: string;
-              variableValue: string;
-            }> = [];
-
-            templatesData.forEach((template) => {
-              const variables = parseUserVariables(template.content);
-              variables.forEach((varName) => {
-                variablesToCreate.push({
-                  videoId: input.videoId,
-                  templateId: template.id,
-                  variableName: varName,
-                  variableValue: '',
-                });
-              });
-            });
-
-            if (variablesToCreate.length > 0) {
-              await db.insert(videoVariables).values(variablesToCreate);
-            }
-          }
-        }
-
-        return { success: true };
+        return result.data;
       }),
 
     getVariables: orgProcedure
