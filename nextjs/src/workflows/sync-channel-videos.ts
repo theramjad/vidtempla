@@ -17,6 +17,7 @@ import {
 import { detectAndRecordDrift } from "@/lib/services/drift";
 
 const SYNC_LOCK_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
+const SYNC_LOCK_HEARTBEAT_EVERY_VIDEOS = 50;
 
 export async function syncChannelVideosWorkflow(
   channelId: string,
@@ -267,6 +268,7 @@ async function syncClaimedChannelVideos(
 
     allVideos.push(...response.videos);
     pageToken = response.nextPageToken;
+    await heartbeatSyncLock(channelId, ownerFilter);
   } while (pageToken);
 
   const videoIds = allVideos.map((v) => v.id);
@@ -283,6 +285,7 @@ async function syncClaimedChannelVideos(
   const existingVideoMap = new Map(existingVideos.map((v) => [v.videoId, v]));
 
   let newVideosAdded = 0;
+  let videosSinceHeartbeat = 0;
 
   for (const ytVideo of allVideos) {
     const videoId = ytVideo.id;
@@ -311,6 +314,11 @@ async function syncClaimedChannelVideos(
           source: "initial_sync",
         });
       }
+      videosSinceHeartbeat++;
+      if (videosSinceHeartbeat >= SYNC_LOCK_HEARTBEAT_EVERY_VIDEOS) {
+        await heartbeatSyncLock(channelId, ownerFilter);
+        videosSinceHeartbeat = 0;
+      }
       continue;
     }
 
@@ -332,6 +340,12 @@ async function syncClaimedChannelVideos(
       await db.transaction(async (tx) => {
         await detectAndRecordDrift(existingVideo.id, ytVideo.snippet.description, userId, tx);
       });
+    }
+
+    videosSinceHeartbeat++;
+    if (videosSinceHeartbeat >= SYNC_LOCK_HEARTBEAT_EVERY_VIDEOS) {
+      await heartbeatSyncLock(channelId, ownerFilter);
+      videosSinceHeartbeat = 0;
     }
   }
 
@@ -383,4 +397,27 @@ async function syncClaimedChannelVideos(
     newVideos: newVideosAdded,
     deletedVideos: videosToDelete.length,
   };
+}
+
+async function heartbeatSyncLock(
+  channelId: string,
+  ownerFilter: ReturnType<typeof eq>
+) {
+  // Keep trigger-managed updatedAt fresh while a long sync is still making
+  // progress, so the stale-lock escape only recovers genuinely abandoned runs.
+  const touched = await db
+    .update(youtubeChannels)
+    .set({ syncStatus: "syncing" })
+    .where(
+      and(
+        eq(youtubeChannels.id, channelId),
+        ownerFilter,
+        eq(youtubeChannels.syncStatus, "syncing")
+      )
+    )
+    .returning({ id: youtubeChannels.id });
+
+  if (touched.length === 0) {
+    throw new Error(`Sync lock lost for channel ${channelId}`);
+  }
 }
