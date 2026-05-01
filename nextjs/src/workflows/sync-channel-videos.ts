@@ -17,12 +17,13 @@ import { detectAndRecordDrift } from "@/lib/services/drift";
 
 export async function syncChannelVideosWorkflow(
   channelId: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ) {
   "use workflow";
 
   try {
-    return await runSyncChannelVideos(channelId, userId);
+    return await runSyncChannelVideos(channelId, userId, organizationId);
   } catch (err) {
     await markSyncFailed(channelId, err);
     throw err;
@@ -49,7 +50,11 @@ async function markSyncFailed(channelId: string, err: unknown) {
     .where(eq(youtubeChannels.id, channelId));
 }
 
-async function runSyncChannelVideos(channelId: string, userId: string) {
+async function runSyncChannelVideos(
+  channelId: string,
+  userId: string,
+  organizationId?: string
+) {
   "use step";
 
   await db
@@ -57,13 +62,17 @@ async function runSyncChannelVideos(channelId: string, userId: string) {
     .set({ syncStatus: "syncing" })
     .where(eq(youtubeChannels.id, channelId));
 
+  const ownerFilter = organizationId
+    ? eq(youtubeChannels.organizationId, organizationId)
+    : eq(youtubeChannels.userId, userId);
+
   const [channel] = await db
     .select()
     .from(youtubeChannels)
     .where(
       and(
         eq(youtubeChannels.id, channelId),
-        eq(youtubeChannels.userId, userId)
+        ownerFilter
       )
     );
 
