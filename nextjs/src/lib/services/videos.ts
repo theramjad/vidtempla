@@ -87,55 +87,92 @@ async function syncOwnedChannelVideos(
     do {
       const page = await fetchChannelVideos(channelYoutubeId, tokens.accessToken, nextPageToken);
 
-      for (const v of page.videos) {
-        const [existing] = await db
-          .select({ id: youtubeVideos.id })
-          .from(youtubeVideos)
-          .where(eq(youtubeVideos.videoId, v.id));
+      if (page.videos.length > 0) {
+        const pageVideoIds = page.videos.map((v) => v.id);
 
-        if (!existing) {
-          const [inserted] = await db
-            .insert(youtubeVideos)
-            .values({
+        // Batch-fetch all existing videos for this page in a single query (replaces the per-video SELECT).
+        const existingRows = await db
+          .select({ id: youtubeVideos.id, videoId: youtubeVideos.videoId })
+          .from(youtubeVideos)
+          .where(
+            and(
+              eq(youtubeVideos.channelId, tokens.channelDbId),
+              inArray(youtubeVideos.videoId, pageVideoIds)
+            )
+          );
+        const byVideoId = new Map(existingRows.map((row) => [row.videoId, row]));
+
+        // Classify each video in the page into inserts vs. updates (drift handling stays inside the txn).
+        const toInsert: (typeof youtubeVideos.$inferInsert)[] = [];
+        const toUpdate: Array<{
+          id: string;
+          title: string;
+          description: string;
+          publishedAt: Date;
+        }> = [];
+        for (const v of page.videos) {
+          const existing = byVideoId.get(v.id);
+          if (!existing) {
+            toInsert.push({
               channelId: tokens.channelDbId,
               videoId: v.id,
               title: v.snippet.title,
               currentDescription: v.snippet.description,
               publishedAt: new Date(v.snippet.publishedAt),
-            })
-            .returning({ id: youtubeVideos.id });
-
-          if (inserted) {
-            await db.insert(descriptionHistory).values({
-              videoId: inserted.id,
-              description: v.snippet.description,
-              versionNumber: 1,
-              renderSnapshot: null,
-              createdBy: userId,
-              source: "initial_sync",
             });
-          }
-        } else {
-          await db
-            .update(youtubeVideos)
-            .set({
-              title: v.snippet.title,
-              publishedAt: new Date(v.snippet.publishedAt),
-              updatedAt: new Date(),
-            })
-            .where(eq(youtubeVideos.id, existing.id));
-
-          if (isBaseline) {
-            await db
-              .update(youtubeVideos)
-              .set({ currentDescription: v.snippet.description, updatedAt: new Date() })
-              .where(eq(youtubeVideos.id, existing.id));
           } else {
-            await db.transaction(async (tx) => {
-              await detectAndRecordDrift(existing.id, v.snippet.description, userId, tx);
+            toUpdate.push({
+              id: existing.id,
+              title: v.snippet.title,
+              description: v.snippet.description,
+              publishedAt: new Date(v.snippet.publishedAt),
             });
           }
         }
+
+        // Single transaction per page: batched insert for new videos, then per-existing update + drift detection.
+        await db.transaction(async (tx) => {
+          if (toInsert.length > 0) {
+            const insertedRows = await tx
+              .insert(youtubeVideos)
+              .values(toInsert)
+              .returning({ id: youtubeVideos.id, description: youtubeVideos.currentDescription });
+
+            if (insertedRows.length > 0) {
+              await tx.insert(descriptionHistory).values(
+                insertedRows.map((row) => ({
+                  videoId: row.id,
+                  description: row.description ?? "",
+                  versionNumber: 1,
+                  renderSnapshot: null,
+                  createdBy: userId,
+                  source: "initial_sync" as const,
+                }))
+              );
+            }
+          }
+
+          const now = new Date();
+          for (const u of toUpdate) {
+            await tx
+              .update(youtubeVideos)
+              .set({
+                title: u.title,
+                publishedAt: u.publishedAt,
+                updatedAt: now,
+              })
+              .where(eq(youtubeVideos.id, u.id));
+
+            if (isBaseline) {
+              await tx
+                .update(youtubeVideos)
+                .set({ currentDescription: u.description, updatedAt: now })
+                .where(eq(youtubeVideos.id, u.id));
+            } else {
+              await detectAndRecordDrift(u.id, u.description, userId, tx);
+            }
+          }
+        });
       }
 
       nextPageToken = page.nextPageToken;
