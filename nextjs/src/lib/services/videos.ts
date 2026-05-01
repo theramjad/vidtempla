@@ -12,6 +12,7 @@ import {
   inArray,
   sql,
   getTableColumns,
+  or,
 } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -61,14 +62,15 @@ export interface ListVideosOpts {
 async function syncOwnedChannelVideos(
   channelYoutubeId: string,
   userId: string,
-  organizationId?: string
+  organizationId?: string,
+  lockedChannelDbId?: string
 ) {
-  const tokens = await getChannelTokens(channelYoutubeId, userId, organizationId);
-  if ("error" in tokens) {
-    return false;
-  }
-
   try {
+    const tokens = await getChannelTokens(channelYoutubeId, userId, organizationId);
+    if ("error" in tokens) {
+      return false;
+    }
+
     const [channel] = await db
       .select({
         id: youtubeChannels.id,
@@ -139,10 +141,11 @@ async function syncOwnedChannelVideos(
       nextPageToken = page.nextPageToken;
     } while (nextPageToken);
 
+    const syncedAt = new Date();
     if (isBaseline) {
       await db
         .update(youtubeChannels)
-        .set({ driftBaselinedAt: new Date() })
+        .set({ driftBaselinedAt: syncedAt })
         .where(
           and(
             eq(youtubeChannels.id, tokens.channelDbId),
@@ -150,12 +153,54 @@ async function syncOwnedChannelVideos(
           )
         );
     }
+
+    await db
+      .update(youtubeChannels)
+      .set({ lastSyncedAt: syncedAt })
+      .where(eq(youtubeChannels.id, tokens.channelDbId));
   } catch (err) {
     // YouTube sync failed — fall through to DB query with stale data
     console.warn("[videos] syncOwnedChannelVideos failed (serving stale data):", err);
+  } finally {
+    if (lockedChannelDbId) {
+      await db
+        .update(youtubeChannels)
+        .set({ syncStatus: "idle" })
+        .where(
+          and(
+            eq(youtubeChannels.id, lockedChannelDbId),
+            eq(youtubeChannels.syncStatus, LIST_VIDEOS_SYNC_STATUS)
+          )
+        );
+    }
   }
 
   return true;
+}
+
+// Throttle inline sync inside listVideos so each REST call doesn't repaginate
+// the entire YouTube uploads playlist. The cron + manual triggers handle freshness.
+const LIST_VIDEOS_SYNC_STALE_MS = 5 * 60 * 1000;
+const LIST_VIDEOS_SYNC_STATUS = "list_syncing";
+
+async function tryAcquireListVideosSyncLock(channelDbId: string) {
+  const staleBefore = new Date(Date.now() - LIST_VIDEOS_SYNC_STALE_MS);
+  const [lockedChannel] = await db
+    .update(youtubeChannels)
+    .set({ syncStatus: LIST_VIDEOS_SYNC_STATUS })
+    .where(
+      and(
+        eq(youtubeChannels.id, channelDbId),
+        eq(youtubeChannels.syncStatus, "idle"),
+        or(
+          isNull(youtubeChannels.lastSyncedAt),
+          lt(youtubeChannels.lastSyncedAt, staleBefore)
+        )
+      )
+    )
+    .returning({ id: youtubeChannels.id });
+
+  return !!lockedChannel;
 }
 
 export async function listVideos(
@@ -192,7 +237,53 @@ export async function listVideos(
 
     let isOwned = false;
     if (opts.channelId) {
-      isOwned = await syncOwnedChannelVideos(opts.channelId, userId, organizationId);
+      // Look up the connected channel row scoped to user/org. Existence here
+      // implies ownership; we then decide whether to refresh from YouTube based
+      // on lastSyncedAt and syncStatus instead of syncing on every list call.
+      const channelOwnerFilter = organizationId
+        ? and(
+            eq(youtubeChannels.channelId, opts.channelId),
+            eq(youtubeChannels.organizationId, organizationId)
+          )
+        : and(
+            eq(youtubeChannels.channelId, opts.channelId),
+            eq(youtubeChannels.userId, userId)
+          );
+
+      const [ownedChannel] = await db
+        .select({
+          id: youtubeChannels.id,
+          lastSyncedAt: youtubeChannels.lastSyncedAt,
+          syncStatus: youtubeChannels.syncStatus,
+        })
+        .from(youtubeChannels)
+        .where(channelOwnerFilter)
+        .limit(1);
+
+      if (ownedChannel) {
+        const stale =
+          !ownedChannel.lastSyncedAt ||
+          Date.now() - ownedChannel.lastSyncedAt.getTime() > LIST_VIDEOS_SYNC_STALE_MS;
+        const syncIdle = ownedChannel.syncStatus === "idle";
+
+        if (stale && syncIdle) {
+          const lockAcquired = await tryAcquireListVideosSyncLock(
+            ownedChannel.id
+          );
+          if (lockAcquired) {
+            await syncOwnedChannelVideos(
+              opts.channelId,
+              userId,
+              organizationId,
+              ownedChannel.id
+            );
+          }
+        }
+
+        // Connected channel ownership does not depend on whether the opportunistic
+        // refresh succeeded; token/Youtube failures should still serve cached DB data.
+        isOwned = true;
+      }
     }
 
     if (opts.channelId && !isOwned) {
