@@ -125,7 +125,9 @@ export async function withApiKey(
     .set({ lastUsedAt: new Date() })
     .where(eq(apiKeys.id, key.id))
     .then(() => {})
-    .catch(() => {});
+    .catch((err: unknown) => {
+      console.error("Failed to update API key lastUsedAt:", err);
+    });
 
   return {
     userId: key.userId,
