@@ -7,6 +7,7 @@ import {
   getChannelTokens,
   logRequest,
 } from "@/lib/api-auth";
+import { mapYouTubeError } from "@/lib/youtube-errors";
 import axios from "axios";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
@@ -70,22 +71,9 @@ export async function GET(request: NextRequest) {
       })
     );
   } catch (error) {
-    const status = axios.isAxiosError(error)
-      ? error.response?.status || 500
-      : 500;
-    const message = axios.isAxiosError(error)
-      ? error.response?.data?.error?.message || error.message
-      : "Unknown error";
-    await logRequest(ctx, "/youtube/playlists", "GET", status, 1);
-    return NextResponse.json(
-      apiError(
-        "YOUTUBE_API_ERROR",
-        message,
-        "Check that the channelId is correct and the channel has playlists",
-        status
-      ),
-      { status }
-    );
+    const mapped = mapYouTubeError(error);
+    await logRequest(ctx, "/youtube/playlists", "GET", mapped.status, 1);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }
 
@@ -167,21 +155,8 @@ export async function POST(request: NextRequest) {
     await logRequest(ctx, "/youtube/playlists", "POST", 201, 50);
     return NextResponse.json(apiSuccess(response.data, { quotaUnits: 50 }));
   } catch (error) {
-    const status = axios.isAxiosError(error)
-      ? error.response?.status || 500
-      : 500;
-    const message = axios.isAxiosError(error)
-      ? error.response?.data?.error?.message || error.message
-      : "Unknown error";
-    await logRequest(ctx, "/youtube/playlists", "POST", status, 50);
-    return NextResponse.json(
-      apiError(
-        "YOUTUBE_API_ERROR",
-        message,
-        "Check that the title is valid and you have permission to create playlists",
-        status
-      ),
-      { status }
-    );
+    const mapped = mapYouTubeError(error);
+    await logRequest(ctx, "/youtube/playlists", "POST", mapped.status, 50);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }

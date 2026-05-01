@@ -74,16 +74,14 @@ const isOrgMember = t.middleware(async ({ ctx, next }) => {
 
 export const orgProcedure = t.procedure.use(isOrgMember);
 
-// Org admin procedure: chains from orgProcedure, just checks role
-const isOrgAdminCheck = t.middleware(async ({ ctx, next }) => {
-  const role = (ctx as { orgRole?: string }).orgRole;
-  if (role !== "owner" && role !== "admin") {
+// Org admin procedure: chains from orgProcedure so ctx already has user, organizationId, and orgRole narrowed.
+// Defining the middleware inline via `orgProcedure.use(...)` preserves that narrowing through to downstream procedures.
+export const orgAdminProcedure = orgProcedure.use(({ ctx, next }) => {
+  if (ctx.orgRole !== "owner" && ctx.orgRole !== "admin") {
     throw new TRPCError({ code: "FORBIDDEN", message: "Admin or owner role required" });
   }
   return next({ ctx });
 });
-
-export const orgAdminProcedure = orgProcedure.use(isOrgAdminCheck);
 
 const isSuperAdminMiddleware = t.middleware(({ ctx, next }) => {
   if (!ctx.user || !isSuperAdmin(ctx.user.email)) {

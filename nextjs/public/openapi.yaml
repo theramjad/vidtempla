@@ -91,6 +91,10 @@ components:
             status:
               type: integer
               description: HTTP status code
+            meta:
+              type: object
+              additionalProperties: true
+              description: Optional machine-readable context about the error
           required: [code, message, status]
       required: [data, error]
 
@@ -381,6 +385,23 @@ components:
               message: This API key has read-only access
               suggestion: Create a new API key with read-write permission from Settings > API Keys
               status: 403
+
+    QuotaExceeded:
+      description: YouTube API quota or rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            data: null
+            error:
+              code: QUOTA_EXCEEDED
+              message: YouTube API quota exhausted
+              suggestion: Retry with backoff. If daily quota is exhausted, wait for the Pacific midnight reset or contact support.
+              status: 429
+              meta:
+                upstreamStatus: 403
+                reasons: [quotaExceeded]
 
     InternalError:
       description: Internal server error
@@ -737,6 +758,8 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/QuotaExceeded"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -1710,6 +1733,8 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/QuotaExceeded"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -1775,6 +1800,8 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/QuotaExceeded"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -1841,6 +1868,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/InsufficientPermissions"
+        "429":
+          $ref: "#/components/responses/QuotaExceeded"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -1893,6 +1922,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/QuotaExceeded"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -1959,6 +1990,8 @@ paths:
           $ref: "#/components/responses/InsufficientPermissions"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/QuotaExceeded"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -2014,6 +2047,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/InsufficientPermissions"
+        "429":
+          $ref: "#/components/responses/QuotaExceeded"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -2083,6 +2118,8 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/QuotaExceeded"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -2143,6 +2180,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/InsufficientPermissions"
+        "429":
+          $ref: "#/components/responses/QuotaExceeded"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -2205,6 +2244,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/InsufficientPermissions"
+        "429":
+          $ref: "#/components/responses/QuotaExceeded"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -2283,6 +2324,8 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/QuotaExceeded"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -2338,6 +2381,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/InsufficientPermissions"
+        "429":
+          $ref: "#/components/responses/QuotaExceeded"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -2399,6 +2444,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/InsufficientPermissions"
+        "429":
+          $ref: "#/components/responses/QuotaExceeded"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -2475,6 +2522,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/InsufficientPermissions"
+        "429":
+          $ref: "#/components/responses/QuotaExceeded"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -2529,6 +2578,8 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/QuotaExceeded"
         "500":
           $ref: "#/components/responses/InternalError"
 

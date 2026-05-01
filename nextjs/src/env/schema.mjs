@@ -15,7 +15,11 @@ export const serverSchema = z.object({
   YOUTUBE_REDIRECT_URI: z.string().url(),
 
   // Encryption
+  // V2 is the currently-active key (required). V3 is reserved for the next
+  // rotation; set it ahead of bumping ACTIVE_VERSION in `utils/encryption.ts`.
+  // See `utils/encryption.ts` for the version-byte → key mapping.
   ENCRYPTION_KEY_V2: z.string().min(32),
+  ENCRYPTION_KEY_V3: z.string().min(32).optional(),
 
   // RapidAPI (optional)
   RAPID_API_KEY: z.string().optional(),
@@ -61,6 +65,7 @@ export const serverEnv = {
 
   // Encryption
   ENCRYPTION_KEY_V2: process.env.ENCRYPTION_KEY_V2,
+  ENCRYPTION_KEY_V3: process.env.ENCRYPTION_KEY_V3,
 
   // RapidAPI
   RAPID_API_KEY: process.env.RAPID_API_KEY,

@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { toMcp, getSessionUserId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
+import { toMcp, getSessionUserId, getSessionOrgId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
 import {
   listTemplates,
   getTemplate,
@@ -21,7 +21,8 @@ export function registerTemplateTools(server: McpServer) {
     READ,
     async (args) => {
       const userId = getSessionUserId();
-      const result = await listTemplates(userId, args);
+      const organizationId = getSessionOrgId();
+      const result = await listTemplates(organizationId, args);
       logMcpRequest(userId, "list_templates", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -34,7 +35,8 @@ export function registerTemplateTools(server: McpServer) {
     READ,
     async ({ id }) => {
       const userId = getSessionUserId();
-      const result = await getTemplate(id, userId);
+      const organizationId = getSessionOrgId();
+      const result = await getTemplate(id, organizationId);
       logMcpRequest(userId, "get_template", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -50,7 +52,8 @@ export function registerTemplateTools(server: McpServer) {
     WRITE,
     async ({ name, content }) => {
       const userId = getSessionUserId();
-      const result = await createTemplate(userId, name, content);
+      const organizationId = getSessionOrgId();
+      const result = await createTemplate(userId, organizationId, name, content);
       logMcpRequest(userId, "create_template", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -68,7 +71,8 @@ export function registerTemplateTools(server: McpServer) {
     WRITE,
     async ({ id, name, content, force }) => {
       const userId = getSessionUserId();
-      const result = await updateTemplate(id, userId, { name, content, force });
+      const organizationId = getSessionOrgId();
+      const result = await updateTemplate(id, userId, organizationId, { name, content, force });
       logMcpRequest(userId, "update_template", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -81,7 +85,8 @@ export function registerTemplateTools(server: McpServer) {
     DESTRUCTIVE,
     async ({ id }) => {
       const userId = getSessionUserId();
-      const result = await deleteTemplate(id, userId);
+      const organizationId = getSessionOrgId();
+      const result = await deleteTemplate(id, organizationId);
       logMcpRequest(userId, "delete_template", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -94,7 +99,8 @@ export function registerTemplateTools(server: McpServer) {
     READ,
     async ({ id }) => {
       const userId = getSessionUserId();
-      const result = await getTemplateImpact(id, userId);
+      const organizationId = getSessionOrgId();
+      const result = await getTemplateImpact(id, userId, organizationId);
       logMcpRequest(userId, "get_template_impact", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
