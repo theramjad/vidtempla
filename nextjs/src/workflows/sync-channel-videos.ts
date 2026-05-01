@@ -8,6 +8,7 @@ import {
 import { eq, and, inArray, lt, ne, or, sql } from "drizzle-orm";
 import { decrypt, encrypt } from "@/utils/encryption";
 import {
+  isYouTubeInvalidGrantError,
   refreshAccessToken,
   fetchChannelVideos,
   fetchChannelInfo,
@@ -37,6 +38,7 @@ async function markSyncFailed(
   console.error("[sync-channel-videos] failed", { channelId, error: errorMessage });
 
   const isTokenError =
+    isYouTubeInvalidGrantError(err) ||
     errorMessage.includes("invalid_grant") ||
     errorMessage.includes("Token has been expired or revoked") ||
     errorMessage.includes("Failed to refresh access token");
@@ -186,6 +188,7 @@ async function syncClaimedChannelVideos(
         error instanceof Error ? error.message : "Unknown error";
 
       const isTokenError =
+        isYouTubeInvalidGrantError(error) ||
         errorMessage.includes("invalid_grant") ||
         errorMessage.includes("Token has been expired or revoked") ||
         errorMessage.includes("status 400");

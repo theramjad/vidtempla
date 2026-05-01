@@ -1,5 +1,5 @@
 import Head from "next/head";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { OrganizationProvider, useOrganization } from "@/contexts/OrganizationContext";
 import { authClient } from "@/lib/auth-client";
@@ -25,10 +25,39 @@ function OrgSettingsContent() {
   const { toast } = useToast();
   const router = useRouter();
   const [orgName, setOrgName] = useState(name);
+  const [savedOrgName, setSavedOrgName] = useState(name);
+  const previousOrganizationIdRef = useRef(organizationId);
+  const currentOrganizationIdRef = useRef(organizationId);
+  const isDirtyRef = useRef(false);
+  const saveRequestIdRef = useRef(0);
   const [saving, setSaving] = useState(false);
   const [orgCount, setOrgCount] = useState<number | null>(null);
 
   const { data: plan } = api.dashboard.billing.getCurrentPlan.useQuery();
+  const isDirty = orgName !== savedOrgName;
+
+  useEffect(() => {
+    isDirtyRef.current = isDirty;
+  }, [isDirty]);
+
+  // Defense-in-depth: resync local state when the org name prop changes (e.g.
+  // active org switches in-place without a remount). Same-org updates are
+  // dirty-guarded so they don't stomp on user typing, but org switches must
+  // always reset the input to avoid saving a stale name into the new org.
+  useEffect(() => {
+    const organizationChanged = previousOrganizationIdRef.current !== organizationId;
+    previousOrganizationIdRef.current = organizationId;
+    currentOrganizationIdRef.current = organizationId;
+    if (organizationChanged) {
+      saveRequestIdRef.current += 1;
+      setSaving(false);
+    }
+    setSavedOrgName(name);
+    if (organizationChanged || !isDirtyRef.current) {
+      setOrgName(name);
+      isDirtyRef.current = false;
+    }
+  }, [organizationId, name]);
 
   useEffect(() => {
     authClient.organization.list().then(({ data }) => {
@@ -41,20 +70,46 @@ function OrgSettingsContent() {
   const canDelete = isOwner && !isPaid && !isLastOrg;
 
   async function handleSave() {
+    const requestId = saveRequestIdRef.current + 1;
+    saveRequestIdRef.current = requestId;
+    const organizationIdAtSave = organizationId;
+    const orgNameAtSave = orgName;
     setSaving(true);
     try {
       const { data } = await authClient.organization.update({
-        data: { name: orgName },
+        data: { name: orgNameAtSave },
       });
+      if (
+        saveRequestIdRef.current !== requestId ||
+        currentOrganizationIdRef.current !== organizationIdAtSave
+      ) {
+        return;
+      }
       toast({ title: "Organization updated" });
+      const updatedName = data?.name ?? orgNameAtSave;
+      setOrgName(updatedName);
+      setSavedOrgName(updatedName);
+      isDirtyRef.current = false;
       // If slug changed, redirect
       if (data?.slug && data.slug !== slug) {
         router.replace(`/org/${data.slug}/organization/settings`);
       }
     } catch (err: any) {
+      if (
+        saveRequestIdRef.current !== requestId ||
+        currentOrganizationIdRef.current !== organizationIdAtSave
+      ) {
+        return;
+      }
       toast({ variant: "destructive", title: "Failed", description: err?.message || "Unknown error" });
+    } finally {
+      if (
+        saveRequestIdRef.current === requestId &&
+        currentOrganizationIdRef.current === organizationIdAtSave
+      ) {
+        setSaving(false);
+      }
     }
-    setSaving(false);
   }
 
   async function handleDelete() {
@@ -80,8 +135,11 @@ function OrgSettingsContent() {
       {/* Name */}
       <div className="space-y-2">
         <label className="text-sm font-medium">Organization Name</label>
-        <Input value={orgName} onChange={(e) => setOrgName(e.target.value)} />
-        <Button onClick={handleSave} disabled={saving || orgName === name}>
+        <Input
+          value={orgName}
+          onChange={(e) => setOrgName(e.target.value)}
+        />
+        <Button onClick={handleSave} disabled={saving || !isDirty}>
           {saving ? "Saving..." : "Save"}
         </Button>
       </div>

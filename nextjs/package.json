@@ -8,6 +8,7 @@
     "vercel-build": "npx drizzle-kit migrate && next build",
     "lint": "next lint",
     "test:org-guards": "node scripts/check-youtube-router-org-guards.mjs",
+    "test:encryption": "node --experimental-strip-types --test scripts/test-encryption.mjs",
     "start": "next start"
   },
   "dependencies": {

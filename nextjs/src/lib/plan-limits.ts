@@ -282,6 +282,14 @@ export async function upsertCredits(organizationId: string, allocation: number, 
     organizationId, userId: resolvedUserId, balance: allocation, monthlyAllocation: allocation, periodStart, periodEnd,
   }).onConflictDoUpdate({
     target: userCredits.organizationId,
-    set: { balance: allocation, monthlyAllocation: allocation, periodStart, periodEnd, updatedAt: new Date() },
+    set: {
+      // Only reset balance to allocation when the period rolls over (periodStart changes).
+      // Mid-period updates (card change, proration, metadata edit) preserve consumed credits.
+      balance: sql`CASE WHEN ${userCredits.periodStart} = ${periodStart} THEN ${userCredits.balance} ELSE ${allocation} END`,
+      monthlyAllocation: allocation,
+      periodStart,
+      periodEnd,
+      updatedAt: new Date(),
+    },
   });
 }
