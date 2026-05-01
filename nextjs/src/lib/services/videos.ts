@@ -1,6 +1,7 @@
 import {
   eq,
   and,
+  or,
   desc,
   asc,
   ilike,
@@ -12,7 +13,7 @@ import {
   inArray,
   sql,
   getTableColumns,
-  or,
+  type SQL,
 } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -45,6 +46,12 @@ import { start } from "workflow/api";
 import { updateVideoDescriptionsWorkflow, type PushPayload } from "@/workflows/update-video-descriptions";
 import type { ServiceResult, PaginationMeta } from "./types";
 import { assertNoDrift, detectAndRecordDrift } from "./drift";
+import {
+  decodeCompositeCursor,
+  encodeCompositeCursor,
+  isEncodedCompositeCursor,
+  isValidCursorId,
+} from "./cursors";
 
 const DESCRIPTION_PUSH_RESERVATION_MS = 2 * 60 * 1000;
 
@@ -392,24 +399,115 @@ export async function listVideos(
     if (opts.hasDrift === true) filters.push(isNotNull(youtubeVideos.driftDetectedAt));
     if (opts.hasDrift === false) filters.push(isNull(youtubeVideos.driftDetectedAt));
 
+    const [sortField, sortDir] = sortParam.split(":");
+    const activeSortField = sortField === "title" ? "title" : "publishedAt";
+    const activeSortDir = sortDir === "asc" ? "asc" : "desc";
+    const isAsc = activeSortDir === "asc";
+    const isTitleSort = activeSortField === "title";
+
     if (opts.cursor) {
-      const [, sortDir] = sortParam.split(":");
-      if (sortDir === "asc") {
-        filters.push(gt(youtubeVideos.publishedAt, new Date(opts.cursor)));
+      if (isEncodedCompositeCursor(opts.cursor)) {
+        const cursor = decodeCompositeCursor(opts.cursor);
+        if (
+          !cursor ||
+          cursor.scope !== "videos" ||
+          cursor.sort !== activeSortField ||
+          cursor.dir !== activeSortDir ||
+          !isValidCursorId(cursor.id)
+        ) {
+          return invalidCursor();
+        }
+
+        const idCmp = isAsc ? gt : lt;
+        let primary: SQL | undefined;
+        let tieEq: SQL;
+        if (isTitleSort) {
+          if (cursor.key === null) {
+            filters.push(and(isNull(youtubeVideos.title), idCmp(youtubeVideos.id, cursor.id))!);
+            primary = undefined;
+          } else {
+            primary = isAsc
+              ? gt(youtubeVideos.title, cursor.key)
+              : lt(youtubeVideos.title, cursor.key);
+            tieEq = eq(youtubeVideos.title, cursor.key);
+            filters.push(
+              or(primary, isNull(youtubeVideos.title), and(tieEq, idCmp(youtubeVideos.id, cursor.id)))!
+            );
+          }
+        } else {
+          const cursorDate = parseCursorDate(cursor.key);
+          if (cursor.key !== null && !cursorDate) {
+            return invalidCursor();
+          }
+          if (cursorDate === null) {
+            filters.push(and(isNull(youtubeVideos.publishedAt), idCmp(youtubeVideos.id, cursor.id))!);
+            primary = undefined;
+          } else {
+            primary = isAsc
+              ? gt(youtubeVideos.publishedAt, cursorDate)
+              : lt(youtubeVideos.publishedAt, cursorDate);
+            tieEq = eq(youtubeVideos.publishedAt, cursorDate);
+            filters.push(
+              or(
+                primary,
+                isNull(youtubeVideos.publishedAt),
+                and(tieEq, idCmp(youtubeVideos.id, cursor.id))
+              )!
+            );
+          }
+        }
+      } else if (opts.cursor.includes("|")) {
+        // Pre-versioned composite cursor from this PR: `${sortKey}|${id}`.
+        const sepIdx = opts.cursor.lastIndexOf("|");
+        const cursorKey = opts.cursor.slice(0, sepIdx);
+        const cursorId = opts.cursor.slice(sepIdx + 1);
+        if (!cursorKey || !cursorId || !isValidCursorId(cursorId)) {
+          return invalidCursor();
+        }
+
+        const idCmp = isAsc ? gt : lt;
+        let primary: SQL;
+        let tieEq: SQL;
+        if (isTitleSort) {
+          primary = isAsc
+            ? gt(youtubeVideos.title, cursorKey)
+            : lt(youtubeVideos.title, cursorKey);
+          tieEq = eq(youtubeVideos.title, cursorKey);
+        } else {
+          const cursorDate = parseCursorDate(cursorKey);
+          if (!cursorDate) {
+            return invalidCursor();
+          }
+          primary = isAsc
+            ? gt(youtubeVideos.publishedAt, cursorDate)
+            : lt(youtubeVideos.publishedAt, cursorDate);
+          tieEq = eq(youtubeVideos.publishedAt, cursorDate);
+        }
+        filters.push(or(primary, and(tieEq, idCmp(youtubeVideos.id, cursorId)))!);
       } else {
-        filters.push(lt(youtubeVideos.publishedAt, new Date(opts.cursor)));
+        // Legacy cursor: bare publishedAt ISO string (pre-composite-cursor deploy).
+        const cursorDate = parseCursorDate(opts.cursor);
+        if (!cursorDate) {
+          return invalidCursor();
+        }
+        // Title-sort pages briefly emitted this legacy publishedAt cursor during
+        // rollout; accept it as a best-effort compatibility filter.
+        if (isAsc) {
+          filters.push(gt(youtubeVideos.publishedAt, cursorDate));
+        } else {
+          filters.push(lt(youtubeVideos.publishedAt, cursorDate));
+        }
       }
     }
 
-    const [sortField, sortDir] = sortParam.split(":");
-    const orderBy =
-      sortField === "title"
-        ? sortDir === "asc"
-          ? asc(youtubeVideos.title)
-          : desc(youtubeVideos.title)
-        : sortDir === "asc"
-          ? asc(youtubeVideos.publishedAt)
-          : desc(youtubeVideos.publishedAt);
+    const idTiebreaker = isAsc ? asc(youtubeVideos.id) : desc(youtubeVideos.id);
+    const primaryOrder = isTitleSort
+      ? isAsc
+        ? sql`${youtubeVideos.title} asc nulls last`
+        : sql`${youtubeVideos.title} desc nulls last`
+      : isAsc
+        ? sql`${youtubeVideos.publishedAt} asc nulls last`
+        : sql`${youtubeVideos.publishedAt} desc nulls last`;
 
     const results = await db
       .select({
@@ -425,12 +523,32 @@ export async function listVideos(
       .innerJoin(youtubeChannels, eq(youtubeVideos.channelId, youtubeChannels.id))
       .leftJoin(containers, eq(youtubeVideos.containerId, containers.id))
       .where(and(...filters))
-      .orderBy(orderBy)
+      .orderBy(primaryOrder, idTiebreaker)
       .limit(limit + 1);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
-    const nextCursor = hasMore && items.length > 0 ? items[items.length - 1]!.publishedAt?.toISOString() : undefined;
+    const last = items[items.length - 1];
+    let nextCursor: string | undefined;
+    if (hasMore && last) {
+      if (isTitleSort) {
+        nextCursor = encodeCompositeCursor({
+          scope: "videos",
+          sort: activeSortField,
+          dir: activeSortDir,
+          key: last.title,
+          id: last.id,
+        });
+      } else {
+        nextCursor = encodeCompositeCursor({
+          scope: "videos",
+          sort: activeSortField,
+          dir: activeSortDir,
+          key: last.publishedAt?.toISOString() ?? null,
+          id: last.id,
+        });
+      }
+    }
 
     const baseFilters = [ownerFilter] as any[];
     if (opts.channelId) baseFilters.push(eq(youtubeChannels.channelId, opts.channelId));
@@ -464,6 +582,23 @@ export async function listVideos(
       },
     };
   }
+}
+
+function invalidCursor(): ServiceResult<{ data: any[]; meta: PaginationMeta; source: "db" | "youtube" }> {
+  return {
+    error: {
+      code: "INVALID_CURSOR",
+      message: "Invalid cursor format",
+      suggestion: "Omit the cursor to start from the first page",
+      status: 400,
+    },
+  };
+}
+
+function parseCursorDate(value: string | null): Date | null {
+  if (value === null) return null;
+  const parsedDate = new Date(value);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
 }
 
 export async function getVideo(
