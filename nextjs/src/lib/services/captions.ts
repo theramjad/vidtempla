@@ -21,16 +21,17 @@ export interface CaptionTrackInfo {
 
 export async function listVideoCaptions(
   videoId: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<CaptionTrackInfo[]>> {
   try {
-    const videoResult = await resolveVideo(videoId, userId);
+    const videoResult = await resolveVideo(videoId, userId, organizationId);
     if (!videoResult.found) {
       return { error: videoNotFoundError(videoResult.reason) };
     }
     const video = videoResult.video;
 
-    const tokens = await getChannelTokens(video.channelYoutubeId, userId);
+    const tokens = await getChannelTokens(video.channelYoutubeId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -71,16 +72,17 @@ export interface TranscriptResult {
 export async function getVideoTranscript(
   videoId: string,
   userId: string,
-  opts: TranscriptOpts = {}
+  opts: TranscriptOpts = {},
+  organizationId?: string
 ): Promise<ServiceResult<TranscriptResult>> {
   try {
-    const videoResult = await resolveVideo(videoId, userId);
+    const videoResult = await resolveVideo(videoId, userId, organizationId);
     if (!videoResult.found) {
       return { error: videoNotFoundError(videoResult.reason) };
     }
     const video = videoResult.video;
 
-    const tokens = await getChannelTokens(video.channelYoutubeId, userId);
+    const tokens = await getChannelTokens(video.channelYoutubeId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -161,16 +163,17 @@ export async function getVideoTranscript(
 export async function insertCaption(
   videoId: string,
   userId: string,
-  opts: { language: string; name: string; captionData: string; isDraft?: boolean; sync?: boolean }
+  opts: { language: string; name: string; captionData: string; isDraft?: boolean; sync?: boolean },
+  organizationId?: string
 ): Promise<ServiceResult<CaptionTrackInfo>> {
   try {
-    const videoResult = await resolveVideo(videoId, userId);
+    const videoResult = await resolveVideo(videoId, userId, organizationId);
     if (!videoResult.found) {
       return { error: videoNotFoundError(videoResult.reason) };
     }
     const video = videoResult.video;
 
-    const tokens = await getChannelTokens(video.channelYoutubeId, userId);
+    const tokens = await getChannelTokens(video.channelYoutubeId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -199,16 +202,17 @@ export async function updateCaption(
   videoId: string,
   userId: string,
   captionId: string,
-  opts: { captionData?: string; isDraft?: boolean }
+  opts: { captionData?: string; isDraft?: boolean },
+  organizationId?: string
 ): Promise<ServiceResult<CaptionTrackInfo>> {
   try {
-    const videoResult = await resolveVideo(videoId, userId);
+    const videoResult = await resolveVideo(videoId, userId, organizationId);
     if (!videoResult.found) {
       return { error: videoNotFoundError(videoResult.reason) };
     }
     const video = videoResult.video;
 
-    const tokens = await getChannelTokens(video.channelYoutubeId, userId);
+    const tokens = await getChannelTokens(video.channelYoutubeId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -234,16 +238,17 @@ export async function updateCaption(
 export async function deleteCaption(
   videoId: string,
   userId: string,
-  captionId: string
+  captionId: string,
+  organizationId?: string
 ): Promise<ServiceResult<{ deleted: true }>> {
   try {
-    const videoResult = await resolveVideo(videoId, userId);
+    const videoResult = await resolveVideo(videoId, userId, organizationId);
     if (!videoResult.found) {
       return { error: videoNotFoundError(videoResult.reason) };
     }
     const video = videoResult.video;
 
-    const tokens = await getChannelTokens(video.channelYoutubeId, userId);
+    const tokens = await getChannelTokens(video.channelYoutubeId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
