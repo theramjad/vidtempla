@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 import { start } from "workflow/api";
 import { scheduledSyncWorkflow } from "@/workflows/scheduled-sync";
+import { verifyCronAuth } from "@/lib/cron-auth";
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (
-    process.env.CRON_SECRET &&
-    authHeader !== `Bearer ${process.env.CRON_SECRET}`
-  ) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = verifyCronAuth(request);
+  if (unauthorized) {
+    return unauthorized;
   }
 
   const run = await start(scheduledSyncWorkflow);

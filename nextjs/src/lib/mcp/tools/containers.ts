@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { toMcp, getSessionUserId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
+import { toMcp, getSessionUserId, getSessionOrgId, logMcpRequest, READ, WRITE, DESTRUCTIVE } from "../helpers";
 import {
   listContainers,
   getContainer,
@@ -20,7 +20,8 @@ export function registerContainerTools(server: McpServer) {
     READ,
     async (args) => {
       const userId = getSessionUserId();
-      const result = await listContainers(userId, args);
+      const organizationId = getSessionOrgId();
+      const result = await listContainers(organizationId, args);
       logMcpRequest(userId, "list_containers", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -33,7 +34,8 @@ export function registerContainerTools(server: McpServer) {
     READ,
     async ({ id }) => {
       const userId = getSessionUserId();
-      const result = await getContainer(id, userId);
+      const organizationId = getSessionOrgId();
+      const result = await getContainer(id, organizationId);
       logMcpRequest(userId, "get_container", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -50,7 +52,8 @@ export function registerContainerTools(server: McpServer) {
     WRITE,
     async ({ name, templateIds, separator }) => {
       const userId = getSessionUserId();
-      const result = await createContainer(userId, name, templateIds, separator);
+      const organizationId = getSessionOrgId();
+      const result = await createContainer(userId, organizationId, name, templateIds, separator);
       logMcpRequest(userId, "create_container", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -69,7 +72,8 @@ export function registerContainerTools(server: McpServer) {
     WRITE,
     async ({ id, name, templateIds, separator, force }) => {
       const userId = getSessionUserId();
-      const result = await updateContainer(id, userId, { name, templateIds, separator, force });
+      const organizationId = getSessionOrgId();
+      const result = await updateContainer(id, userId, organizationId, { name, templateIds, separator, force });
       logMcpRequest(userId, "update_container", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -82,7 +86,8 @@ export function registerContainerTools(server: McpServer) {
     DESTRUCTIVE,
     async ({ id }) => {
       const userId = getSessionUserId();
-      const result = await deleteContainer(id, userId);
+      const organizationId = getSessionOrgId();
+      const result = await deleteContainer(id, organizationId);
       logMcpRequest(userId, "delete_container", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
