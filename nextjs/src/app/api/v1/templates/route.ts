@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const url = new URL(request.url);
-  const result = await listTemplates(auth.userId, {
+  const result = await listTemplates(auth.organizationId, {
     cursor: url.searchParams.get("cursor") ?? undefined,
     limit: url.searchParams.has("limit") ? parseInt(url.searchParams.get("limit")!) : undefined,
   });
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const result = await createTemplate(auth.userId, name, content);
+  const result = await createTemplate(auth.userId, auth.organizationId, name, content);
 
   if ("error" in result) {
     logRequest(auth, "/v1/templates", "POST", result.error.status, 0);
