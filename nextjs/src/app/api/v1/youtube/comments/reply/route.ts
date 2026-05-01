@@ -7,6 +7,7 @@ import {
   getChannelTokens,
   logRequest,
 } from "@/lib/api-auth";
+import { mapYouTubeError } from "@/lib/youtube-errors";
 import axios from "axios";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     await logRequest(ctx, "/youtube/comments/reply", "POST", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -81,21 +82,8 @@ export async function POST(request: NextRequest) {
     await logRequest(ctx, "/youtube/comments/reply", "POST", 201, 50);
     return NextResponse.json(apiSuccess(response.data, { quotaUnits: 50 }));
   } catch (error) {
-    const status = axios.isAxiosError(error)
-      ? error.response?.status || 500
-      : 500;
-    const message = axios.isAxiosError(error)
-      ? error.response?.data?.error?.message || error.message
-      : "Unknown error";
-    await logRequest(ctx, "/youtube/comments/reply", "POST", status, 50);
-    return NextResponse.json(
-      apiError(
-        "YOUTUBE_API_ERROR",
-        message,
-        "Check that parentId is a valid comment ID and you have permission to reply",
-        status
-      ),
-      { status }
-    );
+    const mapped = mapYouTubeError(error);
+    await logRequest(ctx, "/youtube/comments/reply", "POST", mapped.status, 50);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }

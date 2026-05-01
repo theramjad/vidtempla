@@ -1,33 +1,86 @@
-import { eq, and, desc, lt, count, inArray, asc } from "drizzle-orm";
+import { eq, and, or, desc, lt, count, inArray, asc, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { templates, containers, youtubeVideos } from "@/db/schema";
 import { parseVariables } from "@/utils/templateParser";
 import type { ServiceResult, PaginationOpts, PaginationMeta } from "./types";
 import { assertNoDrift } from "./drift";
 import { pushVideoDescriptions } from "./videos";
+import {
+  decodeCompositeCursor,
+  encodeCompositeCursor,
+  isEncodedCompositeCursor,
+  isValidCursorId,
+} from "./cursors";
 
 // ── list_templates ───────────────────────────────────────────
 
 export async function listTemplates(
-  userId: string,
+  organizationId: string,
   opts: PaginationOpts
 ): Promise<ServiceResult<{ data: unknown[]; meta: PaginationMeta }>> {
   try {
     const limit = Math.min(opts.limit ?? 50, 100);
-    const filters: ReturnType<typeof eq>[] = [eq(templates.userId, userId)];
-    if (opts.cursor) filters.push(lt(templates.createdAt, new Date(opts.cursor)));
+    const filters: SQL[] = [eq(templates.organizationId, organizationId)];
+    if (opts.cursor) {
+      if (isEncodedCompositeCursor(opts.cursor)) {
+        const cursor = decodeCompositeCursor(opts.cursor);
+        if (!cursor || cursor.scope !== "templates" || !isValidCursorId(cursor.id)) {
+          return invalidCursor();
+        }
+        const parsedDate = parseCursorDate(cursor.key);
+        if (!parsedDate) {
+          return invalidCursor();
+        }
+        filters.push(
+          or(
+            lt(templates.createdAt, parsedDate),
+            and(eq(templates.createdAt, parsedDate), lt(templates.id, cursor.id))
+          )!
+        );
+      } else if (opts.cursor.includes("|")) {
+        // Pre-versioned composite cursor from this PR: `${createdAt}|${id}`.
+        const [cursorDate, cursorId, extra] = opts.cursor.split("|");
+        if (!cursorDate || !cursorId || extra !== undefined || !isValidCursorId(cursorId)) {
+          return invalidCursor();
+        }
+        const parsedDate = parseCursorDate(cursorDate);
+        if (!parsedDate) {
+          return invalidCursor();
+        }
+        filters.push(
+          or(
+            lt(templates.createdAt, parsedDate),
+            and(eq(templates.createdAt, parsedDate), lt(templates.id, cursorId))
+          )!
+        );
+      } else {
+        // Legacy single-column cursor in flight: bare createdAt ISO string.
+        const parsedDate = parseCursorDate(opts.cursor);
+        if (!parsedDate) {
+          return invalidCursor();
+        }
+        filters.push(lt(templates.createdAt, parsedDate));
+      }
+    }
 
     const results = await db
       .select()
       .from(templates)
       .where(and(...filters))
-      .orderBy(desc(templates.createdAt))
+      .orderBy(desc(templates.createdAt), desc(templates.id))
       .limit(limit + 1);
 
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
+    const last = items[items.length - 1];
     const nextCursor =
-      hasMore && items.length > 0 ? items[items.length - 1]!.createdAt.toISOString() : undefined;
+      hasMore && last
+        ? encodeCompositeCursor({
+            scope: "templates",
+            key: last.createdAt.toISOString(),
+            id: last.id,
+          })
+        : undefined;
 
     const templatesWithVars = items.map((t) => ({
       ...t,
@@ -37,7 +90,7 @@ export async function listTemplates(
     const [totalResult] = await db
       .select({ total: count() })
       .from(templates)
-      .where(eq(templates.userId, userId));
+      .where(eq(templates.organizationId, organizationId));
 
     return {
       data: {
@@ -50,17 +103,34 @@ export async function listTemplates(
   }
 }
 
+function invalidCursor(): ServiceResult<{ data: unknown[]; meta: PaginationMeta }> {
+  return {
+    error: {
+      code: "INVALID_CURSOR",
+      message: "Invalid cursor format",
+      suggestion: "Omit the cursor to start from the first page",
+      status: 400,
+    },
+  };
+}
+
+function parseCursorDate(value: string | null): Date | null {
+  if (value === null) return null;
+  const parsedDate = new Date(value);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+}
+
 // ── get_template ─────────────────────────────────────────────
 
 export async function getTemplate(
   id: string,
-  userId: string
+  organizationId: string
 ): Promise<ServiceResult<unknown>> {
   try {
     const [template] = await db
       .select()
       .from(templates)
-      .where(and(eq(templates.id, id), eq(templates.userId, userId)));
+      .where(and(eq(templates.id, id), eq(templates.organizationId, organizationId)));
 
     if (!template) {
       return { error: { code: "TEMPLATE_NOT_FOUND", message: "Template not found", suggestion: "Check the template ID", status: 404 } };
@@ -76,6 +146,7 @@ export async function getTemplate(
 
 export async function createTemplate(
   userId: string,
+  organizationId: string,
   name: string,
   content: string
 ): Promise<ServiceResult<unknown>> {
@@ -86,7 +157,7 @@ export async function createTemplate(
 
     const [template] = await db
       .insert(templates)
-      .values({ userId, name: name.trim(), content })
+      .values({ userId, organizationId, name: name.trim(), content })
       .returning();
 
     return { data: { ...template, variables: parseVariables(content) } };
@@ -100,6 +171,7 @@ export async function createTemplate(
 export async function updateTemplate(
   id: string,
   userId: string,
+  organizationId: string,
   data: { name?: string; content?: string; force?: boolean }
 ): Promise<ServiceResult<unknown>> {
   try {
@@ -155,7 +227,7 @@ export async function updateTemplate(
     const [template] = await db
       .update(templates)
       .set(updateData)
-      .where(and(eq(templates.id, id), eq(templates.userId, userId)))
+      .where(and(eq(templates.id, id), eq(templates.organizationId, organizationId)))
       .returning();
 
     if (!template) {
@@ -176,12 +248,12 @@ export async function updateTemplate(
 
 export async function deleteTemplate(
   id: string,
-  userId: string
+  organizationId: string
 ): Promise<ServiceResult<{ success: true }>> {
   try {
     const result = await db
       .delete(templates)
-      .where(and(eq(templates.id, id), eq(templates.userId, userId)))
+      .where(and(eq(templates.id, id), eq(templates.organizationId, organizationId)))
       .returning({ id: templates.id });
 
     if (result.length === 0) {
@@ -198,13 +270,14 @@ export async function deleteTemplate(
 
 export async function getTemplateImpact(
   id: string,
-  userId: string
+  userId: string,
+  organizationId: string
 ): Promise<ServiceResult<unknown>> {
   try {
     const [template] = await db
       .select({ id: templates.id })
       .from(templates)
-      .where(and(eq(templates.id, id), eq(templates.userId, userId)));
+      .where(and(eq(templates.id, id), eq(templates.organizationId, organizationId)));
 
     if (!template) {
       return { error: { code: "TEMPLATE_NOT_FOUND", message: "Template not found", suggestion: "Check the template ID", status: 404 } };

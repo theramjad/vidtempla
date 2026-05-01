@@ -1,10 +1,12 @@
 import { db } from "@/db";
 import { youtubeVideos, descriptionHistory } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   getChannelAccessToken,
   updateVideoDescription,
 } from "@/lib/clients/youtube";
+
+const DESCRIPTION_PUSH_RESERVATION_MS = 2 * 60 * 1000;
 
 export interface PushPayload {
   videoId: string;
@@ -38,51 +40,120 @@ async function runUpdateVideoDescription(payload: PushPayload) {
 
   const canonical = newDescription.replace(/\s+$/, "");
   const accessToken = await getChannelAccessToken(channelId);
+  const reservationExpiresAt = new Date(
+    Date.now() + DESCRIPTION_PUSH_RESERVATION_MS
+  );
 
+  // Phase 1: validate state in a short read-only txn (no FOR UPDATE — we use CAS
+  // on render_version in phase 3 to detect concurrent modifications).
+  const preCheckRows = await db.execute(sql<{
+    renderVersion: number;
+    driftDetectedAt: Date | null;
+  }>`
+    select render_version as "renderVersion",
+           drift_detected_at as "driftDetectedAt"
+    from youtube_videos
+    where id = ${videoId}
+  `);
+  const preCheck = preCheckRows[0];
+
+  if (!preCheck) {
+    console.warn("[update-video-descriptions] video no longer exists — skipping push", {
+      videoId,
+    });
+    return { success: true, videoId, stale: true };
+  }
+
+  if (Number(preCheck.renderVersion) !== renderVersion) {
+    console.log("[update-video-descriptions] stale push discarded", {
+      videoId,
+      payloadRenderVersion: renderVersion,
+      currentRenderVersion: Number(preCheck.renderVersion),
+    });
+    return { success: true, videoId, stale: true };
+  }
+
+  if (preCheck.driftDetectedAt) {
+    console.warn("[update-video-descriptions] overwriting drifted description via template push", {
+      videoId,
+      driftDetectedAt: preCheck.driftDetectedAt,
+    });
+  }
+
+  // Phase 2a: reserve this render with a short CAS before the external PUT.
+  // If the row was deleted or modified after the pre-check, skip the side effect.
+  const claimRows = await db
+    .update(youtubeVideos)
+    .set({
+      descriptionPushReservedUntil: reservationExpiresAt,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(youtubeVideos.id, videoId),
+        eq(youtubeVideos.renderVersion, renderVersion),
+        sql`(${youtubeVideos.descriptionPushReservedUntil} is null or ${youtubeVideos.descriptionPushReservedUntil} <= now())`
+      )
+    )
+    .returning({ renderVersion: youtubeVideos.renderVersion });
+
+  const claimedRenderVersion = Number(claimRows[0]?.renderVersion ?? 0);
+
+  if (!claimedRenderVersion) {
+    console.warn(
+      "[update-video-descriptions] CAS claim failed before YouTube PUT — skipping side effect",
+      { videoId, renderVersion }
+    );
+    return { success: true, videoId, stale: true };
+  }
+
+  // Phase 2b: external HTTP PUT — performed OUTSIDE any transaction so we never
+  // hold a row lock across the YouTube round-trip. If this throws, best-effort
+  // restore the reservation so the workflow retry can use the original stamp.
+  try {
+    await updateVideoDescription(videoIdYouTube, canonical, accessToken);
+  } catch (err) {
+    await db
+      .update(youtubeVideos)
+      .set({
+        descriptionPushReservedUntil: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(youtubeVideos.id, videoId),
+          eq(youtubeVideos.renderVersion, claimedRenderVersion)
+        )
+      );
+    throw err;
+  }
+
+  // Phase 3: short write txn with CAS on render_version. If a concurrent writer
+  // bumped render_version between phase 1 and phase 3, we abort the local write
+  // (YouTube is already updated — the next sync's drift detection will surface
+  // any remaining divergence rather than overwriting concurrent intent here).
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`set local statement_timeout = '30s'`);
 
-    const currentRows = await tx.execute(sql<{
-      renderVersion: number;
-      driftDetectedAt: Date | null;
-    }>`
-      select render_version as "renderVersion",
-             drift_detected_at as "driftDetectedAt"
-      from youtube_videos
-      where id = ${videoId}
-      for update
-    `);
-    const current = currentRows[0];
-
-    if (!current) {
-      console.warn("[update-video-descriptions] video no longer exists — skipping push", {
-        videoId,
-      });
-      return { stale: true as const };
-    }
-
-    if (Number(current.renderVersion) !== renderVersion) {
-      console.log("[update-video-descriptions] stale push discarded", {
-        videoId,
-        payloadRenderVersion: renderVersion,
-        currentRenderVersion: Number(current.renderVersion),
-      });
-      return { stale: true as const };
-    }
-
-    if (current.driftDetectedAt) {
-      console.warn("[update-video-descriptions] overwriting drifted description via template push", {
-        videoId,
-        driftDetectedAt: current.driftDetectedAt,
-      });
-    }
-
-    await updateVideoDescription(videoIdYouTube, canonical, accessToken);
-
-    await tx
+    const updated = await tx
       .update(youtubeVideos)
-      .set({ currentDescription: canonical, driftDetectedAt: null })
-      .where(eq(youtubeVideos.id, videoId));
+      .set({
+        currentDescription: canonical,
+        driftDetectedAt: null,
+        renderVersion: sql`${youtubeVideos.renderVersion} + 1`,
+        descriptionPushReservedUntil: null,
+      })
+      .where(
+        and(
+          eq(youtubeVideos.id, videoId),
+          eq(youtubeVideos.renderVersion, claimedRenderVersion)
+        )
+      )
+      .returning({ id: youtubeVideos.id });
+
+    if (updated.length === 0) {
+      return { casFailed: true as const };
+    }
 
     const nextVersionRows = await tx.execute(sql<{ next: number }>`
       select coalesce(max(version_number), 0) + 1 as next
@@ -99,10 +170,14 @@ async function runUpdateVideoDescription(payload: PushPayload) {
       source: "template_push",
     });
 
-    return { stale: false as const };
+    return { casFailed: false as const };
   });
 
-  if (result.stale) {
+  if (result.casFailed) {
+    console.warn(
+      "[update-video-descriptions] CAS failed after YouTube PUT — concurrent writer changed render_version; YouTube has new description but DB write skipped (drift detection will reconcile)",
+      { videoId, renderVersion, claimedRenderVersion }
+    );
     return { success: true, videoId, stale: true };
   }
 

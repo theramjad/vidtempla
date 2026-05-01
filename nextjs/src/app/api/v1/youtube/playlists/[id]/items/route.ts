@@ -7,12 +7,13 @@ import {
   getChannelTokens,
   logRequest,
 } from "@/lib/api-auth";
+import { mapYouTubeError } from "@/lib/youtube-errors";
 import axios from "axios";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 
 /**
- * GET /api/v1/youtube/playlists/[id]/items?channelId=...&pageToken=...&maxResults=25
+ * GET /api/v1/youtube/playlists/[id]/items?channelId=...&cursor=...&maxResults=25
  * List items in a playlist
  * Quota cost: 1 unit
  */
@@ -26,7 +27,7 @@ export async function GET(
   const { id } = await params;
   const { searchParams } = new URL(request.url);
   const channelId = searchParams.get("channelId");
-  const pageToken = searchParams.get("pageToken");
+  const pageToken = searchParams.get("cursor") || searchParams.get("pageToken");
   const maxResults = Math.min(
     parseInt(searchParams.get("maxResults") || "25", 10),
     50
@@ -45,7 +46,7 @@ export async function GET(
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     await logRequest(ctx, `/youtube/playlists/${id}/items`, "GET", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -63,30 +64,20 @@ export async function GET(
     });
 
     await logRequest(ctx, `/youtube/playlists/${id}/items`, "GET", 200, 1);
+    const nextPageToken: string | null = response.data.nextPageToken || null;
+    const pageInfo: { totalResults?: number } | undefined = response.data.pageInfo;
     return NextResponse.json(
       apiSuccess(response.data.items || [], {
+        cursor: nextPageToken,
+        hasMore: Boolean(nextPageToken),
+        total: pageInfo?.totalResults ?? null,
         quotaUnits: 1,
-        pageInfo: response.data.pageInfo,
-        nextPageToken: response.data.nextPageToken || null,
       })
     );
   } catch (error) {
-    const status = axios.isAxiosError(error)
-      ? error.response?.status || 500
-      : 500;
-    const message = axios.isAxiosError(error)
-      ? error.response?.data?.error?.message || error.message
-      : "Unknown error";
-    await logRequest(ctx, `/youtube/playlists/${id}/items`, "GET", status, 1);
-    return NextResponse.json(
-      apiError(
-        "YOUTUBE_API_ERROR",
-        message,
-        "Check the playlist ID is correct",
-        status
-      ),
-      { status }
-    );
+    const mapped = mapYouTubeError(error);
+    await logRequest(ctx, `/youtube/playlists/${id}/items`, "GET", mapped.status, 1);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }
 
@@ -138,7 +129,7 @@ export async function POST(
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     await logRequest(ctx, `/youtube/playlists/${id}/items`, "POST", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -168,21 +159,8 @@ export async function POST(
     await logRequest(ctx, `/youtube/playlists/${id}/items`, "POST", 201, 50);
     return NextResponse.json(apiSuccess(response.data, { quotaUnits: 50 }));
   } catch (error) {
-    const status = axios.isAxiosError(error)
-      ? error.response?.status || 500
-      : 500;
-    const message = axios.isAxiosError(error)
-      ? error.response?.data?.error?.message || error.message
-      : "Unknown error";
-    await logRequest(ctx, `/youtube/playlists/${id}/items`, "POST", status, 50);
-    return NextResponse.json(
-      apiError(
-        "YOUTUBE_API_ERROR",
-        message,
-        "Check the videoId and playlist permissions",
-        status
-      ),
-      { status }
-    );
+    const mapped = mapYouTubeError(error);
+    await logRequest(ctx, `/youtube/playlists/${id}/items`, "POST", mapped.status, 50);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }

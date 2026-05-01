@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     filters?: string;
     sort?: string;
     maxResults?: number;
-  });
+  }, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, "/analytics/query", "POST", result.error.status, 0);
