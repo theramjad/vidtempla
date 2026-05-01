@@ -405,6 +405,7 @@ export default function VideosTab() {
         {/* History Drawer */}
         {selectedVideo && (
           <HistoryDrawer
+            key={selectedVideo.id}
             videoId={selectedVideo.id}
             videoTitle={selectedVideo.title ?? 'Untitled Video'}
             open={historyOpen}

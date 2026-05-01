@@ -4,7 +4,7 @@
  */
 
 import { z } from "zod";
-import { orgProcedure } from "@/server/trpc/init";
+import { orgProcedure, orgAdminProcedure } from "@/server/trpc/init";
 import { TRPCError } from "@trpc/server";
 import { stripe } from "@/lib/stripe-server";
 import {
@@ -81,7 +81,7 @@ export const billingRouter = router({
   /**
    * Create a checkout session for upgrading to a paid plan
    */
-  createCheckoutSession: orgProcedure
+  createCheckoutSession: orgAdminProcedure
     .input(
       z.object({
         planTier: z.enum(["pro", "business"]),
@@ -159,7 +159,7 @@ export const billingRouter = router({
   /**
    * Get the customer portal URL for managing subscriptions
    */
-  getCustomerPortalUrl: orgProcedure.query(async ({ ctx }) => {
+  getCustomerPortalUrl: orgAdminProcedure.query(async ({ ctx }) => {
     try {
       const [subscription] = await db
         .select({ stripeCustomerId: subscriptions.stripeCustomerId })
@@ -308,7 +308,7 @@ export const billingRouter = router({
   /**
    * Update subscription to a different plan
    */
-  updateSubscription: orgProcedure
+  updateSubscription: orgAdminProcedure
     .input(
       z.object({
         targetPlanTier: z.enum(["free", "pro", "business"]),
