@@ -16,10 +16,11 @@ import type { ServiceResult } from "./types";
 export async function listPlaylists(
   channelId: string,
   userId: string,
-  opts: { maxResults?: number; pageToken?: string } = {}
+  opts: { maxResults?: number; pageToken?: string } = {},
+  organizationId?: string
 ): Promise<ServiceResult<{ items: unknown[]; nextPageToken?: string }>> {
   try {
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -36,10 +37,11 @@ export async function listPlaylists(
 export async function createPlaylist(
   channelId: string,
   userId: string,
-  opts: { title: string; description?: string; privacyStatus?: string }
+  opts: { title: string; description?: string; privacyStatus?: string },
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -56,10 +58,11 @@ export async function createPlaylist(
 export async function getPlaylist(
   playlistId: string,
   channelId: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -80,10 +83,11 @@ export async function updatePlaylist(
   playlistId: string,
   channelId: string,
   userId: string,
-  updates: { title?: string; description?: string; privacyStatus?: string }
+  updates: { title?: string; description?: string; privacyStatus?: string },
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -116,10 +120,11 @@ export async function updatePlaylist(
 export async function deletePlaylist(
   playlistId: string,
   channelId: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<{ deleted: true }>> {
   try {
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -137,10 +142,11 @@ export async function listPlaylistItems(
   playlistId: string,
   channelId: string,
   userId: string,
-  opts: { maxResults?: number; pageToken?: string } = {}
+  opts: { maxResults?: number; pageToken?: string } = {},
+  organizationId?: string
 ): Promise<ServiceResult<{ items: unknown[]; nextPageToken?: string }>> {
   try {
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -158,10 +164,11 @@ export async function addPlaylistItem(
   playlistId: string,
   channelId: string,
   userId: string,
-  videoId: string
+  videoId: string,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -178,10 +185,11 @@ export async function addPlaylistItem(
 export async function deletePlaylistItem(
   itemId: string,
   channelId: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<{ deleted: true }>> {
   try {
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }

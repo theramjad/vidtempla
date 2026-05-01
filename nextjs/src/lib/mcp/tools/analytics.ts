@@ -24,7 +24,8 @@ export function registerAnalyticsTools(server: McpServer) {
     READ,
     async ({ channelId, ...opts }) => {
       const userId = getSessionUserId();
-      const result = await getChannelAnalytics(channelId, userId, opts);
+      const orgId = getSessionOrgId();
+      const result = await getChannelAnalytics(channelId, userId, opts, orgId);
       logMcpRequest(userId, "get_channel_analytics", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -46,7 +47,8 @@ export function registerAnalyticsTools(server: McpServer) {
     READ,
     async (args) => {
       const userId = getSessionUserId();
-      const result = await queryAnalytics(userId, args);
+      const orgId = getSessionOrgId();
+      const result = await queryAnalytics(userId, args, orgId);
       logMcpRequest(userId, "query_analytics", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -67,7 +69,7 @@ export function registerAnalyticsTools(server: McpServer) {
       const orgId = getSessionOrgId();
       const credits = await consumeCredits(orgId, 100);
       if (!credits.success) return mcpQuotaExceeded(userId, "search_my_videos");
-      const result = await searchMyVideos(channelId, userId, opts);
+      const result = await searchMyVideos(channelId, userId, opts, orgId);
       logMcpRequest(userId, "search_my_videos", 100, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -98,7 +100,7 @@ export function registerAnalyticsTools(server: McpServer) {
       const orgId = getSessionOrgId();
       const credits = await consumeCredits(orgId, 100);
       if (!credits.success) return mcpQuotaExceeded(userId, "search_youtube");
-      const result = await searchYouTube(channelId, userId, opts);
+      const result = await searchYouTube(channelId, userId, opts, orgId);
       logMcpRequest(userId, "search_youtube", 100, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -111,7 +113,8 @@ export function registerAnalyticsTools(server: McpServer) {
     WRITE,
     async ({ channelId }) => {
       const userId = getSessionUserId();
-      const result = await syncChannel(channelId, userId);
+      const orgId = getSessionOrgId();
+      const result = await syncChannel(channelId, userId, orgId);
       logMcpRequest(userId, "sync_channel", 0, "error" in result ? 400 : 200);
       return toMcp(result);
     }

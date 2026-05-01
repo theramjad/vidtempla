@@ -768,10 +768,20 @@ async function buildPushPayload(
     return null;
   }
 
-  const templatesList = await tx
-    .select({ id: templates.id, content: templates.content })
-    .from(templates)
-    .where(inArray(templates.id, video.container.templateOrder));
+  const templatesList = video.container.organizationId
+    ? await tx
+        .select({ id: templates.id, content: templates.content })
+        .from(templates)
+        .where(
+          and(
+            inArray(templates.id, video.container.templateOrder),
+            eq(templates.organizationId, video.container.organizationId)
+          )
+        )
+    : await tx
+        .select({ id: templates.id, content: templates.content })
+        .from(templates)
+        .where(inArray(templates.id, video.container.templateOrder));
 
   if (templatesList.length === 0) return null;
 
