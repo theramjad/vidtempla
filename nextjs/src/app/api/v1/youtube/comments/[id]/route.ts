@@ -13,7 +13,7 @@ import axios from "axios";
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 
 /**
- * GET /api/v1/youtube/comments/[id]?channelId=...&maxResults=100&order=relevance|time&pageToken=...
+ * GET /api/v1/youtube/comments/[id]?channelId=...&maxResults=100&order=relevance|time&cursor=...
  * List comment threads for a video (id = videoId)
  * Quota cost: 1 unit
  */
@@ -27,7 +27,7 @@ export async function GET(
   const { id: videoId } = await params;
   const { searchParams } = new URL(request.url);
   const channelId = searchParams.get("channelId");
-  const pageToken = searchParams.get("pageToken");
+  const pageToken = searchParams.get("cursor") || searchParams.get("pageToken");
   const maxResults = Math.min(
     parseInt(searchParams.get("maxResults") || "20", 10),
     100
@@ -79,11 +79,14 @@ export async function GET(
     });
 
     await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", 200, 1);
+    const nextPageToken: string | null = response.data.nextPageToken || null;
+    const pageInfo: { totalResults?: number } | undefined = response.data.pageInfo;
     return NextResponse.json(
       apiSuccess(response.data.items || [], {
+        cursor: nextPageToken,
+        hasMore: Boolean(nextPageToken),
+        total: pageInfo?.totalResults ?? null,
         quotaUnits: 1,
-        pageInfo: response.data.pageInfo,
-        nextPageToken: response.data.nextPageToken || null,
       })
     );
   } catch (error) {
