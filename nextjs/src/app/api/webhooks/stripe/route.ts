@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "@/lib/stripe-server";
 import { db } from "@/db";
 import { webhookEvents, subscriptions } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { PlanTier, SubscriptionStatus } from "@/lib/stripe";
 import { mapPriceIdToPlanTier, PLAN_CONFIG } from "@/lib/stripe";
 import { upsertCredits } from "@/lib/plan-limits";
@@ -56,54 +56,94 @@ export async function POST(request: NextRequest) {
   console.log(`Received webhook event: ${event.type}`);
 
   try {
-    // Store webhook event for audit trail and idempotency
-    await db.insert(webhookEvents).values({
-      eventId: event.id,
-      eventType: event.type,
-      payload: event.data.object as never,
-      processed: false,
-    }).onConflictDoUpdate({
-      target: webhookEvents.eventId,
-      set: {
-        eventType: event.type,
-        payload: event.data.object as never,
-        processed: false,
-      },
+    return await db.transaction(async (tx) => {
+      const lockRows = await tx.execute<{ locked: boolean }>(
+        sql`select pg_try_advisory_xact_lock(hashtextextended(${event.id}, 0)) as locked`
+      );
+
+      if (!lockRows[0]?.locked) {
+        console.log(`Webhook event already in progress: ${event.id}`);
+        return NextResponse.json(
+          { error: "Webhook event already in progress" },
+          { status: 500 }
+        );
+      }
+
+      try {
+        // Idempotency guard: if this event has already been processed, acknowledge
+        // without re-running handlers. Stripe redelivers (retries, manual replays,
+        // network blips) must not cause duplicate credit allocations or notifications.
+        const [existing] = await tx
+          .select({ processed: webhookEvents.processed })
+          .from(webhookEvents)
+          .where(eq(webhookEvents.eventId, event.id))
+          .limit(1);
+
+        if (existing?.processed) {
+          console.log(`Skipping already-processed webhook event: ${event.id}`);
+          return NextResponse.json({ received: true, duplicate: true });
+        }
+
+        // Store webhook event for audit trail and idempotency. Preserve any existing
+        // unprocessed row so failed events can be retried without resetting success.
+        await tx.insert(webhookEvents).values({
+          eventId: event.id,
+          eventType: event.type,
+          payload: event.data.object as never,
+          processed: false,
+        }).onConflictDoNothing({
+          target: webhookEvents.eventId,
+        });
+
+        // Handle the event
+        switch (event.type) {
+          case "checkout.session.completed":
+            await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+            break;
+
+          case "customer.subscription.created":
+          case "customer.subscription.updated":
+            await handleSubscriptionUpdate(event.data.object as StripeSubscriptionWithPeriods);
+            break;
+
+          case "customer.subscription.deleted":
+            await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+            break;
+
+          case "invoice.paid":
+            console.log(`Invoice paid: ${(event.data.object as StripeInvoiceWithSubscription).id}`);
+            break;
+
+          case "invoice.payment_failed":
+            await handleInvoicePaymentFailed(event.data.object as StripeInvoiceWithSubscription);
+            break;
+
+          default:
+            console.log(`Unhandled event type: ${event.type}`);
+        }
+
+        // Mark event as processed
+        await tx.update(webhookEvents)
+          .set({ processed: true, processedAt: new Date(), errorMessage: null })
+          .where(eq(webhookEvents.eventId, event.id));
+
+        return NextResponse.json({ received: true });
+      } catch (error) {
+        console.error("Error processing webhook:", error);
+
+        // Log error in webhook_events table before releasing the event lock.
+        await tx.update(webhookEvents)
+          .set({
+            processed: false,
+            errorMessage: error instanceof Error ? error.message : "Unknown error",
+          })
+          .where(eq(webhookEvents.eventId, event.id));
+
+        // Preserve current error response behavior; processed=false keeps the
+        // event eligible for manual replay or future retry handling.
+        return NextResponse.json({ error: "Internal error" }, { status: 200 });
+      }
     });
-
-    // Handle the event
-    switch (event.type) {
-      case "checkout.session.completed":
-        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
-        break;
-
-      case "customer.subscription.created":
-      case "customer.subscription.updated":
-        await handleSubscriptionUpdate(event.data.object as StripeSubscriptionWithPeriods);
-        break;
-
-      case "customer.subscription.deleted":
-        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
-        break;
-
-      case "invoice.paid":
-        console.log(`Invoice paid: ${(event.data.object as StripeInvoiceWithSubscription).id}`);
-        break;
-
-      case "invoice.payment_failed":
-        await handleInvoicePaymentFailed(event.data.object as StripeInvoiceWithSubscription);
-        break;
-
-      default:
-        console.log(`Unhandled event type: ${event.type}`);
-    }
-
-    // Mark event as processed
-    await db.update(webhookEvents)
-      .set({ processed: true, processedAt: new Date() })
-      .where(eq(webhookEvents.eventId, event.id));
-
-    return NextResponse.json({ received: true });
   } catch (error) {
     console.error("Error processing webhook:", error);
 
