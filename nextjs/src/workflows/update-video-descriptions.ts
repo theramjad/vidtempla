@@ -85,14 +85,14 @@ async function runUpdateVideoDescription(payload: PushPayload) {
   const claimRows = await db
     .update(youtubeVideos)
     .set({
-      renderVersion: sql`${youtubeVideos.renderVersion} + 1`,
       descriptionPushReservedUntil: reservationExpiresAt,
       updatedAt: new Date(),
     })
     .where(
       and(
         eq(youtubeVideos.id, videoId),
-        eq(youtubeVideos.renderVersion, renderVersion)
+        eq(youtubeVideos.renderVersion, renderVersion),
+        sql`(${youtubeVideos.descriptionPushReservedUntil} is null or ${youtubeVideos.descriptionPushReservedUntil} <= now())`
       )
     )
     .returning({ renderVersion: youtubeVideos.renderVersion });
@@ -116,7 +116,6 @@ async function runUpdateVideoDescription(payload: PushPayload) {
     await db
       .update(youtubeVideos)
       .set({
-        renderVersion,
         descriptionPushReservedUntil: null,
         updatedAt: new Date(),
       })
@@ -141,6 +140,7 @@ async function runUpdateVideoDescription(payload: PushPayload) {
       .set({
         currentDescription: canonical,
         driftDetectedAt: null,
+        renderVersion: sql`${youtubeVideos.renderVersion} + 1`,
         descriptionPushReservedUntil: null,
       })
       .where(

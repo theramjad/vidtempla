@@ -550,7 +550,8 @@ export async function assignVideo(
 ): Promise<ServiceResult<{ success: true }>> {
   try {
     const videoResult = await resolveVideo(id, userId, organizationId);
-    if (!videoResult.found) return { error: videoNotFoundError(videoResult.reason) };
+    if (!videoResult.found)
+      return { error: videoNotFoundError(videoResult.reason) };
     const video = videoResult.video;
 
     if (video.containerId) {
@@ -567,27 +568,16 @@ export async function assignVideo(
     const channelOwnerFilter = organizationId
       ? eq(youtubeChannels.organizationId, organizationId)
       : eq(youtubeChannels.userId, userId);
-    const channels = await db.select({ id: youtubeChannels.id }).from(youtubeChannels).where(channelOwnerFilter);
+    const channels = await db
+      .select({ id: youtubeChannels.id })
+      .from(youtubeChannels)
+      .where(channelOwnerFilter);
     const channelIds = channels.map((c) => c.id);
 
-    if (channelIds.length > 0) {
-      const [countResult] = await db
-        .select({ assignedCount: count() })
-        .from(youtubeVideos)
-        .where(and(inArray(youtubeVideos.channelId, channelIds), sql`${youtubeVideos.containerId} IS NOT NULL`));
-
-      const limitCheck = await checkVideoLimit(organizationId ?? userId, db);
-      if ((countResult?.assignedCount ?? 0) >= limitCheck.limit) {
-        return {
-          error: {
-            code: "VIDEO_LIMIT_REACHED",
-            message: `Assigned video limit reached (${limitCheck.limit} on ${limitCheck.planTier} plan)`,
-            suggestion: "Upgrade your plan to assign more videos",
-            status: 403,
-          },
-        };
-      }
-    }
+    // Pre-fetch the plan limit (not race-sensitive — the value rarely changes
+    // mid-request). The actual race-sensitive check (current assigned count vs.
+    // limit) is performed inside the transaction below under an advisory lock.
+    const limitCheck = await checkVideoLimit(organizationId ?? userId, db);
 
     const containerOwnerFilter = organizationId
       ? eq(containers.organizationId, organizationId)
@@ -643,32 +633,112 @@ export async function assignVideo(
       }
     }
 
-    await db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select 1 from youtube_videos where id = ${video.id} for update`
-      );
-
-      await tx
-        .update(youtubeVideos)
-        .set({ containerId, driftDetectedAt: null })
-        .where(eq(youtubeVideos.id, video.id));
-
-      if (variablesToCreate.length > 0) {
-        await tx.insert(videoVariables).values(variablesToCreate);
-        await tx.insert(videoVariableEvents).values(
-          eventsToRecord.map((e) => ({
-            videoId: e.videoId,
-            templateId: e.templateId,
-            variableName: e.variableName,
-            oldValue: null,
-            newValue: "",
-            changeType: "assignment_init" as const,
-            changedBy: userId,
-            organizationId: organizationId ?? null,
-          }))
+    const ASSIGN_CONFLICT = Symbol("assign_conflict");
+    const LIMIT_REACHED = Symbol("limit_reached");
+    const VIDEO_MISSING = Symbol("video_missing");
+    try {
+      await db.transaction(async (tx) => {
+        // Serialize owner-level assignments so post-update limit checks cannot
+        // interleave and commit over the plan cap.
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${organizationId ?? userId}))`,
         );
+
+        await tx.execute(
+          sql`select 1 from youtube_videos where id = ${video.id} for update`,
+        );
+        const [lockedVideo] = await tx
+          .select({ containerId: youtubeVideos.containerId })
+          .from(youtubeVideos)
+          .where(eq(youtubeVideos.id, video.id));
+
+        if (!lockedVideo) {
+          throw VIDEO_MISSING;
+        }
+
+        if (lockedVideo.containerId) {
+          throw ASSIGN_CONFLICT;
+        }
+
+        if (channelIds.length > 0) {
+          const [countResult] = await tx
+            .select({ assignedCount: count() })
+            .from(youtubeVideos)
+            .where(
+              and(
+                inArray(youtubeVideos.channelId, channelIds),
+                isNotNull(youtubeVideos.containerId),
+              ),
+            );
+
+          if ((countResult?.assignedCount ?? 0) >= limitCheck.limit) {
+            throw LIMIT_REACHED;
+          }
+        }
+
+        // CAS update: only assign if container_id is still NULL. If a concurrent
+        // assign already won, this returns 0 rows and we abort the transaction
+        // to avoid silently overwriting the first assignment (and creating
+        // duplicate videoVariables rows).
+        const updated = await tx
+          .update(youtubeVideos)
+          .set({ containerId, driftDetectedAt: null })
+          .where(
+            and(
+              eq(youtubeVideos.id, video.id),
+              isNull(youtubeVideos.containerId),
+            ),
+          )
+          .returning({ id: youtubeVideos.id });
+
+        if (updated.length === 0) {
+          throw ASSIGN_CONFLICT;
+        }
+
+        if (variablesToCreate.length > 0) {
+          await tx.insert(videoVariables).values(variablesToCreate);
+          await tx.insert(videoVariableEvents).values(
+            eventsToRecord.map((e) => ({
+              videoId: e.videoId,
+              templateId: e.templateId,
+              variableName: e.variableName,
+              oldValue: null,
+              newValue: "",
+              changeType: "assignment_init" as const,
+              changedBy: userId,
+              organizationId: organizationId ?? null,
+            })),
+          );
+        }
+      });
+    } catch (txErr) {
+      if (txErr === VIDEO_MISSING) {
+        return { error: videoNotFoundError("not_found") };
       }
-    });
+      if (txErr === ASSIGN_CONFLICT) {
+        return {
+          error: {
+            code: "ALREADY_ASSIGNED",
+            message: "Video was just assigned to another container",
+            suggestion: "Refresh and try again — another request won the race",
+            status: 409,
+          },
+        };
+      }
+      if (txErr === LIMIT_REACHED) {
+        return {
+          error: {
+            code: "VIDEO_LIMIT_REACHED",
+            message: `Assigned video limit reached (${limitCheck.limit} on ${
+              limitCheck.planTier
+            } plan)`,
+            suggestion: "Upgrade your plan to assign more videos",
+            status: 403,
+          },
+        };
+      }
+      throw txErr;
+    }
 
     return { data: { success: true } };
   } catch (err) {
@@ -1071,14 +1141,14 @@ export async function revertDescription(
     const claimRows = await db
       .update(youtubeVideos)
       .set({
-        renderVersion: sql`${youtubeVideos.renderVersion} + 1`,
         descriptionPushReservedUntil: reservationExpiresAt,
         updatedAt: new Date(),
       })
       .where(
         and(
           eq(youtubeVideos.id, video.id),
-          eq(youtubeVideos.renderVersion, expectedRenderVersion)
+          eq(youtubeVideos.renderVersion, expectedRenderVersion),
+          sql`(${youtubeVideos.descriptionPushReservedUntil} is null or ${youtubeVideos.descriptionPushReservedUntil} <= now())`
         )
       )
       .returning({ renderVersion: youtubeVideos.renderVersion });
@@ -1114,7 +1184,6 @@ export async function revertDescription(
       await db
         .update(youtubeVideos)
         .set({
-          renderVersion: expectedRenderVersion,
           descriptionPushReservedUntil: null,
           updatedAt: new Date(),
         })
@@ -1149,6 +1218,7 @@ export async function revertDescription(
         .set({
           currentDescription: history.description,
           driftDetectedAt: null,
+          renderVersion: sql`${youtubeVideos.renderVersion} + 1`,
           descriptionPushReservedUntil: null,
           ...(hadContainer ? { containerId: null } : {}),
         })

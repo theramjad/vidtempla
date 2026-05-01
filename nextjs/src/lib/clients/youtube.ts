@@ -19,6 +19,35 @@ const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 const YOUTUBE_ANALYTICS_BASE = 'https://youtubeanalytics.googleapis.com/v2';
 
 /**
+ * Thrown when YouTube returns `invalid_grant` from the OAuth token endpoint.
+ * Indicates the user revoked access or the refresh token expired/was rotated.
+ *
+ * Callers should treat this as a terminal auth failure: the channel needs to
+ * be reconnected. `getChannelAccessToken` flips `tokenStatus = 'invalid'`
+ * before re-throwing so consumers (REST handlers, workflows, tRPC procedures)
+ * can `instanceof` check this and surface a structured re-auth response
+ * instead of bubbling up an opaque 500.
+ */
+export class YouTubeInvalidGrantError extends Error {
+  constructor(public channelId?: string) {
+    super(
+      'YouTube token refresh failed with invalid_grant (user revoked access or token expired)'
+    );
+    this.name = 'YouTubeInvalidGrantError';
+    Object.setPrototypeOf(this, YouTubeInvalidGrantError.prototype);
+  }
+}
+
+export function isYouTubeInvalidGrantError(
+  error: unknown
+): error is YouTubeInvalidGrantError {
+  return (
+    error instanceof YouTubeInvalidGrantError ||
+    (error instanceof Error && error.name === 'YouTubeInvalidGrantError')
+  );
+}
+
+/**
  * Custom type for OAuth 2.0 token response
  * Matches Google's standard OAuth token format
  */
@@ -256,14 +285,25 @@ export async function refreshAccessToken(
   } catch (error) {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
-      const errorData = error.response?.data;
-      const errorMessage = errorData?.error_description || errorData?.error || 'Unknown error';
+      const errorData = error.response?.data as
+        | { error?: string; error_description?: string }
+        | undefined;
+      const errorCode = errorData?.error;
+      const errorMessage = errorData?.error_description || errorCode || 'Unknown error';
 
       console.error('Token refresh error:', {
         status,
         error: errorData,
         message: error.message,
       });
+
+      // Google returns HTTP 400 with `error: "invalid_grant"` when the refresh
+      // token has been revoked, expired, or the user disconnected the app.
+      // Surface this as a typed error so callers can mark tokenStatus=invalid
+      // and prompt re-auth instead of looping on 500s.
+      if (errorCode === 'invalid_grant') {
+        throw new YouTubeInvalidGrantError();
+      }
 
       throw new Error(
         `Failed to refresh access token (status ${status}): ${errorMessage}. ` +
@@ -284,12 +324,17 @@ export async function getChannelAccessToken(channelId: string): Promise<string> 
       accessTokenEncrypted: youtubeChannels.accessTokenEncrypted,
       refreshTokenEncrypted: youtubeChannels.refreshTokenEncrypted,
       tokenExpiresAt: youtubeChannels.tokenExpiresAt,
+      tokenStatus: youtubeChannels.tokenStatus,
     })
     .from(youtubeChannels)
     .where(eq(youtubeChannels.id, channelId));
 
   if (!channel?.accessTokenEncrypted || !channel.refreshTokenEncrypted) {
     throw new Error('Channel tokens not found');
+  }
+
+  if (channel.tokenStatus === 'invalid') {
+    throw new YouTubeInvalidGrantError(channel.id);
   }
 
   const accessToken = decrypt(channel.accessTokenEncrypted);
@@ -302,7 +347,25 @@ export async function getChannelAccessToken(channelId: string): Promise<string> 
   }
 
   const refreshToken = decrypt(channel.refreshTokenEncrypted);
-  const newTokens = await refreshAccessToken(refreshToken);
+
+  let newTokens: OAuthTokenResponse;
+  try {
+    newTokens = await refreshAccessToken(refreshToken);
+  } catch (err) {
+    if (isYouTubeInvalidGrantError(err)) {
+      // Mark the channel as needing reconnection so the UI/API can prompt
+      // re-auth instead of retrying the doomed refresh on every request.
+      await db
+        .update(youtubeChannels)
+        .set({ tokenStatus: 'invalid' })
+        .where(eq(youtubeChannels.id, channel.id));
+      // Re-throw with the channelId attached so structured handlers upstream
+      // can include it in their response payload.
+      throw new YouTubeInvalidGrantError(channel.id);
+    }
+    throw err;
+  }
+
   const newExpiresAt = new Date();
   newExpiresAt.setSeconds(newExpiresAt.getSeconds() + newTokens.expires_in);
 
