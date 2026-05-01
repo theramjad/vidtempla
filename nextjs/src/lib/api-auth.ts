@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { apiKeys, apiRequestLog, youtubeChannels, youtubeVideos } from "@/db/schema";
+import { apiKeys, apiRequestLog, member, youtubeChannels, youtubeVideos } from "@/db/schema";
 import { hashApiKey } from "@/lib/api-keys";
 import { decrypt } from "@/utils/encryption";
 import {
@@ -81,14 +81,58 @@ export async function withApiKey(
     );
   }
 
-  // Fire-and-forget: update lastUsedAt
+  // Defense in depth: after the backfill migration (0013) every key should
+  // have a real organizationId. Reject rather than fall back to userId — a
+  // userId UUID would never match a real organization id and would silently
+  // 404 every request.
+  if (!key.organizationId) {
+    return NextResponse.json(
+      apiError(
+        "API_KEY_REISSUE_REQUIRED",
+        "API key is not organization-scoped.",
+        "Recreate this API key from your dashboard.",
+        401
+      ),
+      { status: 401 }
+    );
+  }
+
+  const [membership] = await db
+    .select({ id: member.id })
+    .from(member)
+    .where(
+      and(
+        eq(member.userId, key.userId),
+        eq(member.organizationId, key.organizationId)
+      )
+    )
+    .limit(1);
+
+  if (!membership) {
+    return NextResponse.json(
+      apiError(
+        "API_KEY_REISSUE_REQUIRED",
+        "API key is orphaned from its organization.",
+        "Ask an organization admin to reissue this API key.",
+        401
+      ),
+      { status: 401 }
+    );
+  }
+
+  // Fire-and-forget: update lastUsedAt only after the key is accepted.
   db.update(apiKeys)
     .set({ lastUsedAt: new Date() })
     .where(eq(apiKeys.id, key.id))
     .then(() => {})
     .catch(() => {});
 
-  return { userId: key.userId, organizationId: key.organizationId ?? key.userId, apiKeyId: key.id, permission: key.permission as "read" | "read-write" };
+  return {
+    userId: key.userId,
+    organizationId: key.organizationId,
+    apiKeyId: key.id,
+    permission: key.permission as "read" | "read-write",
+  };
 }
 
 /**
