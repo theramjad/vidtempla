@@ -4,7 +4,7 @@
  */
 
 import { z } from "zod";
-import { orgProcedure } from "@/server/trpc/init";
+import { orgProcedure, orgAdminProcedure } from "@/server/trpc/init";
 import { TRPCError } from "@trpc/server";
 import { stripe } from "@/lib/stripe-server";
 import {
@@ -17,8 +17,59 @@ import {
 } from "@/lib/stripe";
 import { db } from "@/db";
 import { subscriptions, youtubeChannels, youtubeVideos } from "@/db/schema";
-import { eq, and, desc, count, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { router } from "@/server/trpc/init";
+
+async function getPreferredOrgSubscription(organizationId: string) {
+  const orgSubscriptions = await db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.organizationId, organizationId))
+    .orderBy(desc(subscriptions.createdAt));
+
+  return (
+    orgSubscriptions.find((subscription) => subscription.stripeCustomerId) ??
+    orgSubscriptions[0]
+  );
+}
+
+async function createFreeSubscriptionForOrg(
+  userId: string,
+  organizationId: string,
+) {
+  const [newSubscription] = await db
+    .insert(subscriptions)
+    .values({
+      userId,
+      organizationId,
+      planTier: "free",
+      status: "active",
+    })
+    .onConflictDoNothing({
+      target: subscriptions.organizationId,
+      where: sql`${subscriptions.organizationId} IS NOT NULL`,
+    })
+    .returning();
+
+  if (newSubscription) {
+    return newSubscription;
+  }
+
+  const [existingSubscription] = await db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.organizationId, organizationId))
+    .limit(1);
+
+  if (!existingSubscription) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to create subscription",
+    });
+  }
+
+  return existingSubscription;
+}
 
 export const billingRouter = router({
   /**
@@ -34,17 +85,7 @@ export const billingRouter = router({
 
     // If no subscription exists, create a free tier subscription
     if (!subscription) {
-      const [newSubscription] = await db
-        .insert(subscriptions)
-        .values({
-          userId: ctx.user.id,
-          organizationId: ctx.organizationId,
-          planTier: "free",
-          status: "active",
-        })
-        .returning();
-
-      return newSubscription;
+      return createFreeSubscriptionForOrg(ctx.user.id, ctx.organizationId);
     }
 
     return subscription;
@@ -53,7 +94,7 @@ export const billingRouter = router({
   /**
    * Create a checkout session for upgrading to a paid plan
    */
-  createCheckoutSession: orgProcedure
+  createCheckoutSession: orgAdminProcedure
     .input(
       z.object({
         planTier: z.enum(["pro", "business"]),
@@ -71,24 +112,14 @@ export const billingRouter = router({
         }
 
         // Get or create subscription record
-        let [subscription] = await db
-          .select()
-          .from(subscriptions)
-          .where(eq(subscriptions.organizationId, ctx.organizationId));
+        let subscription = await getPreferredOrgSubscription(ctx.organizationId);
 
         // Create subscription record if it doesn't exist
         if (!subscription) {
-          const [newSubscription] = await db
-            .insert(subscriptions)
-            .values({
-              userId: ctx.user.id,
-              organizationId: ctx.organizationId,
-              planTier: "free",
-              status: "active",
-            })
-            .returning();
-
-          subscription = newSubscription;
+          subscription = await createFreeSubscriptionForOrg(
+            ctx.user.id,
+            ctx.organizationId,
+          );
         }
 
         // Create Stripe Checkout session
@@ -103,7 +134,9 @@ export const billingRouter = router({
           ],
           success_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/settings?checkout=success`,
           cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/pricing`,
-          customer_email: ctx.user.email,
+          ...(subscription?.stripeCustomerId
+            ? { customer: subscription.stripeCustomerId }
+            : { customer_email: ctx.user.email }),
           allow_promotion_codes: true,
           metadata: {
             userId: ctx.user.id,
@@ -138,14 +171,12 @@ export const billingRouter = router({
   /**
    * Get the customer portal URL for managing subscriptions
    */
-  getCustomerPortalUrl: orgProcedure.query(async ({ ctx }) => {
+  getCustomerPortalUrl: orgAdminProcedure.query(async ({ ctx }) => {
     try {
-      const [subscription] = await db
-        .select({ stripeCustomerId: subscriptions.stripeCustomerId })
-        .from(subscriptions)
-        .where(eq(subscriptions.organizationId, ctx.organizationId));
+      const subscription = await getPreferredOrgSubscription(ctx.organizationId);
+      const stripeCustomerId = subscription?.stripeCustomerId;
 
-      if (!subscription?.stripeCustomerId) {
+      if (!stripeCustomerId) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "No active subscription found",
@@ -154,7 +185,7 @@ export const billingRouter = router({
 
       // Create Stripe Customer Portal session
       const portalSession = await stripe.billingPortal.sessions.create({
-        customer: subscription.stripeCustomerId,
+        customer: stripeCustomerId,
         return_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/settings`,
       });
 
@@ -287,7 +318,7 @@ export const billingRouter = router({
   /**
    * Update subscription to a different plan
    */
-  updateSubscription: orgProcedure
+  updateSubscription: orgAdminProcedure
     .input(
       z.object({
         targetPlanTier: z.enum(["free", "pro", "business"]),
