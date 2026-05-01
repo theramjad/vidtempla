@@ -26,19 +26,31 @@ function OrgSettingsContent() {
   const router = useRouter();
   const [orgName, setOrgName] = useState(name);
   const [savedOrgName, setSavedOrgName] = useState(name);
+  const previousOrganizationIdRef = useRef(organizationId);
   const isDirtyRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [orgCount, setOrgCount] = useState<number | null>(null);
 
   const { data: plan } = api.dashboard.billing.getCurrentPlan.useQuery();
+  const isDirty = orgName !== savedOrgName;
+
+  useEffect(() => {
+    isDirtyRef.current = isDirty;
+  }, [isDirty]);
 
   // Defense-in-depth: resync local state when the org name prop changes (e.g.
-  // active org switches in-place without a remount). Dirty-guarded so it
-  // doesn't stomp on user typing.
+  // active org switches in-place without a remount). Same-org updates are
+  // dirty-guarded so they don't stomp on user typing, but org switches must
+  // always reset the input to avoid saving a stale name into the new org.
   useEffect(() => {
+    const organizationChanged = previousOrganizationIdRef.current !== organizationId;
+    previousOrganizationIdRef.current = organizationId;
     setSavedOrgName(name);
-    if (!isDirtyRef.current) setOrgName(name);
-  }, [name]);
+    if (organizationChanged || !isDirtyRef.current) {
+      setOrgName(name);
+      isDirtyRef.current = false;
+    }
+  }, [organizationId, name]);
 
   useEffect(() => {
     authClient.organization.list().then(({ data }) => {
@@ -96,12 +108,9 @@ function OrgSettingsContent() {
         <label className="text-sm font-medium">Organization Name</label>
         <Input
           value={orgName}
-          onChange={(e) => {
-            setOrgName(e.target.value);
-            isDirtyRef.current = true;
-          }}
+          onChange={(e) => setOrgName(e.target.value)}
         />
-        <Button onClick={handleSave} disabled={saving || orgName === savedOrgName}>
+        <Button onClick={handleSave} disabled={saving || !isDirty}>
           {saving ? "Saving..." : "Save"}
         </Button>
       </div>
