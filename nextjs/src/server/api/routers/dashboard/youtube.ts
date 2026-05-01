@@ -18,7 +18,7 @@ import { start } from 'workflow/api';
 import { syncChannelVideosWorkflow } from '@/workflows/sync-channel-videos';
 import { db } from '@/db';
 import { youtubeChannels, containers, templates, youtubeVideos, videoVariables, descriptionHistory } from '@/db/schema';
-import { eq, and, desc, asc, count, isNull, ilike, inArray, getTableColumns } from 'drizzle-orm';
+import { eq, and, desc, asc, count, isNull, ilike, inArray, getTableColumns, sql } from 'drizzle-orm';
 import { checkChannelLimit } from '@/lib/plan-limits';
 import { router } from '@/server/trpc/init';
 import {
@@ -105,9 +105,55 @@ export const youtubeRouter = router({
     disconnect: orgProcedure
       .input(z.object({ channelId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
-        await db
-          .delete(youtubeChannels)
-          .where(and(eq(youtubeChannels.id, input.channelId), eq(youtubeChannels.organizationId, ctx.organizationId)));
+        const result = await db.transaction(async (tx) => {
+          const videoRows = (await tx.execute(sql<{
+            videoId: string;
+            descriptionPushReservedUntil: Date | string | null;
+          }>`
+            select v.video_id as "videoId",
+                   v.description_push_reserved_until as "descriptionPushReservedUntil"
+            from youtube_videos v
+            inner join youtube_channels c on c.id = v.channel_id
+            where c.id = ${input.channelId}
+              and c.organization_id = ${ctx.organizationId}
+            for update of v
+          `)) as Array<{
+            videoId: string;
+            descriptionPushReservedUntil: Date | string | null;
+          }>;
+
+          const now = Date.now();
+          const reservedVideo = videoRows.find((video) => {
+            if (!video.descriptionPushReservedUntil) return false;
+            return new Date(video.descriptionPushReservedUntil).getTime() > now;
+          });
+
+          if (reservedVideo) {
+            return {
+              reserved: true as const,
+              videoId: reservedVideo.videoId,
+              reservedUntil: reservedVideo.descriptionPushReservedUntil,
+            };
+          }
+
+          await tx
+            .delete(youtubeChannels)
+            .where(
+              and(
+                eq(youtubeChannels.id, input.channelId),
+                eq(youtubeChannels.organizationId, ctx.organizationId)
+              )
+            );
+
+          return { reserved: false as const };
+        });
+
+        if (result.reserved) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'A YouTube description push is in progress for this channel. Try disconnecting again shortly.',
+          });
+        }
 
         return { success: true };
       }),

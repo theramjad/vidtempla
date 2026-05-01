@@ -16,6 +16,7 @@ import {
 } from "@/lib/clients/youtube";
 import { detectAndRecordDrift } from "@/lib/services/drift";
 
+const DESCRIPTION_PUSH_DELETE_GRACE_MS = 2 * 60 * 1000;
 const SYNC_LOCK_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
 const SYNC_LOCK_HEARTBEAT_EVERY_VIDEOS = 50;
 
@@ -70,6 +71,10 @@ async function runSyncChannelVideos(
 ) {
   "use step";
 
+  const syncStartedAt = new Date();
+  const deleteUpdatedBefore = new Date(
+    syncStartedAt.getTime() - DESCRIPTION_PUSH_DELETE_GRACE_MS
+  );
   const staleSyncCutoff = new Date(
     Date.now() - SYNC_LOCK_STALE_AFTER_MS
   );
@@ -126,7 +131,12 @@ async function runSyncChannelVideos(
   }
 
   try {
-    return await syncClaimedChannelVideos(channelId, userId, ownerFilter);
+    return await syncClaimedChannelVideos(
+      channelId,
+      userId,
+      ownerFilter,
+      deleteUpdatedBefore
+    );
   } catch (err) {
     await markSyncFailed(channelId, userId, err, organizationId);
     throw err;
@@ -136,7 +146,8 @@ async function runSyncChannelVideos(
 async function syncClaimedChannelVideos(
   channelId: string,
   userId: string,
-  ownerFilter: ReturnType<typeof eq>
+  ownerFilter: ReturnType<typeof eq>,
+  deleteUpdatedBefore: Date
 ) {
   const [channel] = await db
     .select()
@@ -278,6 +289,9 @@ async function syncClaimedChannelVideos(
     .select({
       id: youtubeVideos.id,
       videoId: youtubeVideos.videoId,
+      renderVersion: youtubeVideos.renderVersion,
+      updatedAt: youtubeVideos.updatedAt,
+      descriptionPushReservedUntil: youtubeVideos.descriptionPushReservedUntil,
     })
     .from(youtubeVideos)
     .where(eq(youtubeVideos.channelId, channelId));
@@ -349,19 +363,35 @@ async function syncClaimedChannelVideos(
     }
   }
 
-  const videosToDelete = Array.from(existingVideoMap.keys()).filter(
-    (id) => !videoIds.includes(id)
+  const videosToDelete = Array.from(existingVideoMap.values()).filter(
+    (video) => !videoIds.includes(video.videoId)
   );
 
   if (videosToDelete.length > 0) {
-    await db
-      .delete(youtubeVideos)
-      .where(
-        and(
-          inArray(youtubeVideos.videoId, videosToDelete),
-          eq(youtubeVideos.channelId, channelId)
+    for (const video of videosToDelete) {
+      const deleted = await db
+        .delete(youtubeVideos)
+        .where(
+          and(
+            eq(youtubeVideos.videoId, video.videoId),
+            eq(youtubeVideos.channelId, channelId),
+            eq(youtubeVideos.renderVersion, video.renderVersion),
+            sql`${youtubeVideos.updatedAt} < ${deleteUpdatedBefore}`,
+            sql`(${youtubeVideos.descriptionPushReservedUntil} is null or ${youtubeVideos.descriptionPushReservedUntil} <= now())`
+          )
         )
-      );
+        .returning({ id: youtubeVideos.id });
+
+      if (deleted.length === 0) {
+        console.warn("[sync-channel-videos] skipped deleting changed video row", {
+          channelId,
+          videoId: video.videoId,
+          renderVersion: video.renderVersion,
+          updatedAt: video.updatedAt,
+          descriptionPushReservedUntil: video.descriptionPushReservedUntil,
+        });
+      }
+    }
   }
 
   if (isBaseline) {
