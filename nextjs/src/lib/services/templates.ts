@@ -9,6 +9,7 @@ import {
   decodeCompositeCursor,
   encodeCompositeCursor,
   isEncodedCompositeCursor,
+  isValidCursorId,
 } from "./cursors";
 
 // ── list_templates ───────────────────────────────────────────
@@ -23,7 +24,7 @@ export async function listTemplates(
     if (opts.cursor) {
       if (isEncodedCompositeCursor(opts.cursor)) {
         const cursor = decodeCompositeCursor(opts.cursor);
-        if (!cursor || cursor.scope !== "templates") {
+        if (!cursor || cursor.scope !== "templates" || !isValidCursorId(cursor.id)) {
           return invalidCursor();
         }
         const parsedDate = parseCursorDate(cursor.key);
@@ -39,7 +40,7 @@ export async function listTemplates(
       } else if (opts.cursor.includes("|")) {
         // Pre-versioned composite cursor from this PR: `${createdAt}|${id}`.
         const [cursorDate, cursorId, extra] = opts.cursor.split("|");
-        if (!cursorDate || !cursorId || extra !== undefined) {
+        if (!cursorDate || !cursorId || extra !== undefined || !isValidCursorId(cursorId)) {
           return invalidCursor();
         }
         const parsedDate = parseCursorDate(cursorDate);

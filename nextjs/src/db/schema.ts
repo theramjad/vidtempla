@@ -8,7 +8,9 @@ import {
   jsonb,
   unique,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // Better Auth tables (4 + 3 organization plugin)
 
@@ -215,6 +217,10 @@ export const youtubeVideos = pgTable("youtube_videos", {
     withTimezone: true,
   }),
   renderVersion: integer("render_version").notNull().default(0),
+  descriptionPushReservedUntil: timestamp("description_push_reserved_until", {
+    mode: "date",
+    withTimezone: true,
+  }),
   publishedAt: timestamp("published_at", {
     mode: "date",
     withTimezone: true,
@@ -328,34 +334,45 @@ export const videoVariableEvents = pgTable(
   })
 );
 
-export const subscriptions = pgTable("subscriptions", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  organizationId: text("organization_id")
-    .references(() => organization.id, { onDelete: "cascade" }),
-  stripeSubscriptionId: text("stripe_subscription_id").unique(),
-  stripeCustomerId: text("stripe_customer_id"),
-  stripeCheckoutSessionId: text("stripe_checkout_session_id"),
-  planTier: text("plan_tier").notNull().default("free"),
-  status: text("status").notNull().default("active"),
-  currentPeriodStart: timestamp("current_period_start", {
-    mode: "date",
-    withTimezone: true,
-  }),
-  currentPeriodEnd: timestamp("current_period_end", {
-    mode: "date",
-    withTimezone: true,
-  }),
-  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .references(() => organization.id, { onDelete: "cascade" }),
+    stripeSubscriptionId: text("stripe_subscription_id").unique(),
+    stripeCustomerId: text("stripe_customer_id"),
+    stripeCheckoutSessionId: text("stripe_checkout_session_id"),
+    planTier: text("plan_tier").notNull().default("free"),
+    status: text("status").notNull().default("active"),
+    currentPeriodStart: timestamp("current_period_start", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    currentPeriodEnd: timestamp("current_period_end", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    // Partial unique index: enforces one subscription per organization while
+    // allowing legacy rows where organization_id IS NULL (handled by the org
+    // backfill in PRs #34, #35).
+    orgIdUnique: uniqueIndex("subscriptions_org_id_unique")
+      .on(table.organizationId)
+      .where(sql`${table.organizationId} IS NOT NULL`),
+  })
+);
 
 export const webhookEvents = pgTable("webhook_events", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -437,29 +454,35 @@ export const oauthConsent = pgTable("oauth_consent", {
 
 // API tables
 
-export const apiKeys = pgTable("api_keys", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  organizationId: text("organization_id")
-    .references(() => organization.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  keyHash: text("key_hash").notNull(),
-  keyPrefix: text("key_prefix").notNull(),
-  permission: text("permission").notNull().default("read"),
-  lastUsedAt: timestamp("last_used_at", {
-    mode: "date",
-    withTimezone: true,
-  }),
-  expiresAt: timestamp("expires_at", {
-    mode: "date",
-    withTimezone: true,
-  }),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    keyHash: text("key_hash").notNull(),
+    keyPrefix: text("key_prefix").notNull(),
+    permission: text("permission").notNull().default("read"),
+    lastUsedAt: timestamp("last_used_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    expiresAt: timestamp("expires_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    keyHashUnique: uniqueIndex("api_keys_key_hash_unique").on(table.keyHash),
+  })
+);
 
 export const apiRequestLog = pgTable(
   "api_request_log",

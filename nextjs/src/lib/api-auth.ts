@@ -4,7 +4,10 @@ import { db } from "@/db";
 import { apiKeys, apiRequestLog, member, youtubeChannels, youtubeVideos } from "@/db/schema";
 import { hashApiKey } from "@/lib/api-keys";
 import { decrypt } from "@/utils/encryption";
-import { refreshAccessToken } from "@/lib/clients/youtube";
+import {
+  isYouTubeInvalidGrantError,
+  refreshAccessToken,
+} from "@/lib/clients/youtube";
 import { encrypt } from "@/utils/encryption";
 
 export interface ApiContext {
@@ -297,6 +300,7 @@ export async function getChannelTokens(
         error instanceof Error ? error.message : "Unknown error";
 
       const isTokenError =
+        isYouTubeInvalidGrantError(error) ||
         errorMessage.includes("invalid_grant") ||
         errorMessage.includes("Token has been expired or revoked") ||
         errorMessage.includes("status 400");

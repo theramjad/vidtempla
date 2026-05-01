@@ -1,4 +1,5 @@
 const COMPOSITE_CURSOR_PREFIX = "v1:";
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface CompositeCursorPayload {
   scope: string;
@@ -20,6 +21,10 @@ export function encodeCompositeCursor(payload: CompositeCursorPayload): string {
 
 export function isEncodedCompositeCursor(cursor: string): boolean {
   return cursor.startsWith(COMPOSITE_CURSOR_PREFIX);
+}
+
+export function isValidCursorId(id: string): boolean {
+  return UUID_REGEX.test(id);
 }
 
 export function decodeCompositeCursor(cursor: string): CompositeCursorPayload | null {

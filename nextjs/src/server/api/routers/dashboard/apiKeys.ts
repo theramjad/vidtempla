@@ -4,7 +4,7 @@
  */
 
 import { z } from "zod";
-import { orgProcedure, router } from "@/server/trpc/init";
+import { orgProcedure, orgAdminProcedure, router } from "@/server/trpc/init";
 import { db } from "@/db";
 import { apiKeys, apiRequestLog, user } from "@/db/schema";
 import { eq, and, desc, sql, gte, lte, count, like, lt, or } from "drizzle-orm";
@@ -30,7 +30,7 @@ export const apiKeysRouter = router({
     return keys;
   }),
 
-  create: orgProcedure
+  create: orgAdminProcedure
     .input(
       z.object({
         name: z.string().min(1).max(100),
@@ -71,7 +71,7 @@ export const apiKeysRouter = router({
       };
     }),
 
-  revoke: orgProcedure
+  revoke: orgAdminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       await db
