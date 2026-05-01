@@ -14,12 +14,12 @@ import {
 // ── list_templates ───────────────────────────────────────────
 
 export async function listTemplates(
-  userId: string,
+  organizationId: string,
   opts: PaginationOpts
 ): Promise<ServiceResult<{ data: unknown[]; meta: PaginationMeta }>> {
   try {
     const limit = Math.min(opts.limit ?? 50, 100);
-    const filters: SQL[] = [eq(templates.userId, userId)];
+    const filters: SQL[] = [eq(templates.organizationId, organizationId)];
     if (opts.cursor) {
       if (isEncodedCompositeCursor(opts.cursor)) {
         const cursor = decodeCompositeCursor(opts.cursor);
@@ -89,7 +89,7 @@ export async function listTemplates(
     const [totalResult] = await db
       .select({ total: count() })
       .from(templates)
-      .where(eq(templates.userId, userId));
+      .where(eq(templates.organizationId, organizationId));
 
     return {
       data: {
@@ -123,13 +123,13 @@ function parseCursorDate(value: string | null): Date | null {
 
 export async function getTemplate(
   id: string,
-  userId: string
+  organizationId: string
 ): Promise<ServiceResult<unknown>> {
   try {
     const [template] = await db
       .select()
       .from(templates)
-      .where(and(eq(templates.id, id), eq(templates.userId, userId)));
+      .where(and(eq(templates.id, id), eq(templates.organizationId, organizationId)));
 
     if (!template) {
       return { error: { code: "TEMPLATE_NOT_FOUND", message: "Template not found", suggestion: "Check the template ID", status: 404 } };
@@ -145,6 +145,7 @@ export async function getTemplate(
 
 export async function createTemplate(
   userId: string,
+  organizationId: string,
   name: string,
   content: string
 ): Promise<ServiceResult<unknown>> {
@@ -155,7 +156,7 @@ export async function createTemplate(
 
     const [template] = await db
       .insert(templates)
-      .values({ userId, name: name.trim(), content })
+      .values({ userId, organizationId, name: name.trim(), content })
       .returning();
 
     return { data: { ...template, variables: parseVariables(content) } };
@@ -169,6 +170,7 @@ export async function createTemplate(
 export async function updateTemplate(
   id: string,
   userId: string,
+  organizationId: string,
   data: { name?: string; content?: string; force?: boolean }
 ): Promise<ServiceResult<unknown>> {
   try {
@@ -224,7 +226,7 @@ export async function updateTemplate(
     const [template] = await db
       .update(templates)
       .set(updateData)
-      .where(and(eq(templates.id, id), eq(templates.userId, userId)))
+      .where(and(eq(templates.id, id), eq(templates.organizationId, organizationId)))
       .returning();
 
     if (!template) {
@@ -245,12 +247,12 @@ export async function updateTemplate(
 
 export async function deleteTemplate(
   id: string,
-  userId: string
+  organizationId: string
 ): Promise<ServiceResult<{ success: true }>> {
   try {
     const result = await db
       .delete(templates)
-      .where(and(eq(templates.id, id), eq(templates.userId, userId)))
+      .where(and(eq(templates.id, id), eq(templates.organizationId, organizationId)))
       .returning({ id: templates.id });
 
     if (result.length === 0) {
@@ -267,13 +269,14 @@ export async function deleteTemplate(
 
 export async function getTemplateImpact(
   id: string,
-  userId: string
+  userId: string,
+  organizationId: string
 ): Promise<ServiceResult<unknown>> {
   try {
     const [template] = await db
       .select({ id: templates.id })
       .from(templates)
-      .where(and(eq(templates.id, id), eq(templates.userId, userId)));
+      .where(and(eq(templates.id, id), eq(templates.organizationId, organizationId)));
 
     if (!template) {
       return { error: { code: "TEMPLATE_NOT_FOUND", message: "Template not found", suggestion: "Check the template ID", status: 404 } };
