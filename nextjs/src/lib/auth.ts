@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { magicLink, mcp, organization } from "better-auth/plugins";
+import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { subscriptions, userCredits, member as memberTable } from "@/db/schema";
@@ -54,13 +55,22 @@ export const auth = betterAuth({
               createdAt: new Date(),
             });
 
-            // Create free-tier subscription for the org
-            await tx.insert(subscriptions).values({
-              organizationId: orgId,
-              userId: user.id,
-              planTier: "free",
-              status: "active",
-            });
+            // Create free-tier subscription for the org.
+            // Idempotent against retries via the partial unique index on
+            // organization_id (subscriptions_org_id_unique). The `where`
+            // predicate must match the index predicate for Postgres to use it.
+            await tx
+              .insert(subscriptions)
+              .values({
+                organizationId: orgId,
+                userId: user.id,
+                planTier: "free",
+                status: "active",
+              })
+              .onConflictDoNothing({
+                target: subscriptions.organizationId,
+                where: sql`${subscriptions.organizationId} IS NOT NULL`,
+              });
 
             // Create credit allocation for the org
             const allocation = PLAN_CONFIG.free.monthlyCredits;

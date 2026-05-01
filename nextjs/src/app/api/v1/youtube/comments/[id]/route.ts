@@ -7,12 +7,13 @@ import {
   getChannelTokens,
   logRequest,
 } from "@/lib/api-auth";
+import { mapYouTubeError } from "@/lib/youtube-errors";
 import axios from "axios";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 
 /**
- * GET /api/v1/youtube/comments/[id]?channelId=...&maxResults=100&order=relevance|time&pageToken=...
+ * GET /api/v1/youtube/comments/[id]?channelId=...&maxResults=100&order=relevance|time&cursor=...
  * List comment threads for a video (id = videoId)
  * Quota cost: 1 unit
  */
@@ -26,7 +27,7 @@ export async function GET(
   const { id: videoId } = await params;
   const { searchParams } = new URL(request.url);
   const channelId = searchParams.get("channelId");
-  const pageToken = searchParams.get("pageToken");
+  const pageToken = searchParams.get("cursor") || searchParams.get("pageToken");
   const maxResults = Math.min(
     parseInt(searchParams.get("maxResults") || "20", 10),
     100
@@ -59,7 +60,7 @@ export async function GET(
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -78,30 +79,20 @@ export async function GET(
     });
 
     await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", 200, 1);
+    const nextPageToken: string | null = response.data.nextPageToken || null;
+    const pageInfo: { totalResults?: number } | undefined = response.data.pageInfo;
     return NextResponse.json(
       apiSuccess(response.data.items || [], {
+        cursor: nextPageToken,
+        hasMore: Boolean(nextPageToken),
+        total: pageInfo?.totalResults ?? null,
         quotaUnits: 1,
-        pageInfo: response.data.pageInfo,
-        nextPageToken: response.data.nextPageToken || null,
       })
     );
   } catch (error) {
-    const status = axios.isAxiosError(error)
-      ? error.response?.status || 500
-      : 500;
-    const message = axios.isAxiosError(error)
-      ? error.response?.data?.error?.message || error.message
-      : "Unknown error";
-    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", status, 1);
-    return NextResponse.json(
-      apiError(
-        "YOUTUBE_API_ERROR",
-        message,
-        "Check that the videoId is correct and comments are enabled",
-        status
-      ),
-      { status }
-    );
+    const mapped = mapYouTubeError(error);
+    await logRequest(ctx, `/youtube/comments/${videoId}`, "GET", mapped.status, 1);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }
 
@@ -136,7 +127,7 @@ export async function DELETE(
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     await logRequest(ctx, `/youtube/comments/${commentId}`, "DELETE", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -151,27 +142,14 @@ export async function DELETE(
     await logRequest(ctx, `/youtube/comments/${commentId}`, "DELETE", 200, 50);
     return NextResponse.json(apiSuccess({ deleted: true }, { quotaUnits: 50 }));
   } catch (error) {
-    const status = axios.isAxiosError(error)
-      ? error.response?.status || 500
-      : 500;
-    const message = axios.isAxiosError(error)
-      ? error.response?.data?.error?.message || error.message
-      : "Unknown error";
+    const mapped = mapYouTubeError(error);
     await logRequest(
       ctx,
       `/youtube/comments/${commentId}`,
       "DELETE",
-      status,
+      mapped.status,
       50
     );
-    return NextResponse.json(
-      apiError(
-        "YOUTUBE_API_ERROR",
-        message,
-        "Check the comment ID and your permissions to delete it",
-        status
-      ),
-      { status }
-    );
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }

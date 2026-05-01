@@ -6,6 +6,7 @@ import { fetchChannelAnalytics } from "@/lib/clients/youtube";
 import { start } from "workflow/api";
 import { syncChannelVideosWorkflow } from "@/workflows/sync-channel-videos";
 import axios from "axios";
+import { mapYouTubeServiceError } from "@/lib/youtube-errors";
 import type { ServiceResult } from "./types";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
@@ -23,7 +24,8 @@ export interface ChannelAnalyticsOpts {
 export async function getChannelAnalytics(
   channelId: string,
   userId: string,
-  opts: ChannelAnalyticsOpts
+  opts: ChannelAnalyticsOpts,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
     const now = new Date();
@@ -33,7 +35,7 @@ export async function getChannelAnalytics(
     const metrics = opts.metrics ?? "views,estimatedMinutesWatched";
     const dimensions = opts.dimensions ?? "day";
 
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -60,7 +62,8 @@ export interface QueryAnalyticsOpts {
 
 export async function queryAnalytics(
   userId: string,
-  opts: QueryAnalyticsOpts
+  opts: QueryAnalyticsOpts,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -68,7 +71,7 @@ export async function queryAnalytics(
       return { error: { code: "INVALID_PARAMETER", message: "Dates must be in YYYY-MM-DD format", suggestion: "Use ISO date format, e.g. 2024-01-01", status: 400 } };
     }
 
-    const tokens = await getChannelTokens(opts.channelId, userId);
+    const tokens = await getChannelTokens(opts.channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -125,12 +128,13 @@ export const searchChannelVideos = searchMyVideos;
 export async function searchMyVideos(
   channelId: string,
   userId: string,
-  opts: SearchChannelVideosOpts
+  opts: SearchChannelVideosOpts,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
     const maxResults = Math.min(opts.maxResults ?? 25, 50);
 
-    const tokens = await getChannelTokens(channelId, userId);
+    const tokens = await getChannelTokens(channelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -148,8 +152,8 @@ export async function searchMyVideos(
     });
 
     return { data: response.data };
-  } catch {
-    return { error: { code: "YOUTUBE_API_ERROR", message: "Failed to search channel videos", suggestion: "Try again later", status: 500 } };
+  } catch (error) {
+    return { error: mapYouTubeServiceError(error) };
   }
 }
 
@@ -174,12 +178,13 @@ export interface SearchYouTubeOpts {
 export async function searchYouTube(
   authChannelId: string,
   userId: string,
-  opts: SearchYouTubeOpts
+  opts: SearchYouTubeOpts,
+  organizationId?: string
 ): Promise<ServiceResult<unknown>> {
   try {
     const maxResults = Math.min(opts.maxResults ?? 10, 50);
 
-    const tokens = await getChannelTokens(authChannelId, userId);
+    const tokens = await getChannelTokens(authChannelId, userId, organizationId);
     if ("error" in tokens) {
       return { error: { code: tokens.error.error.code, message: tokens.error.error.message, suggestion: tokens.error.error.suggestion ?? "", status: tokens.status } };
     }
@@ -207,8 +212,8 @@ export async function searchYouTube(
     });
 
     return { data: response.data };
-  } catch {
-    return { error: { code: "YOUTUBE_API_ERROR", message: "Failed to search YouTube", suggestion: "Try again later or refine your query", status: 500 } };
+  } catch (error) {
+    return { error: mapYouTubeServiceError(error) };
   }
 }
 
@@ -216,13 +221,18 @@ export async function searchYouTube(
 
 export async function syncChannel(
   channelId: string,
-  userId: string
+  userId: string,
+  organizationId?: string
 ): Promise<ServiceResult<{ message: string; jobId: string }>> {
   try {
+    const ownerFilter = organizationId
+      ? eq(youtubeChannels.organizationId, organizationId)
+      : eq(youtubeChannels.userId, userId);
+
     const [channel] = await db
       .select({ id: youtubeChannels.id, syncStatus: youtubeChannels.syncStatus })
       .from(youtubeChannels)
-      .where(and(eq(youtubeChannels.channelId, channelId), eq(youtubeChannels.userId, userId)));
+      .where(and(eq(youtubeChannels.channelId, channelId), ownerFilter));
 
     if (!channel) {
       return { error: { code: "CHANNEL_NOT_FOUND", message: "Channel not found or not connected", suggestion: "Connect a YouTube channel from the dashboard first", status: 404 } };
@@ -232,7 +242,7 @@ export async function syncChannel(
       return { error: { code: "SYNC_IN_PROGRESS", message: "A sync is already in progress", suggestion: "Wait for the current sync to complete", status: 409 } };
     }
 
-    await start(syncChannelVideosWorkflow, [channel.id, userId]);
+    await start(syncChannelVideosWorkflow, [channel.id, userId, organizationId]);
 
     return { data: { message: "Video sync started", jobId: `sync-${channel.id}-${Date.now()}` } };
   } catch {

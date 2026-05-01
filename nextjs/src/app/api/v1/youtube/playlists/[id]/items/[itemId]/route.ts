@@ -7,6 +7,7 @@ import {
   getChannelTokens,
   logRequest,
 } from "@/lib/api-auth";
+import { mapYouTubeError } from "@/lib/youtube-errors";
 import axios from "axios";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
@@ -48,7 +49,7 @@ export async function DELETE(
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     await logRequest(
       ctx,
@@ -75,27 +76,14 @@ export async function DELETE(
     );
     return NextResponse.json(apiSuccess({ deleted: true }, { quotaUnits: 50 }));
   } catch (error) {
-    const status = axios.isAxiosError(error)
-      ? error.response?.status || 500
-      : 500;
-    const message = axios.isAxiosError(error)
-      ? error.response?.data?.error?.message || error.message
-      : "Unknown error";
+    const mapped = mapYouTubeError(error);
     await logRequest(
       ctx,
       `/youtube/playlists/${id}/items/${itemId}`,
       "DELETE",
-      status,
+      mapped.status,
       50
     );
-    return NextResponse.json(
-      apiError(
-        "YOUTUBE_API_ERROR",
-        message,
-        "Check the item ID and playlist permissions",
-        status
-      ),
-      { status }
-    );
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }

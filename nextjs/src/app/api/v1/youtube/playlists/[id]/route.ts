@@ -7,6 +7,7 @@ import {
   getChannelTokens,
   logRequest,
 } from "@/lib/api-auth";
+import { mapYouTubeError } from "@/lib/youtube-errors";
 import axios from "axios";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
@@ -40,7 +41,7 @@ export async function GET(
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     await logRequest(ctx, `/youtube/playlists/${id}`, "GET", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -72,17 +73,9 @@ export async function GET(
     await logRequest(ctx, `/youtube/playlists/${id}`, "GET", 200, 1);
     return NextResponse.json(apiSuccess(playlist, { quotaUnits: 1 }));
   } catch (error) {
-    const status = axios.isAxiosError(error)
-      ? error.response?.status || 500
-      : 500;
-    const message = axios.isAxiosError(error)
-      ? error.response?.data?.error?.message || error.message
-      : "Unknown error";
-    await logRequest(ctx, `/youtube/playlists/${id}`, "GET", status, 1);
-    return NextResponse.json(
-      apiError("YOUTUBE_API_ERROR", message, "Check the playlist ID", status),
-      { status }
-    );
+    const mapped = mapYouTubeError(error);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "GET", mapped.status, 1);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }
 
@@ -139,7 +132,7 @@ export async function PATCH(
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -193,17 +186,9 @@ export async function PATCH(
     await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", 200, 50);
     return NextResponse.json(apiSuccess(response.data, { quotaUnits: 50 }));
   } catch (error) {
-    const status = axios.isAxiosError(error)
-      ? error.response?.status || 500
-      : 500;
-    const message = axios.isAxiosError(error)
-      ? error.response?.data?.error?.message || error.message
-      : "Unknown error";
-    await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", status, 50);
-    return NextResponse.json(
-      apiError("YOUTUBE_API_ERROR", message, "Check your input values", status),
-      { status }
-    );
+    const mapped = mapYouTubeError(error);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "PATCH", mapped.status, 50);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }
 
@@ -238,7 +223,7 @@ export async function DELETE(
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -253,21 +238,8 @@ export async function DELETE(
     await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", 200, 50);
     return NextResponse.json(apiSuccess({ deleted: true }, { quotaUnits: 50 }));
   } catch (error) {
-    const status = axios.isAxiosError(error)
-      ? error.response?.status || 500
-      : 500;
-    const message = axios.isAxiosError(error)
-      ? error.response?.data?.error?.message || error.message
-      : "Unknown error";
-    await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", status, 50);
-    return NextResponse.json(
-      apiError(
-        "YOUTUBE_API_ERROR",
-        message,
-        "Check the playlist ID and your permissions",
-        status
-      ),
-      { status }
-    );
+    const mapped = mapYouTubeError(error);
+    await logRequest(ctx, `/youtube/playlists/${id}`, "DELETE", mapped.status, 50);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }

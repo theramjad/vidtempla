@@ -7,6 +7,7 @@ import {
   getChannelTokens,
   logRequest,
 } from "@/lib/api-auth";
+import { mapYouTubeError } from "@/lib/youtube-errors";
 import {
   insertCaptionTrack,
   updateCaptionTrack,
@@ -45,7 +46,7 @@ export async function GET(
     );
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     await logRequest(ctx, `/youtube/captions/${videoId}`, "GET", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -63,22 +64,9 @@ export async function GET(
     await logRequest(ctx, `/youtube/captions/${videoId}`, "GET", 200, 50);
     return NextResponse.json(apiSuccess(response.data.items || [], { quotaUnits: 50 }));
   } catch (error) {
-    const status = axios.isAxiosError(error)
-      ? error.response?.status || 500
-      : 500;
-    const message = axios.isAxiosError(error)
-      ? error.response?.data?.error?.message || error.message
-      : "Unknown error";
-    await logRequest(ctx, `/youtube/captions/${videoId}`, "GET", status, 50);
-    return NextResponse.json(
-      apiError(
-        "YOUTUBE_API_ERROR",
-        message,
-        "Check the videoId is correct and you own this video",
-        status
-      ),
-      { status }
-    );
+    const mapped = mapYouTubeError(error);
+    await logRequest(ctx, `/youtube/captions/${videoId}`, "GET", mapped.status, 50);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }
 
@@ -113,7 +101,7 @@ export async function POST(
     return NextResponse.json(apiError("VALIDATION_ERROR", "channelId, language, name, and captionData are required", "Provide all required fields in the request body", 400), { status: 400 });
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     logRequest(ctx, endpoint, "POST", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -124,10 +112,9 @@ export async function POST(
     logRequest(ctx, endpoint, "POST", 200, 400);
     return NextResponse.json(apiSuccess(track, { quotaUnits: 400 }));
   } catch (error) {
-    const status = axios.isAxiosError(error) ? error.response?.status || 500 : 500;
-    const message = axios.isAxiosError(error) ? error.response?.data?.error?.message || error.message : "Unknown error";
-    logRequest(ctx, endpoint, "POST", status, 400);
-    return NextResponse.json(apiError("YOUTUBE_API_ERROR", message, "Check the videoId, language code, and caption format are correct", status), { status });
+    const mapped = mapYouTubeError(error);
+    logRequest(ctx, endpoint, "POST", mapped.status, 400);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }
 
@@ -162,7 +149,7 @@ export async function PUT(
     return NextResponse.json(apiError("VALIDATION_ERROR", "channelId and captionId are required", "Provide channelId and captionId in the request body", 400), { status: 400 });
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     logRequest(ctx, endpoint, "PUT", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -173,10 +160,9 @@ export async function PUT(
     logRequest(ctx, endpoint, "PUT", 200, 450);
     return NextResponse.json(apiSuccess(track, { quotaUnits: 450 }));
   } catch (error) {
-    const status = axios.isAxiosError(error) ? error.response?.status || 500 : 500;
-    const message = axios.isAxiosError(error) ? error.response?.data?.error?.message || error.message : "Unknown error";
-    logRequest(ctx, endpoint, "PUT", status, 450);
-    return NextResponse.json(apiError("YOUTUBE_API_ERROR", message, "Check the captionId is correct and belongs to this video", status), { status });
+    const mapped = mapYouTubeError(error);
+    logRequest(ctx, endpoint, "PUT", mapped.status, 450);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }
 
@@ -205,7 +191,7 @@ export async function DELETE(
     return NextResponse.json(apiError("VALIDATION_ERROR", "channelId and captionId query parameters are required", "Provide ?channelId=...&captionId=...", 400), { status: 400 });
   }
 
-  const tokens = await getChannelTokens(channelId, ctx.userId);
+  const tokens = await getChannelTokens(channelId, ctx.userId, ctx.organizationId);
   if ("error" in tokens) {
     logRequest(ctx, endpoint, "DELETE", tokens.status, 0);
     return NextResponse.json(tokens.error, { status: tokens.status });
@@ -216,9 +202,8 @@ export async function DELETE(
     logRequest(ctx, endpoint, "DELETE", 200, 50);
     return NextResponse.json(apiSuccess({ deleted: true }, { quotaUnits: 50 }));
   } catch (error) {
-    const status = axios.isAxiosError(error) ? error.response?.status || 500 : 500;
-    const message = axios.isAxiosError(error) ? error.response?.data?.error?.message || error.message : "Unknown error";
-    logRequest(ctx, endpoint, "DELETE", status, 50);
-    return NextResponse.json(apiError("YOUTUBE_API_ERROR", message, "Check the captionId is correct and belongs to this video", status), { status });
+    const mapped = mapYouTubeError(error);
+    logRequest(ctx, endpoint, "DELETE", mapped.status, 50);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }

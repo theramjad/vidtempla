@@ -10,7 +10,7 @@ export async function GET(
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await params;
-  const result = await getTemplateImpact(id, auth.userId);
+  const result = await getTemplateImpact(id, auth.userId, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, `/v1/templates/${id}/impact`, "GET", result.error.status, 0);

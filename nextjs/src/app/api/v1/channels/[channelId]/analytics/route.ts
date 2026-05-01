@@ -17,7 +17,7 @@ export async function GET(
     endDate: url.searchParams.get("endDate") ?? undefined,
     metrics: url.searchParams.get("metrics") ?? undefined,
     dimensions: url.searchParams.get("dimensions") ?? undefined,
-  });
+  }, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, `/v1/channels/${channelId}/analytics`, "GET", result.error.status, 0);
