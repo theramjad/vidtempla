@@ -450,29 +450,35 @@ export const oauthConsent = pgTable("oauth_consent", {
 
 // API tables
 
-export const apiKeys = pgTable("api_keys", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  organizationId: text("organization_id")
-    .references(() => organization.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  keyHash: text("key_hash").notNull(),
-  keyPrefix: text("key_prefix").notNull(),
-  permission: text("permission").notNull().default("read"),
-  lastUsedAt: timestamp("last_used_at", {
-    mode: "date",
-    withTimezone: true,
-  }),
-  expiresAt: timestamp("expires_at", {
-    mode: "date",
-    withTimezone: true,
-  }),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    keyHash: text("key_hash").notNull(),
+    keyPrefix: text("key_prefix").notNull(),
+    permission: text("permission").notNull().default("read"),
+    lastUsedAt: timestamp("last_used_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    expiresAt: timestamp("expires_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    keyHashUnique: uniqueIndex("api_keys_key_hash_unique").on(table.keyHash),
+  })
+);
 
 export const apiRequestLog = pgTable(
   "api_request_log",
