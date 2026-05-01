@@ -568,24 +568,10 @@ export async function assignVideo(
     const channels = await db.select({ id: youtubeChannels.id }).from(youtubeChannels).where(channelOwnerFilter);
     const channelIds = channels.map((c) => c.id);
 
-    if (channelIds.length > 0) {
-      const [countResult] = await db
-        .select({ assignedCount: count() })
-        .from(youtubeVideos)
-        .where(and(inArray(youtubeVideos.channelId, channelIds), sql`${youtubeVideos.containerId} IS NOT NULL`));
-
-      const limitCheck = await checkVideoLimit(organizationId ?? userId, db);
-      if ((countResult?.assignedCount ?? 0) >= limitCheck.limit) {
-        return {
-          error: {
-            code: "VIDEO_LIMIT_REACHED",
-            message: `Assigned video limit reached (${limitCheck.limit} on ${limitCheck.planTier} plan)`,
-            suggestion: "Upgrade your plan to assign more videos",
-            status: 403,
-          },
-        };
-      }
-    }
+    // Pre-fetch the plan limit (not race-sensitive — the value rarely changes
+    // mid-request). The actual race-sensitive check (current assigned count vs.
+    // limit) is performed inside the transaction below under an advisory lock.
+    const limitCheck = await checkVideoLimit(organizationId ?? userId, db);
 
     const containerOwnerFilter = organizationId
       ? eq(containers.organizationId, organizationId)
@@ -641,32 +627,94 @@ export async function assignVideo(
       }
     }
 
-    await db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select 1 from youtube_videos where id = ${video.id} for update`
-      );
+    // Sentinel error thrown inside the txn to abort the assignment when the
+    // re-counted assigned-video total has hit the plan cap. Rolls back the txn
+    // and is caught below so we can return a proper VIDEO_LIMIT_REACHED result.
+    const LIMIT_REACHED = "__assignVideo_limit_reached__";
+    const ALREADY_ASSIGNED = "__assignVideo_already_assigned__";
 
-      await tx
-        .update(youtubeVideos)
-        .set({ containerId, driftDetectedAt: null })
-        .where(eq(youtubeVideos.id, video.id));
+    try {
+      await db.transaction(async (tx) => {
+        // Serialize concurrent assignVideo calls for this owner (org or user)
+        // so the recount + insert below cannot interleave with another caller's
+        // recount + insert. Without this lock, two concurrent calls at limit-1
+        // can both pass the count check and both succeed → over-cap.
+        const lockKey = organizationId ?? userId;
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
 
-      if (variablesToCreate.length > 0) {
-        await tx.insert(videoVariables).values(variablesToCreate);
-        await tx.insert(videoVariableEvents).values(
-          eventsToRecord.map((e) => ({
-            videoId: e.videoId,
-            templateId: e.templateId,
-            variableName: e.variableName,
-            oldValue: null,
-            newValue: "",
-            changeType: "assignment_init" as const,
-            changedBy: userId,
-            organizationId: organizationId ?? null,
-          }))
+        await tx.execute(
+          sql`select 1 from youtube_videos where id = ${video.id} for update`
         );
+
+        const [lockedVideo] = await tx
+          .select({ containerId: youtubeVideos.containerId })
+          .from(youtubeVideos)
+          .where(eq(youtubeVideos.id, video.id));
+
+        if (lockedVideo?.containerId) {
+          throw new Error(ALREADY_ASSIGNED);
+        }
+
+        if (channelIds.length > 0) {
+          const [countResult] = await tx
+            .select({ assignedCount: count() })
+            .from(youtubeVideos)
+            .where(
+              and(
+                inArray(youtubeVideos.channelId, channelIds),
+                isNotNull(youtubeVideos.containerId)
+              )
+            );
+
+          if ((countResult?.assignedCount ?? 0) >= limitCheck.limit) {
+            throw new Error(LIMIT_REACHED);
+          }
+        }
+
+        await tx
+          .update(youtubeVideos)
+          .set({ containerId, driftDetectedAt: null })
+          .where(eq(youtubeVideos.id, video.id));
+
+        if (variablesToCreate.length > 0) {
+          await tx.insert(videoVariables).values(variablesToCreate);
+          await tx.insert(videoVariableEvents).values(
+            eventsToRecord.map((e) => ({
+              videoId: e.videoId,
+              templateId: e.templateId,
+              variableName: e.variableName,
+              oldValue: null,
+              newValue: "",
+              changeType: "assignment_init" as const,
+              changedBy: userId,
+              organizationId: organizationId ?? null,
+            }))
+          );
+        }
+      });
+    } catch (txErr) {
+      if (txErr instanceof Error && txErr.message === LIMIT_REACHED) {
+        return {
+          error: {
+            code: "VIDEO_LIMIT_REACHED",
+            message: `Assigned video limit reached (${limitCheck.limit} on ${limitCheck.planTier} plan)`,
+            suggestion: "Upgrade your plan to assign more videos",
+            status: 403,
+          },
+        };
       }
-    });
+      if (txErr instanceof Error && txErr.message === ALREADY_ASSIGNED) {
+        return {
+          error: {
+            code: "ALREADY_ASSIGNED",
+            message: "Video is already assigned to a container",
+            suggestion: "Unassign the video first or use a different video",
+            status: 400,
+          },
+        };
+      }
+      throw txErr;
+    }
 
     return { data: { success: true } };
   } catch (err) {
