@@ -17,8 +17,46 @@ import {
 } from "@/lib/stripe";
 import { db } from "@/db";
 import { subscriptions, youtubeChannels, youtubeVideos } from "@/db/schema";
-import { eq, and, desc, count, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { router } from "@/server/trpc/init";
+
+async function createFreeSubscriptionForOrg(
+  userId: string,
+  organizationId: string,
+) {
+  const [newSubscription] = await db
+    .insert(subscriptions)
+    .values({
+      userId,
+      organizationId,
+      planTier: "free",
+      status: "active",
+    })
+    .onConflictDoNothing({
+      target: subscriptions.organizationId,
+      where: sql`${subscriptions.organizationId} IS NOT NULL`,
+    })
+    .returning();
+
+  if (newSubscription) {
+    return newSubscription;
+  }
+
+  const [existingSubscription] = await db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.organizationId, organizationId))
+    .limit(1);
+
+  if (!existingSubscription) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to create subscription",
+    });
+  }
+
+  return existingSubscription;
+}
 
 export const billingRouter = router({
   /**
@@ -34,17 +72,7 @@ export const billingRouter = router({
 
     // If no subscription exists, create a free tier subscription
     if (!subscription) {
-      const [newSubscription] = await db
-        .insert(subscriptions)
-        .values({
-          userId: ctx.user.id,
-          organizationId: ctx.organizationId,
-          planTier: "free",
-          status: "active",
-        })
-        .returning();
-
-      return newSubscription;
+      return createFreeSubscriptionForOrg(ctx.user.id, ctx.organizationId);
     }
 
     return subscription;
@@ -78,17 +106,10 @@ export const billingRouter = router({
 
         // Create subscription record if it doesn't exist
         if (!subscription) {
-          const [newSubscription] = await db
-            .insert(subscriptions)
-            .values({
-              userId: ctx.user.id,
-              organizationId: ctx.organizationId,
-              planTier: "free",
-              status: "active",
-            })
-            .returning();
-
-          subscription = newSubscription;
+          subscription = await createFreeSubscriptionForOrg(
+            ctx.user.id,
+            ctx.organizationId,
+          );
         }
 
         // Create Stripe Checkout session
