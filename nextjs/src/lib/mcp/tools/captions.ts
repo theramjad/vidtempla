@@ -15,7 +15,7 @@ export function registerCaptionTools(server: McpServer) {
       const orgId = getSessionOrgId();
       const credits = await consumeCredits(orgId, 50);
       if (!credits.success) return mcpQuotaExceeded(userId, "list_video_captions");
-      const result = await listVideoCaptions(videoId, userId);
+      const result = await listVideoCaptions(videoId, userId, orgId);
       logMcpRequest(userId, "list_video_captions", 50, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -37,7 +37,7 @@ export function registerCaptionTools(server: McpServer) {
       const quotaUnits = captionId ? 200 : 250;
       const credits = await consumeCredits(orgId, quotaUnits);
       if (!credits.success) return mcpQuotaExceeded(userId, "get_video_transcript");
-      const result = await getVideoTranscript(videoId, userId, { captionId, language, format });
+      const result = await getVideoTranscript(videoId, userId, { captionId, language, format }, orgId);
       logMcpRequest(userId, "get_video_transcript", quotaUnits, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -60,7 +60,7 @@ export function registerCaptionTools(server: McpServer) {
       const orgId = getSessionOrgId();
       const credits = await consumeCredits(orgId, 400);
       if (!credits.success) return mcpQuotaExceeded(userId, "upload_caption");
-      const result = await insertCaption(videoId, userId, { language, name, captionData, isDraft, sync });
+      const result = await insertCaption(videoId, userId, { language, name, captionData, isDraft, sync }, orgId);
       logMcpRequest(userId, "upload_caption", 400, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -81,7 +81,7 @@ export function registerCaptionTools(server: McpServer) {
       const orgId = getSessionOrgId();
       const credits = await consumeCredits(orgId, 450);
       if (!credits.success) return mcpQuotaExceeded(userId, "update_caption");
-      const result = await updateCaption(videoId, userId, captionId, { captionData, isDraft });
+      const result = await updateCaption(videoId, userId, captionId, { captionData, isDraft }, orgId);
       logMcpRequest(userId, "update_caption", 450, "error" in result ? 400 : 200);
       return toMcp(result);
     }
@@ -100,7 +100,7 @@ export function registerCaptionTools(server: McpServer) {
       const orgId = getSessionOrgId();
       const credits = await consumeCredits(orgId, 50);
       if (!credits.success) return mcpQuotaExceeded(userId, "delete_caption");
-      const result = await deleteCaption(videoId, userId, captionId);
+      const result = await deleteCaption(videoId, userId, captionId, orgId);
       logMcpRequest(userId, "delete_caption", 50, "error" in result ? 400 : 200);
       return toMcp(result);
     }

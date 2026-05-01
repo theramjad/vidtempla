@@ -572,6 +572,9 @@ export async function assignVideo(
       .where(channelOwnerFilter);
     const channelIds = channels.map((c) => c.id);
 
+    // Pre-fetch the plan limit (not race-sensitive — the value rarely changes
+    // mid-request). The actual race-sensitive check (current assigned count vs.
+    // limit) is performed inside the transaction below under an advisory lock.
     const limitCheck = await checkVideoLimit(organizationId ?? userId, db);
 
     const containerOwnerFilter = organizationId
@@ -655,6 +658,22 @@ export async function assignVideo(
           throw ASSIGN_CONFLICT;
         }
 
+        if (channelIds.length > 0) {
+          const [countResult] = await tx
+            .select({ assignedCount: count() })
+            .from(youtubeVideos)
+            .where(
+              and(
+                inArray(youtubeVideos.channelId, channelIds),
+                isNotNull(youtubeVideos.containerId),
+              ),
+            );
+
+          if ((countResult?.assignedCount ?? 0) >= limitCheck.limit) {
+            throw LIMIT_REACHED;
+          }
+        }
+
         // CAS update: only assign if container_id is still NULL. If a concurrent
         // assign already won, this returns 0 rows and we abort the transaction
         // to avoid silently overwriting the first assignment (and creating
@@ -672,22 +691,6 @@ export async function assignVideo(
 
         if (updated.length === 0) {
           throw ASSIGN_CONFLICT;
-        }
-
-        if (channelIds.length > 0) {
-          const [countResult] = await tx
-            .select({ assignedCount: count() })
-            .from(youtubeVideos)
-            .where(
-              and(
-                inArray(youtubeVideos.channelId, channelIds),
-                isNotNull(youtubeVideos.containerId),
-              ),
-            );
-
-          if ((countResult?.assignedCount ?? 0) > limitCheck.limit) {
-            throw LIMIT_REACHED;
-          }
         }
 
         if (variablesToCreate.length > 0) {
@@ -787,10 +790,20 @@ async function buildPushPayload(
     return null;
   }
 
-  const templatesList = await tx
-    .select({ id: templates.id, content: templates.content })
-    .from(templates)
-    .where(inArray(templates.id, video.container.templateOrder));
+  const templatesList = video.container.organizationId
+    ? await tx
+        .select({ id: templates.id, content: templates.content })
+        .from(templates)
+        .where(
+          and(
+            inArray(templates.id, video.container.templateOrder),
+            eq(templates.organizationId, video.container.organizationId)
+          )
+        )
+    : await tx
+        .select({ id: templates.id, content: templates.content })
+        .from(templates)
+        .where(inArray(templates.id, video.container.templateOrder));
 
   if (templatesList.length === 0) return null;
 
