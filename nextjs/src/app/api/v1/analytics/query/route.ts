@@ -1,23 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { withApiKey, apiSuccess, apiError, logRequest } from "@/lib/api-auth";
 import { queryAnalytics } from "@/lib/services/analytics";
+
+const isoDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, "Date must be a valid calendar date");
+
+const QuerySchema = z
+  .object({
+    channelId: z.string().min(1),
+    startDate: isoDateSchema,
+    endDate: isoDateSchema,
+    metrics: z.string().min(1).max(500),
+    dimensions: z.string().max(500).optional(),
+    filters: z.string().max(1000).optional(),
+    sort: z.string().max(500).optional(),
+    maxResults: z.number().int().positive().max(1000).optional(),
+  })
+  .refine((d) => d.startDate <= d.endDate, {
+    message: "startDate must be <= endDate",
+    path: ["startDate"],
+  });
 
 export async function POST(request: NextRequest) {
   const auth = await withApiKey(request);
   if (auth instanceof NextResponse) return auth;
 
-  let body: {
-    channelId?: string;
-    startDate?: string;
-    endDate?: string;
-    metrics?: string;
-    dimensions?: string;
-    filters?: string;
-    sort?: string;
-    maxResults?: number;
-  };
+  let rawBody: unknown;
   try {
-    body = await request.json();
+    rawBody = await request.json();
   } catch {
     logRequest(auth, "/analytics/query", "POST", 400, 0);
     return NextResponse.json(
@@ -26,26 +42,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { channelId, startDate, endDate, metrics } = body;
-
-  if (!channelId || !startDate || !endDate || !metrics) {
+  const parsed = QuerySchema.safeParse(rawBody);
+  if (!parsed.success) {
     logRequest(auth, "/analytics/query", "POST", 400, 0);
     return NextResponse.json(
-      apiError("MISSING_PARAMETER", "channelId, startDate, endDate, and metrics are required", "Provide all required fields. Example metrics: views,estimatedMinutesWatched,averageViewDuration. Dates in YYYY-MM-DD format.", 400),
+      apiError(
+        "VALIDATION_ERROR",
+        parsed.error.message,
+        "Check field types and ranges. Required: channelId, startDate (YYYY-MM-DD), endDate (YYYY-MM-DD), metrics (comma-separated, e.g. views,estimatedMinutesWatched). Optional: dimensions, filters, sort (strings), maxResults (1-1000).",
+        400
+      ),
       { status: 400 }
     );
   }
 
-  const result = await queryAnalytics(auth.userId, body as {
-    channelId: string;
-    startDate: string;
-    endDate: string;
-    metrics: string;
-    dimensions?: string;
-    filters?: string;
-    sort?: string;
-    maxResults?: number;
-  }, auth.organizationId);
+  const body = parsed.data;
+
+  const result = await queryAnalytics(auth.userId, body, auth.organizationId);
 
   if ("error" in result) {
     logRequest(auth, "/analytics/query", "POST", result.error.status, 0);
