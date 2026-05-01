@@ -97,7 +97,7 @@ export default function AuthCallback() {
         signInRedirectTimeoutRef.current = setTimeout(() => {
           if (redirectedRef.current) return;
 
-          redirectedRef.current = true;
+          signInRedirectTimeoutRef.current = null;
           router.push("/sign-in");
         }, SIGN_IN_REDIRECT_DELAY_MS);
       }
