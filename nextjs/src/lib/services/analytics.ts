@@ -6,6 +6,7 @@ import { fetchChannelAnalytics } from "@/lib/clients/youtube";
 import { start } from "workflow/api";
 import { syncChannelVideosWorkflow } from "@/workflows/sync-channel-videos";
 import axios from "axios";
+import { mapYouTubeServiceError } from "@/lib/youtube-errors";
 import type { ServiceResult } from "./types";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
@@ -151,8 +152,8 @@ export async function searchMyVideos(
     });
 
     return { data: response.data };
-  } catch {
-    return { error: { code: "YOUTUBE_API_ERROR", message: "Failed to search channel videos", suggestion: "Try again later", status: 500 } };
+  } catch (error) {
+    return { error: mapYouTubeServiceError(error) };
   }
 }
 
@@ -211,8 +212,8 @@ export async function searchYouTube(
     });
 
     return { data: response.data };
-  } catch {
-    return { error: { code: "YOUTUBE_API_ERROR", message: "Failed to search YouTube", suggestion: "Try again later or refine your query", status: 500 } };
+  } catch (error) {
+    return { error: mapYouTubeServiceError(error) };
   }
 }
 
