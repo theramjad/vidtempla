@@ -181,6 +181,9 @@ function MembersContent() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {pendingMemberId === m.id && (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              )}
               <Badge variant={roleBadgeVariant(m.role)} className="gap-1">
                 {roleIcon(m.role)}
                 {m.role}
@@ -189,11 +192,7 @@ function MembersContent() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" disabled={pendingMemberId === m.id}>
-                      {pendingMemberId === m.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <MoreHorizontal className="h-4 w-4" />
-                      )}
+                      <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">

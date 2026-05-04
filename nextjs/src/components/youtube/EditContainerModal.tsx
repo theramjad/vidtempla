@@ -70,6 +70,7 @@ export default function EditContainerModal({
 
   const updateMutation = api.dashboard.youtube.containers.update.useMutation();
   const getAffectedVideosMutation = api.dashboard.youtube.containers.getAffectedVideos.useMutation();
+  const isSaving = updateMutation.isPending || getAffectedVideosMutation.isPending;
 
   // Initialize form data on open and when container changes.
   // Depending on `open` ensures reopening the same container after a cancelled edit
@@ -339,17 +340,8 @@ export default function EditContainerModal({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={
-              updateMutation.isPending ||
-              getAffectedVideosMutation.isPending ||
-              !name.trim()
-            }
-          >
-            {(updateMutation.isPending || getAffectedVideosMutation.isPending) && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
+          <Button onClick={handleSave} disabled={isSaving || !name.trim()}>
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save Changes
           </Button>
         </DialogFooter>

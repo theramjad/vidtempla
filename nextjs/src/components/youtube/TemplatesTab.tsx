@@ -66,6 +66,7 @@ export default function TemplatesTab() {
   const updateMutation = api.dashboard.youtube.templates.update.useMutation();
   const deleteMutation = api.dashboard.youtube.templates.delete.useMutation();
   const getAffectedVideosMutation = api.dashboard.youtube.templates.getAffectedVideos.useMutation();
+  const isSaving = updateMutation.isPending || getAffectedVideosMutation.isPending;
 
   const handleCreate = async () => {
     if (!formData.name.trim()) {
@@ -362,13 +363,8 @@ export default function TemplatesTab() {
                 <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button
-                  onClick={handleEdit}
-                  disabled={updateMutation.isPending || getAffectedVideosMutation.isPending}
-                >
-                  {(updateMutation.isPending || getAffectedVideosMutation.isPending) && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
+                <Button onClick={handleEdit} disabled={isSaving}>
+                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Save Changes
                 </Button>
               </div>

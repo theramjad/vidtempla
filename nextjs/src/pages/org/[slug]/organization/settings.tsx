@@ -182,6 +182,7 @@ function OrgSettingsContent() {
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
+                    // Keep dialog mounted while delete is in flight; Radix closes on click by default.
                     onClick={(e) => {
                       e.preventDefault();
                       handleDelete();
