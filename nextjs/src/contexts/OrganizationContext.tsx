@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { useRouter } from "next/router";
 import { authClient } from "@/lib/auth-client";
 import { setOrganizationId } from "@/utils/api";
-import { api } from "@/utils/api";
 
 type OrgContextValue = {
   organizationId: string;
@@ -14,7 +13,35 @@ type OrgContextValue = {
   loading: boolean;
 };
 
+type OrganizationSummary = {
+  id: string;
+  slug?: string | null;
+  name: string;
+};
+
+type MembershipSummary = {
+  userId?: string | null;
+  role?: string | null;
+};
+
 const OrgContext = createContext<OrgContextValue | null>(null);
+const orgCacheBySlug = new Map<string, OrgContextValue>();
+
+function createOrgContextValue(
+  org: OrganizationSummary,
+  fallbackSlug: string,
+  role: string,
+): OrgContextValue {
+  return {
+    organizationId: org.id,
+    slug: org.slug ?? fallbackSlug,
+    name: org.name,
+    role,
+    isOwner: role === "owner",
+    isAdmin: role === "owner" || role === "admin",
+    loading: false,
+  };
+}
 
 export function useOrganization() {
   const ctx = useContext(OrgContext);
@@ -31,26 +58,42 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   const slug = router.query.slug as string | undefined;
   const [orgState, setOrgState] = useState<OrgContextValue | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const cachedOrgState = slug ? orgCacheBySlug.get(slug) ?? null : null;
+  const effectiveOrgState =
+    orgState?.slug === slug ? orgState : cachedOrgState;
 
   useEffect(() => {
     if (!slug) return;
+    const activeSlug: string = slug;
 
     let cancelled = false;
+    const cachedOrg = orgCacheBySlug.get(activeSlug) ?? null;
+    if (cachedOrg) {
+      setOrgState(cachedOrg);
+      setOrganizationId(cachedOrg.organizationId);
+    } else {
+      setOrgState(null);
+    }
+    setError(null);
 
     async function resolveOrg() {
       try {
         // Gate on session before anything else. If the user just signed out
         // (or their session expired), send them to /sign-in, not /org/resolve
         // — /org/resolve would show "create organization" to a signed-out user.
-        const { data: sessionData } = await authClient.getSession();
+        const orgsPromise = authClient.organization.list().catch((err: unknown) => ({
+          data: null,
+          error: err,
+        }));
+        const sessionResult = await authClient.getSession();
+        const { data: sessionData } = sessionResult;
         if (cancelled) return;
         if (!sessionData?.user) {
           router.replace("/sign-in");
           return;
         }
 
-        const { data: orgs, error: listError } =
-          await authClient.organization.list();
+        const { data: orgs, error: listError } = await orgsPromise;
         if (cancelled) return;
 
         if (listError) {
@@ -59,7 +102,9 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
             router.replace("/sign-in");
             return;
           }
-          setError("Failed to load organization");
+          if (!cachedOrg) {
+            setError("Failed to load organization");
+          }
           return;
         }
 
@@ -68,44 +113,42 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const org = orgs.find((o: any) => o.slug === slug);
+        const org = orgs.find((o: any) => o.slug === activeSlug);
         if (!org) {
           router.replace("/org/resolve");
           return;
         }
 
-        await authClient.organization.setActive({ organizationId: org.id });
-        if (cancelled) return;
-
         setOrganizationId(org.id);
+        const activeOrganizationId = (
+          sessionData.session as { activeOrganizationId?: string | null } | undefined
+        )?.activeOrganizationId;
+        if (activeOrganizationId !== org.id) {
+          await authClient.organization.setActive({ organizationId: org.id });
+          if (cancelled) return;
+        }
 
         const { data: fullOrg } = await authClient.organization.getFullOrganization();
         if (cancelled) return;
 
         const myMembership = fullOrg?.members?.find(
-          (m: any) => m.userId === sessionData.user.id
+          (m: MembershipSummary) => m.userId === sessionData.user.id
         ) ?? null;
         const role = myMembership?.role ?? "member";
+        const nextOrgState = createOrgContextValue(org, activeSlug, role);
 
-        setOrgState({
-          organizationId: org.id,
-          slug: org.slug ?? slug,
-          name: org.name,
-          role,
-          isOwner: role === "owner",
-          isAdmin: role === "owner" || role === "admin",
-          loading: false,
-        });
+        orgCacheBySlug.set(activeSlug, nextOrgState);
+        setOrgState(nextOrgState);
       } catch (err) {
         if (!cancelled) {
           console.error("Failed to resolve organization:", err);
-          setError("Failed to load organization");
+          if (!cachedOrg) {
+            setError("Failed to load organization");
+          }
         }
       }
     }
 
-    setOrgState(null);
-    setError(null);
     resolveOrg();
 
     return () => {
@@ -129,7 +172,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!orgState) {
+  if (!effectiveOrgState) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-muted-foreground">Loading organization...</div>
@@ -137,5 +180,5 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  return <OrgContext.Provider value={orgState}>{children}</OrgContext.Provider>;
+  return <OrgContext.Provider value={effectiveOrgState}>{children}</OrgContext.Provider>;
 }
