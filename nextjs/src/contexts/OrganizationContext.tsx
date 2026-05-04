@@ -64,9 +64,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!slug) return;
+    const activeSlug: string = slug;
 
     let cancelled = false;
-    const cachedOrg = orgCacheBySlug.get(slug) ?? null;
+    const cachedOrg = orgCacheBySlug.get(activeSlug) ?? null;
     if (cachedOrg) {
       setOrgState(cachedOrg);
       setOrganizationId(cachedOrg.organizationId);
@@ -112,7 +113,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const org = orgs.find((o: any) => o.slug === slug);
+        const org = orgs.find((o: any) => o.slug === activeSlug);
         if (!org) {
           router.replace("/org/resolve");
           return;
@@ -134,9 +135,9 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           (m: MembershipSummary) => m.userId === sessionData.user.id
         ) ?? null;
         const role = myMembership?.role ?? "member";
-        const nextOrgState = createOrgContextValue(org, slug, role);
+        const nextOrgState = createOrgContextValue(org, activeSlug, role);
 
-        orgCacheBySlug.set(slug, nextOrgState);
+        orgCacheBySlug.set(activeSlug, nextOrgState);
         setOrgState(nextOrgState);
       } catch (err) {
         if (!cancelled) {
