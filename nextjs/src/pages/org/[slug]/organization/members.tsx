@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, MoreHorizontal, Trash2, Shield, Crown } from "lucide-react";
+import { UserPlus, MoreHorizontal, Trash2, Shield, Crown, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +36,9 @@ function MembersContent() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const [pendingMemberId, setPendingMemberId] = useState<string | null>(null);
+  const [cancellingInviteId, setCancellingInviteId] = useState<string | null>(null);
 
   // Fetch members using Better Auth client
   const { data: orgData, refetch } = useQuery({
@@ -50,7 +53,8 @@ function MembersContent() {
   const invitations = orgData?.invitations ?? [];
 
   async function handleInvite() {
-    if (!inviteEmail) return;
+    if (!inviteEmail || inviting) return;
+    setInviting(true);
     try {
       await authClient.organization.inviteMember({
         email: inviteEmail,
@@ -62,36 +66,50 @@ function MembersContent() {
       refetch();
     } catch (err: any) {
       toast({ variant: "destructive", title: "Failed to invite", description: err?.message || "Unknown error" });
+    } finally {
+      setInviting(false);
     }
   }
 
   async function handleRemoveMember(memberId: string) {
+    if (pendingMemberId) return;
+    setPendingMemberId(memberId);
     try {
       await authClient.organization.removeMember({ memberIdOrEmail: memberId });
       toast({ title: "Member removed" });
       refetch();
     } catch (err: any) {
       toast({ variant: "destructive", title: "Failed", description: err?.message || "Unknown error" });
+    } finally {
+      setPendingMemberId(null);
     }
   }
 
   async function handleUpdateRole(memberId: string, role: "admin" | "member") {
+    if (pendingMemberId) return;
+    setPendingMemberId(memberId);
     try {
       await authClient.organization.updateMemberRole({ memberId, role });
       toast({ title: "Role updated" });
       refetch();
     } catch (err: any) {
       toast({ variant: "destructive", title: "Failed", description: err?.message || "Unknown error" });
+    } finally {
+      setPendingMemberId(null);
     }
   }
 
   async function handleCancelInvitation(invitationId: string) {
+    if (cancellingInviteId) return;
+    setCancellingInviteId(invitationId);
     try {
       await authClient.organization.cancelInvitation({ invitationId });
       toast({ title: "Invitation cancelled" });
       refetch();
     } catch (err: any) {
       toast({ variant: "destructive", title: "Failed", description: err?.message || "Unknown error" });
+    } finally {
+      setCancellingInviteId(null);
     }
   }
 
@@ -139,7 +157,10 @@ function MembersContent() {
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button onClick={handleInvite} className="w-full">Send Invitation</Button>
+                <Button onClick={handleInvite} disabled={inviting || !inviteEmail} className="w-full">
+                  {inviting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Send Invitation
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -167,20 +188,36 @@ function MembersContent() {
               {isAdmin && m.role !== "owner" && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" disabled={pendingMemberId === m.id}>
+                      {pendingMemberId === m.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <MoreHorizontal className="h-4 w-4" />
+                      )}
+                    </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     {m.role === "member" && (
-                      <DropdownMenuItem onClick={() => handleUpdateRole(m.id, "admin")}>
+                      <DropdownMenuItem
+                        disabled={pendingMemberId === m.id}
+                        onClick={() => handleUpdateRole(m.id, "admin")}
+                      >
                         <Shield className="mr-2 h-4 w-4" />Make Admin
                       </DropdownMenuItem>
                     )}
                     {m.role === "admin" && isOwner && (
-                      <DropdownMenuItem onClick={() => handleUpdateRole(m.id, "member")}>
+                      <DropdownMenuItem
+                        disabled={pendingMemberId === m.id}
+                        onClick={() => handleUpdateRole(m.id, "member")}
+                      >
                         Remove Admin
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem className="text-destructive" onClick={() => handleRemoveMember(m.id)}>
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      disabled={pendingMemberId === m.id}
+                      onClick={() => handleRemoveMember(m.id)}
+                    >
                       <Trash2 className="mr-2 h-4 w-4" />Remove
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -205,7 +242,15 @@ function MembersContent() {
                     <p className="text-xs text-muted-foreground">Invited as {inv.role}</p>
                   </div>
                   {isAdmin && (
-                    <Button variant="ghost" size="sm" onClick={() => handleCancelInvitation(inv.id)}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={cancellingInviteId === inv.id}
+                      onClick={() => handleCancelInvitation(inv.id)}
+                    >
+                      {cancellingInviteId === inv.id && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
                       Cancel
                     </Button>
                   )}

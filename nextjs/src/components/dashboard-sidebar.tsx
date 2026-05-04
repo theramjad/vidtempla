@@ -30,6 +30,7 @@ import {
   Users,
   Building2,
   ChevronsUpDown,
+  Loader2,
 } from "lucide-react";
 import { Progress } from "./ui/progress";
 import { useRouter } from "next/router";
@@ -69,6 +70,7 @@ function OrgSwitcher() {
   const [orgs, setOrgs] = useState<any[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [newOrgName, setNewOrgName] = useState("");
+  const [creating, setCreating] = useState(false);
   const { toast } = useToast();
   const utils = api.useUtils();
 
@@ -92,7 +94,8 @@ function OrgSwitcher() {
   }
 
   async function handleCreate() {
-    if (!newOrgName.trim()) return;
+    if (!newOrgName.trim() || creating) return;
+    setCreating(true);
     try {
       const { data } = await authClient.organization.create({
         name: newOrgName.trim(),
@@ -107,6 +110,8 @@ function OrgSwitcher() {
       }
     } catch (err: any) {
       toast({ variant: "destructive", title: "Failed", description: err?.message || "Unknown error" });
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -174,7 +179,10 @@ function OrgSwitcher() {
               onChange={(e) => setNewOrgName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleCreate()}
             />
-            <Button onClick={handleCreate} className="w-full">Create</Button>
+            <Button onClick={handleCreate} disabled={creating || !newOrgName.trim()} className="w-full">
+              {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Create
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

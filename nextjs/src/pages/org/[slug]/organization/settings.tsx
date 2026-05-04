@@ -31,6 +31,7 @@ function OrgSettingsContent() {
   const isDirtyRef = useRef(false);
   const saveRequestIdRef = useRef(0);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [orgCount, setOrgCount] = useState<number | null>(null);
 
   const { data: plan } = api.dashboard.billing.getCurrentPlan.useQuery();
@@ -113,6 +114,8 @@ function OrgSettingsContent() {
   }
 
   async function handleDelete() {
+    if (deleting) return;
+    setDeleting(true);
     try {
       await authClient.organization.delete({ organizationId });
       localStorage.removeItem("lastOrgSlug");
@@ -122,6 +125,7 @@ function OrgSettingsContent() {
       router.replace("/org/resolve");
     } catch (err: any) {
       toast({ variant: "destructive", title: "Failed", description: err?.message || "Unknown error" });
+      setDeleting(false);
     }
   }
 
@@ -177,8 +181,15 @@ function OrgSettingsContent() {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                    Delete
+                  <AlertDialogAction
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleDelete();
+                    }}
+                    disabled={deleting}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deleting ? "Deleting..." : "Delete"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

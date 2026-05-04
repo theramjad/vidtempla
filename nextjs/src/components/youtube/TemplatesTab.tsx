@@ -362,8 +362,13 @@ export default function TemplatesTab() {
                 <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleEdit} disabled={updateMutation.isPending}>
-                  {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Button
+                  onClick={handleEdit}
+                  disabled={updateMutation.isPending || getAffectedVideosMutation.isPending}
+                >
+                  {(updateMutation.isPending || getAffectedVideosMutation.isPending) && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   Save Changes
                 </Button>
               </div>

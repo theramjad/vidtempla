@@ -22,6 +22,7 @@ export default function InvitePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
+  const [declining, setDeclining] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -78,7 +79,8 @@ export default function InvitePage() {
   }
 
   async function handleDecline() {
-    if (!token) return;
+    if (!token || declining) return;
+    setDeclining(true);
     try {
       await authClient.organization.rejectInvitation({
         invitationId: token,
@@ -152,11 +154,16 @@ export default function InvitePage() {
                   </div>
                 )}
                 <div className="flex gap-3">
-                  <Button onClick={handleAccept} disabled={accepting} className="flex-1">
+                  <Button onClick={handleAccept} disabled={accepting || declining} className="flex-1">
                     {accepting ? "Accepting..." : "Accept"}
                   </Button>
-                  <Button variant="outline" onClick={handleDecline} className="flex-1">
-                    Decline
+                  <Button
+                    variant="outline"
+                    onClick={handleDecline}
+                    disabled={accepting || declining}
+                    className="flex-1"
+                  >
+                    {declining ? "Declining..." : "Decline"}
                   </Button>
                 </div>
               </div>

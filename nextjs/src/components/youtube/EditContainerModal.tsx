@@ -339,8 +339,15 @@ export default function EditContainerModal({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={updateMutation.isPending || !name.trim()}>
-            {updateMutation.isPending && (
+          <Button
+            onClick={handleSave}
+            disabled={
+              updateMutation.isPending ||
+              getAffectedVideosMutation.isPending ||
+              !name.trim()
+            }
+          >
+            {(updateMutation.isPending || getAffectedVideosMutation.isPending) && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
             Save Changes
